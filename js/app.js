@@ -57,13 +57,13 @@ async function loadAlerts() {
     const r = await fetch(`${CONFIG.alertsUrl}${CONFIG.alertsUrl.includes("?") ? "&" : "?"}t=${Math.floor(Date.now() / 60000)}`, { cache: "no-store" });
     if (!r.ok) throw new Error(r.status);
     const j = await r.json();
-    alertsData = { loaded: true, ok: true, updated: j.updated || null, items: Array.isArray(j.items) ? j.items : [] };
-    try { localStorage.setItem(ALERTS_CACHE, JSON.stringify({ updated: alertsData.updated, items: alertsData.items })); } catch { /* brak miejsca / tryb prywatny */ }
+    alertsData = { loaded: true, ok: true, updated: j.updated || null, items: Array.isArray(j.items) ? j.items : [], telegram: j.telegram && typeof j.telegram === "object" ? j.telegram : {} };
+    try { localStorage.setItem(ALERTS_CACHE, JSON.stringify({ updated: alertsData.updated, items: alertsData.items, telegram: alertsData.telegram })); } catch { /* brak miejsca / tryb prywatny */ }
   } catch {
     // Brak sieci: pokaż ostatnio pobrane dane. O tym, czy są aktualne, decyduje alertsFresh() (wiek danych).
     let c = null;
     try { c = JSON.parse(localStorage.getItem(ALERTS_CACHE) || "null"); } catch { /* uszkodzone */ }
-    if (c && Array.isArray(c.items)) alertsData = { loaded: true, ok: true, updated: c.updated || null, items: c.items };
+    if (c && Array.isArray(c.items)) alertsData = { loaded: true, ok: true, updated: c.updated || null, items: c.items, telegram: c.telegram || {} };
     else alertsData = { ...alertsData, loaded: true, ok: false };
   }
 }
@@ -329,7 +329,7 @@ function screenWynik() {
 
 function screenUstawienia() {
   const c = state.consent;
-  const tg = state.region && CONFIG.telegram[state.region] ? safeUrl(CONFIG.telegram[state.region]) : "";
+  const tg = state.region ? safeUrl(CONFIG.telegram[state.region] || alertsData.telegram?.[state.region] || "") : "";
   const opt = (v, cur, t) => `<option value="${v}" ${cur === v ? "selected" : ""}>${t}</option>`;
   return `<div class="hero"><h1>Ustawienia</h1></div>
   <div class="card"><h2>Region i lokalizacja</h2><div class="field" style="margin-top:8px"><label for="setRegion" class="muted small">Województwo${state.regionSource === "gps" ? ' <span class="tag-gps">wg GPS (przybliżone – sprawdź)</span>' : ""}</label>
@@ -443,6 +443,6 @@ window.addEventListener("hashchange", () => { if (parse().route === "test" && !p
 applyPrefs(); applyCounter();
 testAnswers = { ...(state.test?.answers || {}) };
 render();
-loadAlerts().then(() => { if (state.onboarded && ["pulpit", "alerty", ""].includes(parse().route) && !document.activeElement?.closest?.("select")) render(); });
-setInterval(() => loadAlerts().then(() => { if (["pulpit", "alerty"].includes(parse().route) && !document.activeElement?.closest?.("select")) render(); }), 5 * 60 * 1000);
+loadAlerts().then(() => { if (state.onboarded && ["pulpit", "alerty", "ustawienia", ""].includes(parse().route) && !document.activeElement?.closest?.("select")) render(); });
+setInterval(() => loadAlerts().then(() => { if (["pulpit", "alerty", "ustawienia"].includes(parse().route) && !document.activeElement?.closest?.("select")) render(); }), 5 * 60 * 1000);
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});

@@ -75,7 +75,7 @@ async function main() {
   for (const a of fresh) if (!byId.has(a.id) && !(a.validTo && new Date(a.validTo).getTime() < now)) byId.set(a.id, a);
   const items = [...byId.values()].sort((a, b) => (b.published || "").localeCompare(a.published || "")).slice(0, MAX_ITEMS);
   await mkdir(path.dirname(OUT), { recursive: true });
-  await writeFile(OUT, JSON.stringify({ updated: new Date().toISOString(), source: "RSO (komunikaty.tvp.pl)", items }, null, 1));
+  await writeFile(OUT, JSON.stringify({ updated: new Date().toISOString(), source: "RSO (komunikaty.tvp.pl)", telegram: Object.fromEntries(Object.entries(TG_CHANNELS).filter(([, c]) => /^@[A-Za-z0-9_]{5,32}$/.test(c)).map(([id, c]) => [id, "https://t.me/" + c.slice(1)])), items }, null, 1));
   console.log(`Zapisano ${items.length} komunikatów (nowych w pobraniu: ${fresh.filter((a) => !(previous.items || []).some((p) => p.id === a.id)).length}).`);
 
   // Telegram: tylko nowe, tylko ważne typy, tylko z ostatnich 6 godzin (żeby po pierwszym uruchomieniu nie zalać kanałów).
