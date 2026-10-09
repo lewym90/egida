@@ -1,0 +1,16 @@
+{
+  "name": "egida-server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Pobiera komunikaty RSO, zapisuje data/alerts.json i wysyła nowe komunikaty na kanały Telegram.",
+  "scripts": {
+    "poll": "node poll.mjs",
+    "dump": "node poll.mjs --dump",
+    "test": "node test.mjs"
+  },
+  "dependencies": {
+    "fast-xml-parser": "^4.5.0"
+  },
+  "engines": { "node": ">=20" }
+}
