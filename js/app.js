@@ -71,7 +71,7 @@ const alertsFresh = () => {
   if (!alertsData.ok || !alertsData.updated) return false;
   return (Date.now() - new Date(alertsData.updated).getTime()) / 60000 <= CONFIG.staleAfterMin;
 };
-const regionAlerts = () => alertsData.items.filter((a) => !state.region || a.voivodeship === state.region || a.voivodeship === "all");
+const regionAlerts = () => alertsData.items.filter((a) => !(a.validTo && new Date(a.validTo).getTime() < Date.now())).filter((a) => !state.region || a.voivodeship === state.region || a.voivodeship === "all");
 const fmtDate = (iso) => {
   if (!iso) return "";
   const d = new Date(iso);

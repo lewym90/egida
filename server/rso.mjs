@@ -18,10 +18,13 @@ export const VOIVODESHIPS = {
 // Nazwy pól do przeszukania (małe litery, bez polskich znaków diakrytycznych w porównaniu).
 export const FIELD_MAP = {
   title: ["title", "tytul", "name", "nazwa"],
-  body: ["description", "opis", "tresc", "content", "body", "text", "summary"],
-  date: ["pubdate", "published", "date", "data", "created", "updated", "datapublikacji"],
+  body: ["content", "description", "opis", "tresc", "body", "text", "shortcut", "summary"],
+  date: ["validfrom", "pubdate", "published", "date", "data", "createdat", "created", "datapublikacji"],
+  validTo: ["validto", "expires", "wazneDo"],
+  alarm: ["rsoalarm", "alarm"],
+  water: ["rivername", "waterlevelvalue", "waterlevelalarmstatusvalue"],
   link: ["link", "url", "href"],
-  region: ["wojewodztwo", "voivodeship", "region", "obszar", "area"],
+  region: ["provinces", "province", "wojewodztwo", "voivodeship", "region", "obszar", "area"],
   category: ["category", "kategoria", "type", "typ", "rodzaj"],
   id: ["guid", "id", "uuid", "nid"],
 };
@@ -34,9 +37,21 @@ const text = (v) => {
   return String(v).replace(/<[^>]*>/g, " ").replace(/&nbsp;/g, " ").replace(/\s+/g, " ").trim();
 };
 const pick = (obj, names) => {
-  for (const k of Object.keys(obj)) if (names.includes(norm(k).replace(/[^a-z0-9]/g, ""))) { const t = text(obj[k]); if (t) return t; }
+  const keys = Object.keys(obj).map((k) => [norm(k).replace(/[^a-z0-9]/g, ""), k]);
+  for (const n of names) for (const [nk, k] of keys) if (nk === n.toLowerCase()) { const t = text(obj[k]); if (t) return t; }
   return "";
 };
+
+// RSO podaje czas bez strefy („2026-10-09 17:35:00”) – to czas polski (Europe/Warsaw), niezależnie od strefy serwera.
+export function parseWarsaw(str) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})(?::(\d{2}))?$/.exec(String(str || "").trim());
+  if (!m) { const d = new Date(str); return isNaN(d) ? null : d; }
+  const [y, mo, d, h, mi, se] = m.slice(1).map((x) => Number(x || 0));
+  const guess = Date.UTC(y, mo - 1, d, h, mi, se);
+  const off = (t) => { const p = new Intl.DateTimeFormat("en-US", { timeZone: "Europe/Warsaw", hourCycle: "h23", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit" }).formatToParts(new Date(t)).reduce((a, x) => (a[x.type] = x.value, a), {}); return Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute, p.second) - t; };
+  let t = guess - off(guess); t = guess - off(t);
+  return new Date(t);
+}
 
 export function findItems(node, depth = 0) {
   if (!node || typeof node !== "object" || depth > 8) return [];
@@ -88,14 +103,17 @@ export function parseRso(xml) {
     let regions = detectRegion(regionText);
     if (!regions.length) regions = detectRegion(title, body);
     const dateRaw = pick(r, FIELD_MAP.date);
-    const d = dateRaw ? new Date(dateRaw) : null;
+    const d = dateRaw ? parseWarsaw(dateRaw) : null;
+    const to = pick(r, FIELD_MAP.validTo);
+    const dTo = to ? parseWarsaw(to) : null;
     const category = pick(r, FIELD_MAP.category);
-    const type = detectType(category, title, body);
+    const type = pick(r, FIELD_MAP.water) ? "woda" : detectType(category, title, body);
+    const alarm = ["1", "true"].includes(pick(r, FIELD_MAP.alarm).toLowerCase());
     const link = pick(r, FIELD_MAP.link);
     const id = pick(r, FIELD_MAP.id) || idFor(`${title}|${dateRaw}|${regions.join(",")}`);
     const base = {
       title: title || body.slice(0, 120), body: title && body ? body.slice(0, 600) : "", type,
-      published: d && !isNaN(d) ? d.toISOString() : null, url: /^https?:\/\//.test(link) ? link : "", source: "RSO (komunikaty.tvp.pl)",
+      published: d && !isNaN(d) ? d.toISOString() : null, validTo: dTo && !isNaN(dTo) ? dTo.toISOString() : null, alarm, url: /^https?:\/\//.test(link) ? link : "", source: "RSO (komunikaty.tvp.pl)",
     };
     // Komunikat bez rozpoznanego województwa trafia do „all” (widoczny wszędzie), żeby niczego nie zgubić.
     if (!regions.length) items.push({ ...base, id: `${id}:all`, voivodeship: "all" });

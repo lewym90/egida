@@ -9,8 +9,7 @@ import { XMLParser } from "fast-xml-parser";
 const here = path.dirname(fileURLToPath(import.meta.url));
 const OUT = process.env.ALERTS_OUT || path.join(here, "..", "data", "alerts.json");
 const STATE = process.env.STATE_FILE || path.join(here, "state.json");
-const MAX_ITEMS = 300;
-const MAX_AGE_DAYS = 7;
+const MAX_ITEMS = 500;
 
 const TG_TOKEN = process.env.TELEGRAM_BOT_TOKEN || "";
 // JSON: {"mazowieckie":"@egida_mazowieckie", ...} – publiczne kanały (bot musi być ich administratorem).
@@ -66,13 +65,11 @@ async function main() {
     return;
   }
 
-  const cutoff = Date.now() - MAX_AGE_DAYS * 864e5;
+  // Tylko to, co RSO podaje TERAZ i nie wygasło. Komunikat, który zniknął z RSO (odwołany), znika też u nas.
+  const now = Date.now();
   const byId = new Map();
-  for (const a of [...fresh, ...(previous.items || [])]) if (!byId.has(a.id)) byId.set(a.id, a);
-  const items = [...byId.values()]
-    .filter((a) => !a.published || new Date(a.published).getTime() >= cutoff)
-    .sort((a, b) => (b.published || "").localeCompare(a.published || ""))
-    .slice(0, MAX_ITEMS);
+  for (const a of fresh) if (!byId.has(a.id) && !(a.validTo && new Date(a.validTo).getTime() < now)) byId.set(a.id, a);
+  const items = [...byId.values()].sort((a, b) => (b.published || "").localeCompare(a.published || "")).slice(0, MAX_ITEMS);
   await mkdir(path.dirname(OUT), { recursive: true });
   await writeFile(OUT, JSON.stringify({ updated: new Date().toISOString(), source: "RSO (komunikaty.tvp.pl)", items }, null, 1));
   console.log(`Zapisano ${items.length} komunikatów (nowych w pobraniu: ${fresh.filter((a) => !(previous.items || []).some((p) => p.id === a.id)).length}).`);
@@ -80,7 +77,7 @@ async function main() {
   // Telegram: tylko nowe, tylko ważne typy, tylko z ostatnich 6 godzin (żeby po pierwszym uruchomieniu nie zalać kanałów).
   const isFirstRun = !Object.keys(state.sent).length;
   const recent = Date.now() - 6 * 36e5;
-  const toSend = fresh.filter((a) => !state.sent[a.id] && TG_TYPES.has(a.type) && (!a.published || new Date(a.published).getTime() >= recent));
+  const toSend = fresh.filter((a) => !state.sent[a.id] && (TG_TYPES.has(a.type) || a.alarm) && (!a.published || new Date(a.published).getTime() >= recent));
   for (const a of fresh) if (!state.sent[a.id]) state.sent[a.id] = Date.now();
   if (!TG_TOKEN) { if (toSend.length) console.log(`Telegram wyłączony (brak TELEGRAM_BOT_TOKEN). Do wysłania byłoby: ${toSend.length}.`); }
   else if (isFirstRun && !process.env.TELEGRAM_SEND_ON_FIRST_RUN) console.log("Pierwsze uruchomienie: zapamiętuję komunikaty bez wysyłania (ustaw TELEGRAM_SEND_ON_FIRST_RUN=1, aby wysłać).");
