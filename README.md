@@ -3,7 +3,7 @@
 Darmowa, nieoficjalna aplikacja PWA (bez reklam, konta i sprzedaży danych). Opis projektu: `EGIDA-KOMPLET.md` (w projekcie Claude).
 
 ## Co jest w tej wersji (etap 1 / MVP)
-Start i zgody · Pulpit z wyborem województwa · Alerty (z pliku `data/alerts.json`) · Poradnik „Co robić” · Pierwsza pomoc z metronomem RKO · Plecak i zapasy · Test gotowości · Ustawienia · Źródła i licencje · tryb offline (service worker) · wersja na komputer.
+Start i zgody · Pulpit z wyborem województwa · Alerty (z gałęzi `data`, odświeżanej przez serwer) · Poradnik „Co robić” · Pierwsza pomoc z metronomem RKO · Plecak i zapasy · Test gotowości · Ustawienia · Źródła i licencje · tryb offline (service worker) · wersja na komputer.
 **Jeszcze nie ma:** Mapy, Schronów, NEPTUN, Planu rodziny, push z PWA (patrz „Etap 2” poniżej).
 
 ## Uruchomienie lokalne
@@ -25,7 +25,7 @@ node poll.mjs --dump    # PIERWSZE URUCHOMIENIE: pokaże prawdziwą strukturę X
 node poll.mjs           # zapisuje ../data/alerts.json
 ```
 Zmienne środowiskowe: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHANNELS` (JSON, np. `{"mazowieckie":"@egida_mazowieckie"}`), opcjonalnie `TELEGRAM_TYPES` (domyślnie `rcb,pogoda,woda`), `APP_URL`.
-Cron co 5 min: `*/5 * * * * /ścieżka/do/egida/server/publish.sh` (pobiera, a przy zmianie commituje `data/alerts.json`, Pages odświeża się sam).
+Na serwerze: `bash server/install.sh` (osobny użytkownik `egida`, folder `/opt/egida`), potem `bash server/install.sh --cron`. `run.sh` co 5 min pobiera RSO, a przy zmianie (lub co ≥25 min) wypycha `alerts.json` na gałąź `data` (jeden nadpisywany commit; nie uruchamia budowania GitHub Pages).
 Bez tokenu skrypt działa „na sucho”: zapisuje dane, niczego nie wysyła. Przy pierwszym uruchomieniu nie wysyła historii na kanały.
 
 ## Zasady, które pilnuje kod

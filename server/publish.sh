@@ -1,12 +1,17 @@
 #!/usr/bin/env bash
-# Uruchamiane na VPS co 5 minut: pobiera komunikaty i, jeśli plik się zmienił, wypycha go do repozytorium
-# (GitHub Pages sam się wtedy odświeży). Wymaga sklonowanego repo z kluczem deploy (zapis).
+# Wypycha data/alerts.json na osobną gałąź „data” (jeden commit, nadpisywany – repozytorium nie puchnie).
+# GitHub Pages (gałąź main) NIE jest przez to odświeżane, więc nie ma limitu budowań.
+# Wywoływane z run.sh. Wymaga zmiennych: DATA_DIR, GH_TOKEN, EGIDA_REMOTE.
 set -euo pipefail
-cd "$(dirname "$0")"
-node poll.mjs
-cd ..
-if ! git diff --quiet -- data/alerts.json; then
-  git add data/alerts.json
-  git -c user.name="egida-bot" -c user.email="egida-bot@users.noreply.github.com" commit -m "Aktualizacja komunikatów" -q
-  git pull --rebase -q && git push -q
+cd "$DATA_DIR"
+git add alerts.json
+if git rev-parse -q --verify HEAD >/dev/null; then
+  git -c user.name="egida-bot" -c user.email="egida-bot@users.noreply.github.com" commit --amend --reset-author -q -m "Dane komunikatów"
+else
+  git -c user.name="egida-bot" -c user.email="egida-bot@users.noreply.github.com" commit -q -m "Dane komunikatów"
 fi
+AUTH=()
+case "$EGIDA_REMOTE" in
+  https://*) AUTH=(-c "http.extraheader=Authorization: Basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)") ;;
+esac
+git "${AUTH[@]}" push -q --force origin HEAD:refs/heads/data

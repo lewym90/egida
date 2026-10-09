@@ -51,14 +51,20 @@ const applyPrefs = () => {
 
 /* ---------- komunikaty ---------- */
 let alertsData = { loaded: false, ok: false, updated: null, items: [] };
+const ALERTS_CACHE = "egida.alerts.v1";
 async function loadAlerts() {
   try {
     const r = await fetch(`${CONFIG.alertsUrl}${CONFIG.alertsUrl.includes("?") ? "&" : "?"}t=${Math.floor(Date.now() / 60000)}`, { cache: "no-store" });
     if (!r.ok) throw new Error(r.status);
     const j = await r.json();
     alertsData = { loaded: true, ok: true, updated: j.updated || null, items: Array.isArray(j.items) ? j.items : [] };
+    try { localStorage.setItem(ALERTS_CACHE, JSON.stringify({ updated: alertsData.updated, items: alertsData.items })); } catch { /* brak miejsca / tryb prywatny */ }
   } catch {
-    alertsData = { ...alertsData, loaded: true, ok: false };
+    // Brak sieci: pokaż ostatnio pobrane dane. O tym, czy są aktualne, decyduje alertsFresh() (wiek danych).
+    let c = null;
+    try { c = JSON.parse(localStorage.getItem(ALERTS_CACHE) || "null"); } catch { /* uszkodzone */ }
+    if (c && Array.isArray(c.items)) alertsData = { loaded: true, ok: true, updated: c.updated || null, items: c.items };
+    else alertsData = { ...alertsData, loaded: true, ok: false };
   }
 }
 const alertsFresh = () => {
