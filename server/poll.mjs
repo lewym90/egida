@@ -15,6 +15,10 @@ const TG_TOKEN = process.env.TELEGRAM_BOT_TOKEN || "";
 // JSON: {"mazowieckie":"@egida_mazowieckie", ...} – publiczne kanały (bot musi być ich administratorem).
 let TG_CHANNELS = {};
 try { TG_CHANNELS = JSON.parse(process.env.TELEGRAM_CHANNELS || "{}"); } catch { console.error("TELEGRAM_CHANNELS: niepoprawny JSON"); }
+// Prostsza konfiguracja: TELEGRAM_PREFIX=egida_ i TELEGRAM_REGIONS=lodzkie,mazowieckie => @egida_lodzkie, @egida_mazowieckie.
+for (const id of (process.env.TELEGRAM_REGIONS || "").split(",").map((x) => x.trim()).filter(Boolean)) {
+  TG_CHANNELS[id] ??= "@" + (process.env.TELEGRAM_PREFIX || "egida_") + id.replace(/-/g, "_");
+}
 const APP_URL = process.env.APP_URL || "";
 
 const NAMES = { dolnoslaskie: "Dolnośląskie", "kujawsko-pomorskie": "Kujawsko-pomorskie", lubelskie: "Lubelskie", lubuskie: "Lubuskie", lodzkie: "Łódzkie", malopolskie: "Małopolskie", mazowieckie: "Mazowieckie", opolskie: "Opolskie", podkarpackie: "Podkarpackie", podlaskie: "Podlaskie", pomorskie: "Pomorskie", slaskie: "Śląskie", swietokrzyskie: "Świętokrzyskie", "warminsko-mazurskie": "Warmińsko-mazurskie", wielkopolskie: "Wielkopolskie", zachodniopomorskie: "Zachodniopomorskie" };
