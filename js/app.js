@@ -176,7 +176,7 @@ function screenPulpit() {
   }
   const tile = (h, i, t, soon) => `<a class="tile ${soon ? "soon" : ""}" href="${h}"><span class="ti">${i}</span><b>${t}</b>${soon ? '<span class="badge soon" style="align-self:flex-start">wkrótce</span>' : ""}</a>`;
   const steps = r.steps.map((s, i) => `<li><span class="dot ${s.done ? "done" : ""}">${s.done ? "✓" : i + 1}</span>${s.done ? `<span class="muted">${esc(s.t)}</span>` : `<a href="${s.h}">${esc(s.t)}</a>`}</li>`).join("");
-  const last = list.slice(0, 3).map(msgItem).join("");
+  const last = groupAlerts(list).slice(0, 3).map(groupItem).join("");
   return `<div class="hero"><h1>Pulpit</h1></div>${status}
   <div class="card"><div class="row"><div><div class="muted small">Twoja gotowość</div><div class="big-num">${r.pct}%</div></div><div style="flex:1"><div class="progress" role="progressbar" aria-valuenow="${r.pct}" aria-valuemin="0" aria-valuemax="100" aria-label="Gotowość"><i style="width:${r.pct}%"></i></div></div></div>
   <ul class="steps">${steps}</ul></div>
@@ -184,10 +184,37 @@ function screenPulpit() {
   ${last ? `<h2 style="margin-top:20px">Ostatnie komunikaty</h2><div class="card flat"><ul class="list">${last}</ul></div>` : ""}`;
 }
 
+/* Pilne na górze (alarm/RCB → pogoda → drogi → reszta), w obrębie grupy najnowsze pierwsze. Takie same tytuły zwijamy w jedną pozycję. */
+const PRIO = { rcb: 0, pogoda: 1, drogi: 2, woda: 3 };
+const prioOf = (a) => (a.alarm ? 0 : PRIO[a.type] ?? 4);
+const plural = (n) => (n === 1 ? "komunikat" : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14) ? "komunikaty" : "komunikatów");
+function groupAlerts(list) {
+  const map = new Map();
+  for (const a of list) {
+    const k = `${a.type}|${String(a.title).trim().toLowerCase()}`;
+    if (!map.has(k)) map.set(k, []);
+    map.get(k).push(a);
+  }
+  const groups = [...map.values()].map((items) => {
+    items.sort((x, y) => (y.published || "").localeCompare(x.published || ""));
+    return { items, prio: Math.min(...items.map(prioOf)), date: items[0].published || "" };
+  });
+  return groups.sort((x, y) => x.prio - y.prio || y.date.localeCompare(x.date));
+}
+function groupItem(g) {
+  if (g.items.length === 1) return msgItem(g.items[0]);
+  const a = g.items[0];
+  const type = { pogoda: "Pogoda", rcb: "Alert RCB", woda: "Woda", drogi: "Drogi" }[a.type] || "Komunikat";
+  const inner = g.items.map((x) => `<li style="margin:8px 0">${x.body ? esc(x.body) : esc(x.title)}<div class="muted small">${esc(fmtDate(x.published))}</div></li>`).join("");
+  return `<li class="msg"><details><summary style="cursor:pointer"><div class="meta"><span class="badge ${g.prio === 0 ? "danger" : "info"}">${esc(type)}</span><span>${esc(g.items.length)} ${plural(g.items.length)}</span></div>
+  <h3 style="display:inline">${esc(a.title)}</h3> <span class="muted small">(pokaż szczegóły)</span></summary><ul style="padding-left:18px;margin:8px 0">${inner}</ul>
+  <p class="src" style="margin:6px 0 0">Źródło: ${esc(a.source || "RSO")}</p></details></li>`;
+}
+
 function msgItem(a) {
   const type = { pogoda: "Pogoda", rcb: "Alert RCB", woda: "Woda", drogi: "Drogi" }[a.type] || "Komunikat";
   const url = safeUrl(a.url);
-  return `<li class="msg"><div class="meta"><span class="badge ${a.type === "rcb" ? "danger" : "info"}">${esc(type)}</span><span>${esc(fmtDate(a.published))}</span></div>
+  return `<li class="msg"><div class="meta"><span class="badge ${a.type === "rcb" || a.alarm ? "danger" : "info"}">${esc(type)}</span>${a.alarm ? '<span class="badge danger">Alarm</span>' : ""}<span>${esc(fmtDate(a.published))}</span></div>
   <h3>${esc(a.title)}</h3>${a.body ? `<p class="muted">${esc(a.body)}</p>` : ""}
   <p class="src" style="margin:6px 0 0">Źródło: ${esc(a.source || "RSO")}${url ? ` · <a href="${esc(url)}" target="_blank" rel="noopener noreferrer">Oryginał</a>` : ""}</p></li>`;
 }
@@ -199,7 +226,7 @@ function screenAlerty() {
   if (!state.region) body = `<div class="note warn">Wybierz województwo na górze ekranu, aby zobaczyć komunikaty.</div>`;
   else if (!alertsData.ok) body = `<div class="note warn">Nie udało się pobrać komunikatów. Sprawdź połączenie lub oficjalne źródła: <a href="https://komunikaty.tvp.pl" target="_blank" rel="noopener noreferrer">komunikaty.tvp.pl</a>.</div>`;
   else if (!list.length) body = `<div class="note neutral">Brak komunikatów tej kategorii dla województwa: ${esc(regionById(state.region)?.name)}.</div>`;
-  else body = `<div class="card flat"><ul class="list">${list.map(msgItem).join("")}</ul></div>`;
+  else body = `<div class="card flat"><ul class="list">${groupAlerts(list).map(groupItem).join("")}</ul></div>`;
   const stale = alertsData.ok && !alertsFresh() ? `<div class="banner-offline">Dane mogą być nieaktualne (ostatnia aktualizacja: ${esc(fmtDate(alertsData.updated) || "brak")}).</div>` : "";
   return `<div class="hero"><h1>Alerty</h1><p>Oficjalne komunikaty (RSO: Alert RCB, IMGW, woda, drogi) dla Twojego województwa.</p></div>
   <div class="chips" role="group" aria-label="Filtry">${chips}</div>${stale}${body}`;
