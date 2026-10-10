@@ -142,8 +142,12 @@ ok("buildView: strefa 200 km, areaOnly pomijane, sortowanie od granicy", () => {
     sample({ id: "e", status: "resolved", lat: 50.9, lon: 24.6 }),
     sample({ id: "f", lat: 50.9, lon: 24.6, updatedAt: new Date(NOW - 7200e3).toISOString(), confirmedAt: new Date(NOW - 7200e3).toISOString() }),
   ]);
-  const v = buildView(s, USER, true);
+  const v = buildView(s, USER, true, { nearOnly: true });
   assert.deepEqual(v.rows.map((r) => r.t.id), ["c", "a"]); assert.equal(v.areaOnly, 1); assert.equal(v.rows[0].zone.inPoland, true);
+  // domyślnie (od v15) mapa pokazuje wszystkie obiekty; dalekie są tylko wyświetlane, bez oceny wpływu na użytkownika
+  const all = buildView(s, USER, true);
+  assert.deepEqual(all.rows.map((r) => r.t.id), ["c", "a", "b"]);
+  assert.equal(all.rows[2].far, true); assert.equal(all.rows[2].assess.kind, "far"); assert.equal(all.rows[2].assess.severity, "info");
 });
 ok("ageText", () => { assert.equal(ageText(3), "przed chwilą"); assert.equal(ageText(45), "45 s temu"); assert.equal(ageText(300), "5 min temu"); assert.equal(ageText(null), "czas nieznany"); });
 ok("dane demonstracyjne są spójne i dają różne oceny", () => {

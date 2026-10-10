@@ -371,8 +371,9 @@ export function ageText(sec) {
   return `${Math.round(sec / 3600)} godz. temu`;
 }
 
-/** Wiersze do wyświetlenia. Domyślnie: obiekty w strefie przygranicznej (do LIMITS.zoneKm), od najbliższego granicy.
- *  opts.all = true: także głębiej w Ukrainie (bez ograniczenia strefy). opts.filter: "all" | "drones" | "fast". */
+/** Wiersze do wyświetlenia. Domyślnie WSZYSTKIE obiekty z pozycją (mapa ma pokazywać pełny obraz), od najbliższego granicy Polski.
+ *  Obiekty dalej niż LIMITS.zoneKm są tylko pokazywane: bez oceny wpływu na użytkownika i bez powiadomień.
+ *  opts.nearOnly = true: tylko strefa przygraniczna. opts.filter: "all" | "drones" | "fast". */
 export function buildView(store, user, feedFresh, opts = {}) {
   const now = store.nowMs();
   const rows = [], areaRows = [];
@@ -385,7 +386,7 @@ export function buildView(store, user, feedFresh, opts = {}) {
     if (upd != null && (now - upd) / 1000 > LIMITS.hideAfterSec) continue;
     const zone = zoneOf(t);
     const far = !zone.inPoland && zone.distKm > LIMITS.zoneKm;
-    if (far && !opts.all) { farHidden++; continue; }
+    if (far && opts.nearOnly === true) { farHidden++; continue; }
     if (!wantType(t)) continue;
     const at = t.confirmedAt ?? t.updatedAt;
     const ageSec = at != null ? Math.max(0, (now - at) / 1000) : null;
@@ -393,7 +394,7 @@ export function buildView(store, user, feedFresh, opts = {}) {
     if (t.areaOnly) { areaOnly++; areaRows.push({ t, zone, far, ageSec }); continue; }
     const pred = predict(t, now);
     const as = far
-      ? { kind: "far", severity: "info", text: `Obiekt jest daleko od granicy Polski (ok. ${fmtKm(zone.distKm)}). Poza strefą ${LIMITS.zoneKm} km nie oceniamy wpływu na Twoją pozycję.` }
+      ? { kind: "far", severity: "info", text: `Obiekt jest daleko od granicy Polski (ok. ${fmtKm(zone.distKm)}). Poza strefą ${LIMITS.zoneKm} km nie oceniamy wpływu na Twoją pozycję i nie wysyłamy powiadomień.` }
       : assess(t, user, now, { feedFresh, pred });
     rows.push({ t, zone, far, pred, ageSec, assess: as });
   }

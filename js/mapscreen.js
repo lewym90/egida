@@ -158,8 +158,8 @@ export function renderMapHtml(ctx, { demo = false, diag = false } = {}) {
       <button class="chip" data-nf="drones" aria-pressed="false">Drony</button>
       <button class="chip" data-nf="fast" aria-pressed="false">Rakiety i bomby</button>
     </div>
-    <label class="switch" style="margin-top:6px"><input type="checkbox" id="nepAll" ${lay.nepAll === true ? "checked" : ""}><span><b>Pokaż całą Ukrainę</b><span class="muted small">Domyślnie widać obiekty do ${LIMITS.zoneKm} km od granicy Polski. Po włączeniu także te dalej, bez oceny wpływu na Ciebie.</span></span></label>
-    <h2 style="margin-top:16px">Obiekty</h2>
+    <label class="switch" style="margin-top:6px"><input type="checkbox" id="nepNear" ${lay.nepNear === true ? "checked" : ""}><span><b>Tylko okolice granicy Polski</b><span class="muted small">Domyślnie widać wszystkie obiekty z danych NEPTUN. Po włączeniu zostaną tylko te do ${LIMITS.zoneKm} km od granicy. Odległe obiekty są tylko pokazywane: nie wywołują ocen ani powiadomień.</span></span></label>
+    <h2 style="margin-top:16px">Obiekty (od najbliższego granicy Polski)</h2>
     <div class="card flat"><ul class="list" id="nepList"></ul></div>
     <div id="nepAreaWrap" hidden><h2 style="margin-top:16px">Obserwacje bez dokładnej pozycji</h2>
       <p class="muted small" style="margin:0 0 6px">NEPTUN podaje tylko obwód. Nie rysujemy ich na mapie i nie oceniamy toru.</p>
@@ -283,6 +283,7 @@ export function initMapScreen(ctx, { demo = false, diag = false } = {}) {
 
     /* NEPTUN */
     let feed = null, timer = null, pending = null, lastRows = [], nepFilter = "all";
+    let fitDone = false; // jednorazowe dopasowanie widoku, gdy w kadrze nie ma żadnego obiektu (mapa nie może wyglądać na pustą)
     let openId = null, redrawing = false; // id obiektu z otwartą etykietą: odświeżanie nie może jej zamykać
     map.on("popupclose", () => { if (!redrawing) openId = null; });
     const store = demo ? new ThreatStore() : null;
@@ -299,7 +300,7 @@ export function initMapScreen(ctx, { demo = false, diag = false } = {}) {
       if (!on) { redrawing = false; openId = null; $("btnObjects").hidden = true; return; }
       if (demo) { store.applySnapshot(demoThreats(Date.now())); store.applyAlerts(demoAlerts(), demoRaions()); store.applyMessages(demoMessages(Date.now())); }
       const s = demo ? store : feed.store;
-      const view = buildView(s, user, feedFresh(), { all: ml().nepAll === true, filter: nepFilter });
+      const view = buildView(s, user, feedFresh(), { nearOnly: ml().nepNear === true, filter: nepFilter });
       lastRows = view.rows;
       const fs = demo ? { state: "live", via: "demo" } : feed.status();
       // status źródła
@@ -310,14 +311,14 @@ export function initMapScreen(ctx, { demo = false, diag = false } = {}) {
         msg = fs.state === "connecting" ? "Łączę z NEPTUN…" : "Brak połączenia z NEPTUN. Nie wiemy, co dzieje się przy granicy. To nie znaczy, że jest bezpiecznie. Kieruj się syrenami, Alertami RCB i oficjalnymi komunikatami.";
         if (fs.state !== "connecting") cls = "warn";
       } else if (!view.rows.length && !view.areaRows.length) {
-        msg = `W danych NEPTUN nie ma teraz obiektów w pobliżu granicy (do ${LIMITS.zoneKm} km). To nie znaczy, że jest bezpiecznie: NEPTUN może nie obejmować wszystkich kierunków (np. od strony Białorusi i Kaliningradu) ani nisko lecących obiektów.`;
+        msg = `W danych NEPTUN nie ma teraz żadnych obiektów z pozycją. To nie znaczy, że jest bezpiecznie: NEPTUN może nie obejmować wszystkich kierunków (np. od strony Białorusi i Kaliningradu) ani nisko lecących obiektów.`;
       } else {
         msg = `Źródło odpowiada (${fs.via === "ws" ? "na żywo" : "odświeżanie co " + Math.round(CONFIG.neptun.pollMs / 1000) + " s"}). Obiektów z pozycją: ${view.rows.length}.${view.areaOnly ? ` Bez dokładnej pozycji (tylko obwód): ${view.areaOnly}.` : ""}`;
       }
       const dataOk = demo || (feed.isFresh() && !fs.formatWarning);
       $("nepStatus").className = "note " + cls;
       $("nepStatus").textContent = msg;
-      $("nepList").innerHTML = dataOk && view.rows.length ? view.rows.slice(0, 30).map(itemHtml).join("") + (view.rows.length > 30 ? `<li class="obj muted small">…i ${view.rows.length - 30} dalszych.</li>` : "") : `<li class="obj muted">${dataOk ? "Brak obiektów." : "Brak aktualnych danych."}</li>`;
+      $("nepList").innerHTML = dataOk && view.rows.length ? view.rows.slice(0, 60).map(itemHtml).join("") + (view.rows.length > 60 ? `<li class="obj muted small">…i ${view.rows.length - 60} dalszych.</li>` : "") : `<li class="obj muted">${dataOk ? "Brak obiektów." : "Brak aktualnych danych."}</li>`;
       $("btnObjects").hidden = !(dataOk && view.rows.length);
       // podsumowanie, obserwacje bez pozycji, alarmy w Ukrainie, wiadomości, diagnostyka
       const sum = Object.entries(view.counts).sort((a, b) => b[1] - a[1]).map(([k, n]) => `${TYPES[k].label}: ${n}`).join(" · ");
@@ -341,14 +342,14 @@ export function initMapScreen(ctx, { demo = false, diag = false } = {}) {
         `Rekordy w ostatniej migawce: ${s.stats.seen}, odrzucone: ${s.stats.bad}`,
         `Alarmy w Ukrainie: ${ex.alertsAt ? "odebrane " + esc(hhmm(ex.alertsAt)) : "brak"}${ex.alertsErr ? ` · ${esc(ex.alertsErr)}` : ""}`,
         `Wiadomości: ${ex.messagesAt ? "odebrane " + esc(hhmm(ex.messagesAt)) : "brak"}${ex.messagesErr ? ` · ${esc(ex.messagesErr)}` : ""}`,
-        `Ukryte jako zbyt odległe: ${view.farHidden}`,
+        `Ukryte (włączone „Tylko okolice granicy”): ${view.farHidden}`,
       ].join("<br>");
       if (!dataOk) { redrawing = false; openId = null; return; } // bez świeżych danych nie rysujemy nic, co mogłoby sugerować obraz sytuacji
       view.rows.forEach((row, idx) => {
         const t = row.t, col = TYPES[t.type].kind === "fast" ? "#8A3B00" : "#B45309";
         const here = row.pred.ok ? row.pred.here : { lat: t.lat, lon: t.lon };
         if (t.posQuality === "approx" && t.uncertaintyKm >= 5) L.circle([t.lat, t.lon], { radius: Math.min(t.uncertaintyKm, 60) * 1000, color: col, weight: 1, opacity: 0.5, dashArray: "4 4", fillColor: col, fillOpacity: 0.06, interactive: false }).addTo(gThreats);
-        if (row.pred.ok) {
+        if (row.pred.ok && !row.far) {
           const end = destination(row.pred.here, row.pred.bearing, row.pred.horizonKm);
           if (row.pred.timed && TYPES[t.type].kind === "slow") {
             const c = coneOutline(row.pred);
@@ -363,6 +364,14 @@ export function initMapScreen(ctx, { demo = false, diag = false } = {}) {
         if (openId === String(t.id)) { const pp = mk.getPopup(); const ap = pp.options.autoPan; pp.options.autoPan = false; mk.openPopup(); pp.options.autoPan = ap; }
       });
       redrawing = false;
+      if (!fitDone && view.rows.length) {
+        fitDone = true;
+        const bnd = map.getBounds();
+        if (!view.rows.some((r) => bnd.contains([(r.pred.ok ? r.pred.here : r.t).lat, (r.pred.ok ? r.pred.here : r.t).lon]))) {
+          const pts = view.rows.map((r) => [(r.pred.ok ? r.pred.here : r.t).lat, (r.pred.ok ? r.pred.here : r.t).lon]);
+          map.fitBounds(pts, { padding: [30, 30], maxZoom: 7 });
+        }
+      }
       if (openId != null && !view.rows.some((r) => String(r.t.id) === openId)) openId = null; // obiekt zniknął z danych
     }
 
@@ -385,7 +394,7 @@ export function initMapScreen(ctx, { demo = false, diag = false } = {}) {
       $("nepConsent").hidden = true; $("lyNeptun").checked = true; startFeed(); refresh();
     });
     $("nepNo")?.addEventListener("click", () => { $("nepConsent").hidden = true; });
-    $("nepAll")?.addEventListener("change", (e) => { ml().nepAll = e.target.checked; ctx.save(); refresh(); });
+    $("nepNear")?.addEventListener("change", (e) => { ml().nepNear = e.target.checked; ctx.save(); refresh(); });
     document.querySelectorAll("[data-nf]").forEach((b) => b.addEventListener("click", () => {
       nepFilter = b.dataset.nf;
       document.querySelectorAll("[data-nf]").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));

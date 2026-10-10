@@ -59,17 +59,18 @@ ok("koperta WebSocket: alerts, messages, message", () => {
   assert.equal(applyEnvelope(s, { type: "message", data: { id: 1, text: "hej", ts: 5 } }), "messages");
   assert.equal(s.messages.length, 1);
 });
-ok("widok: strefa domyślna ukrywa dalekie, tryb „cała Ukraina” je pokazuje", () => {
+ok("widok: domyślnie pokazuje WSZYSTKIE obiekty, tryb „tylko okolice granicy” ukrywa dalekie", () => {
   const s = new ThreatStore(); s.applySnapshot(demoThreats(Date.now()));
-  const near = buildView(s, null, true);
-  const all = buildView(s, null, true, { all: true });
+  const all = buildView(s, null, true);
+  const near = buildView(s, null, true, { nearOnly: true });
+  assert.equal(all.farHidden, 0);
   assert.ok(near.farHidden >= 1);
   assert.ok(all.rows.length > near.rows.length);
   assert.ok(all.rows.some((r) => r.far));
 });
 ok("widok: obiekt spoza strefy nie dostaje uspokajającej oceny toru", () => {
   const s = new ThreatStore(); s.applySnapshot(demoThreats(Date.now()));
-  const far = buildView(s, { lat: 51.15, lon: 23.45, accKm: 0.05 }, true, { all: true }).rows.filter((r) => r.far);
+  const far = buildView(s, { lat: 51.15, lon: 23.45, accKm: 0.05 }, true, {}).rows.filter((r) => r.far);
   assert.ok(far.length >= 1);
   assert.ok(far.every((r) => r.assess.kind === "far" && r.assess.severity === "info"));
 });
@@ -82,15 +83,15 @@ ok("widok: obserwacje bez pozycji trafiają na osobną listę, nie na mapę", ()
 });
 ok("widok: filtry dron / rakiety oraz podsumowanie typów", () => {
   const s = new ThreatStore(); s.applySnapshot(demoThreats(Date.now()));
-  const d = buildView(s, null, true, { all: true, filter: "drones" });
-  const f = buildView(s, null, true, { all: true, filter: "fast" });
+  const d = buildView(s, null, true, { filter: "drones" });
+  const f = buildView(s, null, true, { filter: "fast" });
   assert.ok(d.rows.length && d.rows.every((r) => TYPES[r.t.type].kind === "slow"));
   assert.ok(f.rows.length && f.rows.every((r) => TYPES[r.t.type].kind === "fast"));
   assert.ok(f.counts.ballistic >= 1);
 });
 ok("widok: liczba sztuk (count) wchodzi do podsumowania", () => {
   const s = new ThreatStore(); s.applySnapshot([{ id: "g", type: "uav", lat: 51, lon: 24.5, count: 5, updatedAt: new Date().toISOString(), confirmedAt: new Date().toISOString() }]);
-  assert.equal(buildView(s, null, true, { all: true }).counts.uav, 5);
+  assert.equal(buildView(s, null, true, {}).counts.uav, 5);
 });
 ok("widok: alarmy tylko aktywne, posortowane", () => {
   const s = new ThreatStore(); s.applyAlerts(demoAlerts());
