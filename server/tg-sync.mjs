@@ -1,5 +1,6 @@
 // Zbiera numery kanałów Telegram i linki zaproszeń do pliku channels.json (nie trzeba nic wpisywać ręcznie).
 //   node tg-sync.mjs                         – szuka kanałów i pobiera brakujące linki zaproszeń
+//   node tg-sync.mjs --chat <id> <-100…>  – wpisuje numer kanału ręcznie
 //   node tg-sync.mjs --link <id> <https://t.me/+…>   – wpisuje link ręcznie (gdy bot nie ma prawa „Zapraszanie”)
 // Kanały muszą mieć nazwę „EGIDA <Województwo>”. Publiczne znajduje po adresie @egida_<id>, prywatne po
 // zdarzeniu dodania bota (Telegram trzyma je ok. 24 h) albo po wpisanym już numerze w channels.json.
@@ -22,6 +23,18 @@ if (li > 0) {
 }
 const me = await api("getMe");
 if (!me.ok) { console.log("Token odrzucony:", me.description); process.exit(1); }
+// --chat <id_województwa> <numer_kanału>  – wpisuje numer kanału ręcznie (np. Łódzkie -1003963669282); stary link jest kasowany
+const ci = process.argv.indexOf("--chat");
+if (ci > 0) {
+  const [id, chat] = [process.argv[ci + 1], process.argv[ci + 2]];
+  if (!REG[id] || !/^-100\d{5,}$/.test(chat || "")) { console.log("Użycie: --chat <id_województwa> -100…  (np. --chat lodzkie -1003963669282)"); process.exit(1); }
+  const c = await api("getChat", { chat_id: chat });
+  if (!c.ok) { console.log("Telegram nie widzi tego kanału:", c.description); process.exit(1); }
+  const m = await api("getChatMember", { chat_id: chat, user_id: me.result.id });
+  if (!m.ok || !["administrator", "creator"].includes(m.result.status)) { console.log("Bot nie jest administratorem tego kanału."); process.exit(1); }
+  data[id] = { chat: c.result.id, title: c.result.title }; await save();
+  console.log(`Zapisano: ${REG[id]} -> ${c.result.id} („${c.result.title}”). Teraz uruchom tg-sync bez opcji, by pobrać link.`); process.exit(0);
+}
 // 0) sprawdź zapisane kanały – jeśli bota już tam nie ma (stary/usunięty kanał), zapomnij numer i znajdź kanał od nowa
 for (const [id, v] of Object.entries(data)) {
   if (!v.chat) continue;
@@ -41,7 +54,10 @@ if (up.ok) for (const u of [...up.result].reverse()) {
   const c = ev?.chat;
   if (u.my_chat_member && !["administrator", "creator"].includes(ev.new_chat_member?.status)) continue;
   const id = c && c.type === "channel" ? byTitle[norm(c.title)] : null;
-  if (id && !data[id]?.chat) data[id] = { ...(data[id] || {}), chat: c.id, title: c.title };
+  if (id && !data[id]?.chat) {
+    const m = await api("getChatMember", { chat_id: c.id, user_id: me.result.id });
+    if (m.ok && ["administrator", "creator"].includes(m.result.status)) data[id] = { chat: c.id, title: c.title };
+  }
 }
 // 3) linki zaproszeń (bot musi mieć prawo „Zapraszanie użytkowników”)
 const problems = {};
