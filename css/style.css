@@ -198,3 +198,22 @@ table.t th{font-family:var(--font-h);font-size:.75rem;color:var(--muted);border-
 .tglist .tgrow.off{color:var(--muted);font-weight:500}
 .tglist a.tgrow:hover{background:var(--brand-tint)}
 .tgrow .tggo{display:inline-flex;align-items:center;gap:6px;color:var(--brand);font-size:.875rem}
+
+/* Mapa i schrony */
+[hidden]{display:none!important}
+.mapwrap{margin:12px 0}
+.map{height:min(62vh,520px);min-height:340px;border-radius:var(--r-card);border:1px solid var(--line);overflow:hidden;background:#dfe6ec;position:relative;z-index:0}
+.map-sm{height:260px;min-height:220px;margin-top:8px}
+.maptools{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0}
+.demo-banner{background:var(--warn-bg);color:var(--warn-ink);border:2px dashed var(--warn);border-radius:16px;padding:12px 14px;margin:0 0 12px;font-size:.9375rem}
+.obj .meta,.pop .meta{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.assess{border-radius:12px;padding:8px 10px;margin:8px 0 0;font-size:.9rem}
+.assess-watch{background:var(--warn-bg);color:var(--warn-ink)}
+.assess-quiet{background:var(--brand-tint);color:var(--brand-ink)}
+.assess-info{background:var(--note);color:var(--text-card)}
+.thr-ic,.sh-ic{background:none;border:0}
+.thr-tip{background:#fff;border:1px solid var(--line);color:var(--text);font-family:var(--font-h);font-weight:700;font-size:.6875rem;padding:1px 6px;box-shadow:none}
+.leaflet-container{font-family:var(--font-b)}
+.leaflet-touch .leaflet-bar a{width:40px;height:40px;line-height:40px}
+textarea.sel{width:100%;resize:vertical;font-weight:400}
+input.sel{width:100%;font-weight:400}

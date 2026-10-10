@@ -5,6 +5,7 @@
 # Użycie:  bash install.sh          (instalacja)
 #          bash install.sh --cron   (włączenie automatycznego uruchamiania co 5 min)
 #          bash install.sh --uncron (wyłączenie)
+#          bash install.sh --neptun-cron  (dziennik NEPTUN co minutę, tryb cichy) / --neptun-uncron
 set -euo pipefail
 BASE=/opt/egida
 REPO="${EGIDA_REPO:-lewym90/egida}"
@@ -17,6 +18,14 @@ if [ "${1:-}" = "--cron" ]; then
   [ -f "$BASE/env" ] || die "Najpierw zrób zwykłą instalację: bash install.sh"
   ( crontab -u "$US" -l 2>/dev/null | grep -v '# egida_poll' || true; echo "*/5 * * * * bash $BASE/repo/server/run.sh >> $BASE/log.txt 2>&1 # egida_poll" ) | crontab -u "$US" -
   echo "Włączono. Sprawdź za 6 minut:  tail -n 20 $BASE/log.txt"; exit 0
+fi
+if [ "${1:-}" = "--neptun-cron" ]; then
+  [ -f "$BASE/env" ] || die "Najpierw zrób zwykłą instalację: bash install.sh"
+  ( crontab -u "$US" -l 2>/dev/null | grep -v '# egida_neptun' || true; echo "* * * * * bash $BASE/repo/server/run-neptun.sh # egida_neptun" ) | crontab -u "$US" -
+  echo "Włączono dziennik NEPTUN (co minutę). Podgląd: tail -n 5 $BASE/neptun-run.txt"; exit 0
+fi
+if [ "${1:-}" = "--neptun-uncron" ]; then
+  ( crontab -u "$US" -l 2>/dev/null | grep -v '# egida_neptun' || true ) | crontab -u "$US" - ; echo "Wyłączono dziennik NEPTUN."; exit 0
 fi
 if [ "${1:-}" = "--uncron" ]; then
   ( crontab -u "$US" -l 2>/dev/null | grep -v '# egida_poll' || true ) | crontab -u "$US" - ; echo "Wyłączono."; exit 0

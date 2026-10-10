@@ -35,5 +35,13 @@ Bez tokenu skrypt działa „na sucho”: zapisuje dane, niczego nie wysyła. Pr
 - Licznik (GoatCounter) wyłączony domyślnie i bez adresu w `config.js` nic nie zlicza.
 - Treści (`js/content.js`) mają pole `reviewed: null` do czasu merytorycznego zatwierdzenia. `node scripts/check-content.mjs --strict` blokuje publikację bez daty przeglądu – włącz `--strict` w workflow przed premierą.
 
-## Etap 2
-Mapa (dostawca kafelków + satelita), schrony z „Jak wejść”, NEPTUN w trybie cichym (tylko log), potem alerty poziomu 2 z torem. Granice województw dla GPS (dziś: najbliższy środek województwa – przybliżenie, oznaczone w UI).
+## Etap 2 (jest): mapa, schrony, obiekty przy granicy
+- **Mapa** (`#/mapa`): Leaflet 1.9.4 (lokalnie, ładowany dopiero na tym ekranie). Podkłady: OSM, OpenTopoMap (teren), EOX Sentinel-2 (satelita) – adresy w `js/config.js` (`tiles`). Domyślny OSM nadaje się tylko do małego ruchu – przed premierą wymień na własnego dostawcę.
+- **Schrony** (`#/schrony`): odsyłacz do oficjalnej mapy PSP „Gdzie się ukryć”, własne miejsca (zapis tylko w telefonie), wyniki OSM (Overpass; wysyłany jest tylko przybliżony prostokąt, nigdy dokładna pozycja). Dane OSM są niezweryfikowane.
+- **Obiekty znad Ukrainy** (NEPTUN, poziom 2 = nieoficjalne): domyślnie wyłączone, włączane zgodą użytkownika (przeglądarka łączy się wtedy bezpośrednio z neptun.in.ua). Wyłącznik awaryjny: `neptun.enabled=false` w `js/config.js`. Podgląd z wymyślonymi danymi: `#/mapa/demo`.
+- Ocena toru: tylko dla dronów i tylko przy świeżych danych; przy braku danych zawsze „Brak aktualnych danych”.
+- **Testy**: `npm test` (logika) oraz scenariusze przeglądarkowe Playwright (poza repozytorium).
+- **Dziennik NEPTUN na serwerze (tryb cichy)**: `node server/neptun-log.mjs --dump` pokazuje prawdziwy format; `bash server/install.sh --neptun-cron` włącza zapis co minutę do `/opt/egida/neptun-log/`, `--neptun-uncron` wyłącza.
+
+## Dalej
+Granice województw dla GPS (dziś: najbliższy środek województwa – przybliżenie), alerty poziomu 2 z torem po weryfikacji formatu NEPTUN, zatwierdzenie treści (`reviewed`).

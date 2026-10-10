@@ -1,0 +1,9 @@
+{
+  "name": "egida-pwa",
+  "private": true,
+  "type": "module",
+  "description": "EGIDA – nieoficjalna aplikacja PWA. Ten plik pozwala uruchamiać testy w Node (moduły js/*.js); GitHub Pages go ignoruje.",
+  "scripts": {
+    "test": "node scripts/test-client.mjs && node scripts/check-content.mjs"
+  }
+}
