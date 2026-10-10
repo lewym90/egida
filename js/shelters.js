@@ -21,6 +21,11 @@ export function overpassQuery([s, w, n, e]) {
   return `[out:json][timeout:25];(nwr["amenity"="shelter"]["shelter_type"="bomb_shelter"]${box};nwr["military"="bunker"]["bunker_type"="bomb_shelter"]${box};);out center tags 200;`;
 }
 
+/** Zapytanie dla całej Polski – używa go TYLKO serwer (raz na dobę), nie telefony użytkowników. */
+export function overpassQueryPoland() {
+  return `[out:json][timeout:120];area["ISO3166-1"="PL"][admin_level=2]->.pl;(nwr["amenity"="shelter"]["shelter_type"="bomb_shelter"](area.pl);nwr["military"="bunker"]["bunker_type"="bomb_shelter"](area.pl););out center tags;`;
+}
+
 const ACCESS = { yes: "publiczny", public: "publiczny", permissive: "dostępny", customers: "dla klientów", permit: "za zgodą", private: "prywatny (brak wstępu)", no: "zamknięty" };
 
 /** Odpowiedź Overpass → lista obiektów. Pomija wpisy oznaczone jako nieczynne, historyczne, muzealne. */
@@ -44,22 +49,64 @@ export function parseOverpass(json) {
       access: ACCESS[acc] || "", accessRaw: acc,
       hours: clean(tags.opening_hours, 80), capacity: clean(tags.capacity, 20), level: clean(tags.level, 20),
       note: clean(tags.description || tags.note, 200),
+      how: clean(tags["description:pl"] || tags.description || tags.inscription || "", 300),
+      addr: [tags["addr:street"], tags["addr:housenumber"], tags["addr:city"]].filter(Boolean).map((x) => clean(x, 40)).join(" ").trim(),
+      wheelchair: clean(tags.wheelchair, 10),
+      src: "osm",
       osmUrl: `https://www.openstreetmap.org/${e.type}/${e.id}`,
     });
   }
   return out;
 }
 
+/** url: adres serwera Overpass albo lista adresów (próbujemy po kolei, aż któryś odpowie). */
 export async function fetchOsmShelters(url, lat, lon, fetchImpl = (...a) => fetch(...a)) {
   const bbox = coarseBbox(lat, lon);
-  const r = await fetchImpl(url, {
-    method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: "data=" + encodeURIComponent(overpassQuery(bbox)), signal: AbortSignal.timeout(30000),
-  });
-  if (!r.ok) throw new Error("Serwer OpenStreetMap odpowiedział błędem " + r.status);
-  const json = await r.json();
-  if (!json || !Array.isArray(json.elements)) throw new Error("Nieoczekiwana odpowiedź serwera OpenStreetMap");
-  return { at: new Date().toISOString(), bbox, items: parseOverpass(json) };
+  const urls = Array.isArray(url) ? url : [url];
+  let lastErr = null;
+  for (const u of urls) {
+    try {
+      const r = await fetchImpl(u, {
+        method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: "data=" + encodeURIComponent(overpassQuery(bbox)), signal: AbortSignal.timeout(20000),
+      });
+      if (!r.ok) throw new Error("Serwer OpenStreetMap odpowiedział błędem " + r.status);
+      const json = await r.json();
+      if (!json || !Array.isArray(json.elements)) throw new Error("Nieoczekiwana odpowiedź serwera OpenStreetMap");
+      return { at: new Date().toISOString(), bbox, items: parseOverpass(json) };
+    } catch (e) { lastErr = e; }
+  }
+  throw lastErr || new Error("Brak serwera OpenStreetMap");
+}
+
+/* ---------- baza schronów publikowana przez serwer EGIDA (shelters.json na gałęzi data) ---------- */
+export const DB_CACHE = "egida.shdb.v1";
+/** Zwraca { at, source, count, items, stale } albo null. Przy błędzie sieci oddaje ostatnią kopię z telefonu (stale:true). */
+export async function loadShelterDb(url, storage = globalThis.localStorage, fetchImpl = (...a) => fetch(...a)) {
+  const read = () => { try { const j = JSON.parse(storage?.getItem(DB_CACHE) || "null"); return j && Array.isArray(j.items) ? j : null; } catch { return null; } };
+  if (url) {
+    try {
+      const r = await fetchImpl(url + (url.includes("?") ? "&" : "?") + "t=" + Math.floor(Date.now() / 3600000), { signal: AbortSignal.timeout(20000) });
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      const j = await r.json();
+      if (!j || !Array.isArray(j.items)) throw new Error("format");
+      const items = j.items.filter((x) => x && Number.isFinite(x.lat) && Number.isFinite(x.lon)).map((x) => ({
+        id: String(x.id ?? ""), lat: x.lat, lon: x.lon, name: clean(x.name, 80) || "Schron (bez nazwy)", kind: x.kind === "ukrycie" ? "ukrycie" : "schron",
+        access: clean(x.access, 40), hours: clean(x.hours, 80), capacity: clean(x.capacity, 20), level: clean(x.level, 20),
+        how: clean(x.how, 300), addr: clean(x.addr, 100), osmUrl: typeof x.osmUrl === "string" && x.osmUrl.startsWith("https://www.openstreetmap.org/") ? x.osmUrl : "", src: clean(x.src, 20) || "osm",
+      }));
+      const db = { at: clean(j.at, 40), source: clean(j.source, 80) || "OpenStreetMap", count: items.length, items, stale: false };
+      try { storage?.setItem(DB_CACHE, JSON.stringify(db)); } catch { /* brak miejsca */ }
+      return db;
+    } catch { /* spróbujemy kopii */ }
+  }
+  const c = read();
+  return c ? { ...c, stale: true } : null;
+}
+
+/** Najbliższe obiekty z listy (już z odległością), do maxKm. */
+export function nearest(list, pos, { maxKm = 60, limit = 25 } = {}) {
+  return withDistance(list, pos).filter((s) => s.distKm != null && s.distKm <= maxKm).slice(0, limit);
 }
 
 /* ---------- Moje miejsca ---------- */

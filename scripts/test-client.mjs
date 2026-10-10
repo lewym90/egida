@@ -5,7 +5,7 @@ import { haversineKm, bearingDeg, destination, crossTrack, pointInRing, distToRi
 import { POLAND_RING } from "../js/poland-border.js";
 import { normalizeThreat, ThreatStore, applyEnvelope, applySnapshotJson, predict, assess, buildView, zoneOf, coneOutline, parseTime, ageText, LIMITS } from "../js/neptun.js";
 import { createFeed } from "../js/neptun-feed.js";
-import { coarseBbox, overpassQuery, parseOverpass, makeShelter, withDistance, walkMin, dirUrl, fetchOsmShelters } from "../js/shelters.js";
+import { coarseBbox, overpassQuery, parseOverpass, makeShelter, withDistance, walkMin, dirUrl, fetchOsmShelters, loadShelterDb, nearest, overpassQueryPoland, DB_CACHE } from "../js/shelters.js";
 import { demoThreats, DEMO_USER } from "../js/demo.js";
 
 let n = 0;
@@ -229,6 +229,26 @@ ok("odległość, czas pieszo, linki do tras", () => {
   assert.equal(r.items.length, 1); assert.ok(!sent.init.body.includes("51.1478") && !sent.init.body.includes("23.4712"), "dokładna pozycja nie może wyjść do serwera"); n++;
   await assert.rejects(fetchOsmShelters("https://o.test", 51, 23, async () => ({ ok: false, status: 429 })), /429/); n++;
   await assert.rejects(fetchOsmShelters("https://o.test", 51, 23, async () => ({ ok: true, json: async () => ({ brak: 1 }) })), /Nieoczekiwana/); n++;
+}
+
+/* baza schronów (shelters.json), kopie zapasowe i serwery zastępcze */
+{
+  const mem = new Map(); const store = { getItem: (k) => mem.get(k) ?? null, setItem: (k, v) => mem.set(k, v) };
+  const good = { at: "2026-10-10T00:00:00Z", source: "OpenStreetMap", items: [{ id: "node/1", lat: 51.2, lon: 23.4, name: "Schron <b>A</b>", how: "Wejście od podwórka", osmUrl: "https://evil.example/x" }, { id: "bad", lat: "x", lon: 1 }, { id: "node/2", lat: 51.21, lon: 23.41 }] };
+  const db = await loadShelterDb("https://d.test/shelters.json", store, async () => ({ ok: true, json: async () => good }));
+  assert.equal(db.items.length, 2); assert.equal(db.stale, false); assert.equal(db.items[0].osmUrl, "", "obcy adres odrzucony"); assert.equal(db.items[1].name, "Schron (bez nazwy)"); n++;
+  const off = await loadShelterDb("https://d.test/shelters.json", store, async () => { throw new Error("offline"); });
+  assert.equal(off.stale, true); assert.equal(off.items.length, 2); n++;
+  assert.equal(await loadShelterDb("https://d.test/x", { getItem: () => null, setItem() {} }, async () => ({ ok: false, status: 404 })), null); n++;
+  assert.equal(await loadShelterDb("https://d.test/x", store, async () => ({ ok: true, json: async () => ({ brak: 1 }) })).then((x) => x.stale), true, "zły format ⇒ kopia, nie pusta lista"); n++;
+  const near = nearest(db.items, { lat: 51.2, lon: 23.4 }, { maxKm: 5 }); assert.equal(near.length, 2); assert.ok(near[0].distKm < near[1].distKm); n++;
+  assert.equal(nearest(db.items, { lat: 50, lon: 20 }, { maxKm: 50 }).length, 0); n++;
+  assert.match(overpassQueryPoland(), /ISO3166-1.*PL/); n++;
+  // serwery zastępcze: pierwszy pada (504), drugi odpowiada
+  const calls = [];
+  const r = await fetchOsmShelters(["https://a.test", "https://b.test"], 51.1, 23.4, async (u) => { calls.push(u); return u.includes("a.test") ? { ok: false, status: 504 } : { ok: true, json: async () => ({ elements: [] }) }; });
+  assert.deepEqual(calls, ["https://a.test", "https://b.test"]); assert.equal(r.items.length, 0); n++;
+  await assert.rejects(fetchOsmShelters(["https://a.test", "https://b.test"], 51.1, 23.4, async () => ({ ok: false, status: 504 })), /504/); n++;
 }
 
 console.log(`OK: ${n} grup testów logiki klienta przeszło (limity: strefa ${LIMITS.zoneKm} km, uspokajanie ≤ ${LIMITS.reassureAgeSec} s)`);

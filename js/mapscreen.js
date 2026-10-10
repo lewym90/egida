@@ -6,10 +6,9 @@ import { createFeed } from "./neptun-feed.js";
 import { ThreatStore, buildView, coneOutline, fmtKmPl, ageText, TYPES, LIMITS } from "./neptun.js";
 import { compassPl, destination } from "./geo.js";
 import { demoThreats, DEMO_USER } from "./demo.js";
-import { PSP_URL, withDistance, walkMin, dirUrl, makeShelter, fetchOsmShelters } from "./shelters.js";
+import { dirUrl, loadShelterDb } from "./shelters.js";
 
-const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-const OSM_CACHE = "egida.osm.v1";
+export const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
 /* ---------- Leaflet (ładowany leniwie, z własnego hostingu) ---------- */
 let leafletP = null;
@@ -33,8 +32,8 @@ export function loadLeaflet() {
 
 /* ---------- pozycja użytkownika (tylko w pamięci) ---------- */
 let lastUser = null;
-const getUser = () => lastUser;
-function locate(onPos, onErr, watch) {
+export const getUser = () => lastUser;
+export function locate(onPos, onErr, watch) {
   if (!navigator.geolocation) { onErr(new Error("Ta przeglądarka nie obsługuje lokalizacji.")); return () => {}; }
   const ok = (p) => { lastUser = { lat: p.coords.latitude, lon: p.coords.longitude, accKm: (p.coords.accuracy || 0) / 1000 }; onPos(lastUser); };
   const opts = { enableHighAccuracy: false, timeout: 15000, maximumAge: 30000 };
@@ -44,17 +43,30 @@ function locate(onPos, onErr, watch) {
 }
 
 let active = null;
+export const setActive = (a) => { active = a; };
 export function destroyScreens() { if (active) { try { active.destroy(); } catch { /* */ } active = null; } }
 
-function baseLayer(L, key) {
+export function baseLayer(L, key, onFail) {
   const c = CONFIG.tiles[key] || CONFIG.tiles.map;
-  return L.tileLayer(c.url, { attribution: c.attribution, maxZoom: c.maxZoom ?? 18, maxNativeZoom: c.maxNativeZoom, subdomains: c.subdomains || "abc" });
+  const urls = [c.url, ...(c.fallbackUrls || [])];
+  let i = 0, ok = 0, bad = 0;
+  const layer = L.tileLayer(urls[0], { attribution: c.attribution, maxZoom: c.maxZoom ?? 18, maxNativeZoom: c.maxNativeZoom, subdomains: c.subdomains || "abc" });
+  // Gdy żaden kafelek się nie wczytuje (np. zły adres lub awaria dostawcy), próbujemy kolejnego adresu, a na końcu zgłaszamy błąd.
+  layer.on("tileload", () => { ok++; });
+  layer.on("tileerror", () => {
+    bad++;
+    if (ok === 0 && bad >= 4) {
+      bad = 0;
+      if (i + 1 < urls.length) { i++; layer.setUrl(urls[i]); } else if (onFail) { const f = onFail; onFail = null; f(key); }
+    }
+  });
+  return layer;
 }
-const fmtDt = (iso) => { const d = new Date(iso); return isNaN(d) ? "" : d.toLocaleString("pl-PL", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }); };
+export const fmtDt = (iso) => { const d = new Date(iso); return isNaN(d) ? "" : d.toLocaleString("pl-PL", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }); };
 const CONF = { low: "niska", medium: "średnia", high: "wysoka" };
 
 /* ---------- ikony ---------- */
-const shelterIcon = (L, mine) => L.divIcon({
+export const shelterIcon = (L, mine) => L.divIcon({
   className: "sh-ic", iconSize: [30, 30], iconAnchor: [15, 15],
   html: `<svg viewBox="0 0 30 30" width="30" height="30" aria-hidden="true"><circle cx="15" cy="15" r="13" fill="${mine ? "#0B6B63" : "#2A4DA0"}" stroke="#fff" stroke-width="2"/><path d="M15 6l7 2.6v4.9c0 4.3-3 7.1-7 8.4-4-1.3-7-4.1-7-8.4V8.6z" fill="none" stroke="#fff" stroke-width="1.8" stroke-linejoin="round"/></svg>`,
 });
@@ -120,6 +132,7 @@ export function renderMapHtml(ctx, { demo = false } = {}) {
     <li>Możesz to wyłączyć w każdej chwili, tutaj lub w Ustawieniach.</li></ul>
     <div class="grid2" style="margin-top:10px"><button class="btn primary" id="nepYes">Włączam</button><button class="btn" id="nepNo">Nie teraz</button></div>
   </div>
+  <p id="tileMsg" class="note warn" hidden role="status"></p>
   <div class="mapwrap"><div id="map" class="map" role="region" aria-label="Mapa. Obiekty i schrony są też wypisane w listach poniżej."><p class="muted" style="padding:16px">Ładuję mapę…</p></div></div>
   <div class="maptools"><button class="btn sm" id="btnLocate">${ctx.I.pin}Pokaż mnie</button><button class="btn sm" id="btnBorder">Granica wschodnia</button><button class="btn sm" id="btnObjects" hidden>Pokaż obiekty</button></div>
   <p id="locMsg" class="muted small" aria-live="polite"></p>
@@ -154,14 +167,15 @@ export function initMapScreen(ctx, { demo = false } = {}) {
     let user = demo ? { ...DEMO_USER } : getUser();
     const map = L.map(root, { center: [51.6, 22.8], zoom: 6, minZoom: 4, worldCopyJump: false });
     cleanups.push(() => map.remove());
-    let baseL = baseLayer(L, st().map.base || "map").addTo(map);
+    const failNote = (k) => { const n = $("tileMsg"); if (n) { n.hidden = false; n.textContent = `Podkład „${(CONFIG.tiles[k] || {}).name || k}” nie odpowiada. Wybierz inny albo spróbuj później.`; } };
+    let baseL = baseLayer(L, st().map.base || "map", failNote).addTo(map);
     const gShelters = L.layerGroup().addTo(map), gThreats = L.layerGroup().addTo(map), gUser = L.layerGroup().addTo(map);
     setTimeout(() => { if (!dead) map.invalidateSize(); }, 0);
 
     /* podkład */
     document.querySelectorAll("[data-base]").forEach((b) => b.addEventListener("click", () => {
       const k = b.dataset.base; st().map.base = k; ctx.save();
-      map.removeLayer(baseL); baseL = baseLayer(L, k).addTo(map); baseL.bringToBack();
+      map.removeLayer(baseL); if ($("tileMsg")) $("tileMsg").hidden = true; baseL = baseLayer(L, k, failNote).addTo(map); baseL.bringToBack();
       document.querySelectorAll("[data-base]").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
     }));
 
@@ -192,16 +206,18 @@ export function initMapScreen(ctx, { demo = false } = {}) {
     $("btnBorder")?.addEventListener("click", () => map.fitBounds([[49.0, 21.6], [54.6, 24.6]]));
 
     /* schrony na mapie */
+    let dbItems = [];
     const drawShelters = () => {
       gShelters.clearLayers();
       if (ml().shelters === false) return;
       const mine = st().shelters || [];
-      let osm = []; try { osm = JSON.parse(localStorage.getItem(OSM_CACHE) || "null")?.items || []; } catch { /* */ }
+      const osm = dbItems;
       const pop = (s, kind, extra) => `<div class="pop"><b>${esc(s.name)}</b><br><span class="small muted">${kind}</span>${extra || ""}<p class="small" style="margin:6px 0"><a href="${esc(dirUrl(s, "walking"))}" target="_blank" rel="noopener noreferrer">Trasa pieszo</a> · <a href="${esc(dirUrl(s, "driving"))}" target="_blank" rel="noopener noreferrer">Autem</a></p></div>`;
       for (const s of osm) L.marker([s.lat, s.lon], { icon: shelterIcon(L, false), keyboard: false }).bindPopup(pop(s, "OpenStreetMap · niezweryfikowane", s.access ? `<br><span class="small">Dostęp: ${esc(s.access)}</span>` : "")).addTo(gShelters);
       for (const s of mine) L.marker([s.lat, s.lon], { icon: shelterIcon(L, true), keyboard: false }).bindPopup(pop(s, "Twoje miejsce", s.how ? `<br><span class="small">Jak wejść: ${esc(s.how)}</span>` : "")).addTo(gShelters);
     };
     drawShelters();
+    if (!demo) loadShelterDb(CONFIG.sheltersUrl).then((db) => { if (db && !dead) { dbItems = db.items; drawShelters(); } }).catch(() => {});
     $("lyShelters")?.addEventListener("change", (e) => { ml().shelters = e.target.checked; ctx.save(); drawShelters(); });
 
     /* NEPTUN */
@@ -291,122 +307,4 @@ export function initMapScreen(ctx, { demo = false } = {}) {
     if (!dead && root) root.innerHTML = `<p class="note warn" style="margin:16px">Nie udało się załadować mapy (brak internetu?). Schrony zapisane w telefonie znajdziesz w zakładce Schrony.</p>`;
   });
   return screen;
-}
-
-/* =========================================================
-   SCHRONY
-   ========================================================= */
-const readOsm = () => { try { const j = JSON.parse(localStorage.getItem(OSM_CACHE) || "null"); return j && Array.isArray(j.items) ? j : null; } catch { return null; } };
-
-export function renderSheltersHtml(ctx) {
-  return `<div class="hero"><h1>Schrony i ukrycia</h1><p>Gdzie się schronić, gdy zabrzmią syreny. Zaplanuj to wcześniej, a nie w trakcie alarmu.</p></div>
-  <div class="card"><span class="badge ok">Oficjalne źródło</span>
-    <h2 style="margin-top:8px">Mapa PSP „Gdzie się ukryć”</h2>
-    <p>Państwowa Straż Pożarna prowadzi mapę punktów schronienia: według MSWiA to ponad 70 tys. obiektów codziennego użytku, takich jak piwnice, przejścia podziemne i garaże. To najlepsze źródło, więc <b>sprawdź najbliższe miejsca już dziś</b>. Po pobraniu danych mapa działa także bez internetu.</p>
-    <a class="btn primary" href="${PSP_URL}" target="_blank" rel="noopener noreferrer">Otwórz mapę PSP ${ctx.I.ext}</a>
-    <p class="muted small" style="margin-top:10px">Punkt schronienia to istniejący obiekt, który zwiększa bezpieczeństwo. To nie daje prawa wstępu tam, gdzie obowiązują ograniczenia. Dostępność bywa całodobowa albo ograniczona godzinami. EGIDA nie kopiuje danych PSP.</p></div>
-  <div class="card"><h2>Moje miejsca schronienia</h2>
-    <p class="muted small">Zapisz 1–2 miejsca blisko domu i pracy, np. piwnicę lub parking podziemny, i dopisz, jak tam wejść. Zapis jest tylko w tym telefonie i działa bez internetu.</p>
-    <div class="row" style="margin:8px 0"><button class="btn sm" id="shLocate">${ctx.I.pin}Użyj mojej pozycji (odległości)</button><span id="shLocMsg" class="muted small" aria-live="polite"></span></div>
-    <ul class="list" id="myList"></ul>
-    <details id="addBox" class="acc" style="border-top:1px solid var(--line-in);margin-top:8px"><summary>Dodaj miejsce<span class="muted">${ctx.I.chev}</span></summary>
-      <div class="body"><div class="field"><label for="shName"><b>Nazwa</b></label><input class="sel" id="shName" maxlength="60" placeholder="np. Piwnica w bloku, klatka B" autocomplete="off"></div>
-      <div class="field" style="margin-top:10px"><label for="shHow"><b>Jak wejść</b> <span class="muted small">(opcjonalnie)</span></label><textarea class="sel" id="shHow" rows="3" maxlength="400" style="padding:10px 12px;min-height:84px" placeholder="np. schody w dół przy windzie, klucz u administratora"></textarea></div>
-      <p class="muted small" style="margin-top:10px"><b>Miejsce:</b> dotknij mapy albo użyj swojej pozycji. <span id="pickInfo">Nie wskazano.</span></p>
-      <div id="pickMap" class="map map-sm"><p class="muted" style="padding:12px">Mapa załaduje się po otwarciu tej sekcji.</p></div>
-      <div class="grid2" style="margin-top:10px"><button class="btn" id="shUseMe">Moja pozycja</button><button class="btn primary" id="shSave">Zapisz miejsce</button></div>
-      <p id="shErr" class="small" style="color:var(--danger-ink)" role="alert"></p></div></details></div>
-  <div class="card"><span class="badge soon">Dane społeczności · niezweryfikowane</span>
-    <h2 style="margin-top:8px">Schrony z OpenStreetMap</h2>
-    <p class="muted small">Wyszukamy w OpenStreetMap obiekty oznaczone jako schron przeciwlotniczy. To wpisy wolontariuszy: mogą być nieaktualne, niepełne albo błędne, więc <b>nie traktuj ich jako oficjalnego wykazu</b>. Do serwera OSM wysyłamy tylko przybliżony prostokąt wokół Ciebie (ok. 22 × 14 km), nie dokładną pozycję.</p>
-    <button class="btn" id="osmGo">Szukaj w pobliżu</button>
-    <div id="osmOut" aria-live="polite" style="margin-top:10px"></div></div>
-  <a class="btn" href="#/mapa">Zobacz schrony na mapie</a>`;
-}
-
-export function initSheltersScreen(ctx) {
-  destroyScreens();
-  if (!document.getElementById("myList")) return;
-  let dead = false;
-  const cleanups = [];
-  active = { destroy() { dead = true; cleanups.forEach((f) => { try { f(); } catch { /* */ } }); cleanups.length = 0; } };
-  const $ = (id) => document.getElementById(id);
-  const st = () => ctx.state;
-  let pick = null;
-
-  const drawMine = () => {
-    const list = withDistance(st().shelters || [], getUser());
-    $("myList").innerHTML = list.length ? list.map((s) => `<li class="msg"><h3>${esc(s.name)}</h3>
-      ${s.how ? `<p class="small" style="margin:4px 0"><b>Jak wejść:</b> ${esc(s.how)}</p>` : ""}
-      ${s.distKm != null ? `<p class="muted small" style="margin:4px 0">${esc(fmtKmPl(s.distKm))} w linii prostej, ok. ${walkMin(s.distKm)} min pieszo (szacunek)</p>` : ""}
-      <div class="row" style="flex-wrap:wrap;margin-top:8px"><a class="btn sm" href="${esc(dirUrl(s, "walking"))}" target="_blank" rel="noopener noreferrer">Pieszo</a><a class="btn sm" href="${esc(dirUrl(s, "driving"))}" target="_blank" rel="noopener noreferrer">Autem</a><button class="btn sm" data-del="${esc(s.id)}" aria-label="Usuń miejsce ${esc(s.name)}">Usuń</button></div></li>`).join("")
-      : `<li class="muted">Nie zapisano jeszcze żadnego miejsca.</li>`;
-  };
-  $("myList").addEventListener("click", (e) => {
-    const b = e.target.closest("[data-del]"); if (!b) return;
-    if (!confirm("Usunąć to miejsce z telefonu?")) return;
-    st().shelters = (st().shelters || []).filter((x) => x.id !== b.dataset.del); ctx.save(); drawMine();
-  });
-  drawMine();
-
-  $("shLocate").addEventListener("click", () => {
-    $("shLocMsg").textContent = "Ustalam pozycję…";
-    locate(() => { $("shLocMsg").textContent = "Pozycja ustalona (zostaje w telefonie)."; drawMine(); }, () => { $("shLocMsg").textContent = "Nie udało się ustalić pozycji."; }, false);
-  });
-
-  /* dodawanie z mapą do wskazania miejsca */
-  let pm = null, pmarker = null;
-  const setPick = (p) => { pick = p; $("pickInfo").textContent = `Wskazano: ${p.lat.toFixed(5)}, ${p.lon.toFixed(5)}`; if (pm && pmarker) pmarker.setLatLng([p.lat, p.lon]); else if (pm) pmarker = globalThis.L.marker([p.lat, p.lon]).addTo(pm); };
-  $("addBox").addEventListener("toggle", () => {
-    if (!$("addBox").open || pm || dead) return;
-    loadLeaflet().then((L) => {
-      if (dead || pm) return;
-      const el = $("pickMap"); el.innerHTML = "";
-      const u = getUser();
-      pm = L.map(el, { center: u ? [u.lat, u.lon] : [51.6, 22.8], zoom: u ? 15 : 6, minZoom: 4 });
-      cleanups.push(() => pm.remove());
-      baseLayer(L, "map").addTo(pm);
-      pm.on("click", (e) => setPick({ lat: e.latlng.lat, lon: e.latlng.lng }));
-      setTimeout(() => pm.invalidateSize(), 0);
-    }).catch((e) => { console.error("EGIDA mapa (wybór miejsca):", e); $("pickMap").innerHTML = `<p class="note warn" style="margin:12px">Nie udało się załadować mapy. Użyj przycisku „Moja pozycja”.</p>`; });
-  });
-  $("shUseMe").addEventListener("click", () => {
-    $("shErr").textContent = "";
-    locate((p) => { setPick({ lat: p.lat, lon: p.lon }); if (pm) pm.setView([p.lat, p.lon], 17); drawMine(); }, () => { $("shErr").textContent = "Nie udało się ustalić pozycji. Dotknij mapy, aby wskazać miejsce."; }, false);
-  });
-  $("shSave").addEventListener("click", () => {
-    const r = makeShelter({ name: $("shName").value, how: $("shHow").value, lat: pick?.lat, lon: pick?.lon });
-    if (!r.ok) { $("shErr").textContent = r.error; return; }
-    $("shErr").textContent = "";
-    (st().shelters ||= []).push(r.shelter); ctx.save();
-    $("shName").value = ""; $("shHow").value = ""; pick = null; $("pickInfo").textContent = "Zapisano. Możesz dodać kolejne miejsce.";
-    if (pmarker && pm) { pm.removeLayer(pmarker); pmarker = null; }
-    drawMine();
-  });
-
-  /* OpenStreetMap (Overpass) */
-  const drawOsm = (data) => {
-    const items = withDistance(data.items, getUser() || { lat: (data.bbox[0] + data.bbox[2]) / 2, lon: (data.bbox[1] + data.bbox[3]) / 2 });
-    const head = `<p class="muted small">Wyniki z ${esc(fmtDt(data.at))}. Dane OpenStreetMap, © współtwórcy OpenStreetMap (ODbL). Niezweryfikowane.</p>`;
-    $("osmOut").innerHTML = head + (items.length
-      ? `<div class="card flat"><ul class="list">${items.slice(0, 30).map((s) => `<li class="msg"><h3>${esc(s.name)}</h3>
-          <p class="muted small" style="margin:2px 0">${[s.access && `dostęp: ${esc(s.access)}`, s.hours && `godziny: ${esc(s.hours)}`, s.capacity && `miejsc: ${esc(s.capacity)}`, s.level && `poziom: ${esc(s.level)}`, s.distKm != null && `ok. ${esc(fmtKmPl(s.distKm))}`].filter(Boolean).join(" · ")}</p>
-          ${s.note ? `<p class="small" style="margin:2px 0">${esc(s.note)}</p>` : ""}
-          <div class="row" style="flex-wrap:wrap;margin-top:6px"><a class="btn sm" href="${esc(dirUrl(s, "walking"))}" target="_blank" rel="noopener noreferrer">Pieszo</a><a class="btn sm" href="${esc(dirUrl(s, "driving"))}" target="_blank" rel="noopener noreferrer">Autem</a><a class="btn sm" href="${esc(s.osmUrl)}" target="_blank" rel="noopener noreferrer">Wpis w OSM</a></div></li>`).join("")}</ul></div>${items.length > 30 ? `<p class="muted small">Pokazano 30 najbliższych z ${items.length}.</p>` : ""}`
-      : `<div class="note neutral">Brak wpisów w OpenStreetMap w tym obszarze. <b>To nie znaczy, że nie ma schronów</b>: OSM zawiera tylko to, co ktoś wpisał. Sprawdź mapę PSP powyżej.</div>`);
-  };
-  const cached = readOsm(); if (cached) drawOsm(cached);
-  $("osmGo").addEventListener("click", () => {
-    const run = (u) => {
-      $("osmOut").innerHTML = `<p class="muted">Szukam…</p>`;
-      fetchOsmShelters(CONFIG.overpassUrl, u.lat, u.lon).then((data) => {
-        try { localStorage.setItem(OSM_CACHE, JSON.stringify(data)); } catch { /* brak miejsca */ }
-        if (!dead) { drawOsm(data); drawMine(); }
-      }).catch((e) => { if (!dead) $("osmOut").innerHTML = `<div class="note warn">Nie udało się pobrać danych z OpenStreetMap (${esc(e.message)}). Spróbuj później albo skorzystaj z mapy PSP.</div>`; });
-    };
-    const u = getUser();
-    if (u) { run(u); return; }
-    $("osmOut").innerHTML = `<p class="muted">Ustalam pozycję…</p>`;
-    locate(run, () => { $("osmOut").innerHTML = `<div class="note warn">Do wyszukania w pobliżu potrzebna jest Twoja pozycja. Zezwól na lokalizację albo skorzystaj z mapy PSP.</div>`; }, false);
-  });
 }

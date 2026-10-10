@@ -28,11 +28,14 @@ export const CONFIG = {
     terrain: { name: "Teren", url: "https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png", subdomains: "abc", maxZoom: 17,
       attribution: '© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">współtwórcy OpenStreetMap</a>, SRTM | styl: © <a href="https://opentopomap.org" target="_blank" rel="noopener noreferrer">OpenTopoMap</a> (CC-BY-SA)' },
     sat: { name: "Satelita", url: "https://tiles.maps.eox.at/wmts/1.0.0/s2cloudless-2025_3857/default/g/{z}/{y}/{x}.jpg", maxZoom: 15, maxNativeZoom: 13,
+      fallbackUrls: ["https://tiles.maps.eox.at/wmts/1.0.0/s2cloudless-2025_3857/default/GoogleMapsCompatible/{z}/{y}/{x}.jpg", "https://tiles.maps.eox.at/wmts/1.0.0/s2cloudless-2024_3857/default/g/{z}/{y}/{x}.jpg"],
       attribution: 'EOxCloudless <a href="https://cloudless.eox.at" target="_blank" rel="noopener noreferrer">cloudless.eox.at</a> by EOX IT Services GmbH (Contains modified Copernicus Sentinel data 2025)' },
   },
   // NEPTUN (neptun.in.ua): otwarte API, tylko odczyt. REST nie częściej niż co 5 s (my: co pollMs).
   // Ustaw enabled: false, aby wyłączyć całą funkcję (np. gdyby operator zmienił warunki lub API).
   neptun: { enabled: true, restUrl: "https://neptun.in.ua/api/v1/threats", wsUrl: "wss://neptun.in.ua/api/v1/stream", pollMs: 15000 },
   // Serwer Overpass (OpenStreetMap) do wyszukiwania schronów w pobliżu. Można zmienić na inny publiczny serwer.
-  overpassUrl: "https://overpass-api.de/api/interpreter",
+  overpassUrl: ["https://overpass-api.de/api/interpreter", "https://overpass.private.coffee/api/interpreter", "https://overpass.kumi.systems/api/interpreter"],
+  // Baza schronów z OpenStreetMap, odświeżana raz na dobę przez serwer EGIDA (gałąź data). Telefon nie pyta wtedy OSM o nic.
+  sheltersUrl: "https://raw.githubusercontent.com/lewym90/egida/data/shelters.json",
 };

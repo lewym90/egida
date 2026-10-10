@@ -2,7 +2,8 @@ import { CONFIG } from "./config.js";
 import {
   VOIVODESHIPS, LEGAL_HTML, ALERT_FILTERS, PLECAK, FIRST_AID, WHAT_TO_DO, READINESS_QUESTIONS, SOURCES,
 } from "./content.js";
-import { renderMapHtml, initMapScreen, renderSheltersHtml, initSheltersScreen, destroyScreens } from "./mapscreen.js";
+import { renderMapHtml, initMapScreen, destroyScreens } from "./mapscreen.js";
+import { renderSheltersHtml, initSheltersScreen } from "./sheltersscreen.js";
 
 /* ---------- pomocnicze ---------- */
 const $ = (s, r = document) => r.querySelector(s);
@@ -405,7 +406,7 @@ function render() {
   switch (route) {
     case "alerty": inner = screenAlerty(); break;
     case "mapa": inner = screenMapa(arg); break;
-    case "schrony": inner = renderSheltersHtml(geoCtx); break;
+    case "schrony": inner = renderSheltersHtml(geoCtx, { demo: arg === "demo" }); break;
     case "plan-rodziny": inner = screenSoon("Plan rodziny", "Miejsce spotkania, kontakty i karta ICE do wydruku są w przygotowaniu."); break;
     case "poradnik": inner = screenPoradnik(); break;
     case "co-robic": inner = screenCoRobic(arg); break;
@@ -419,7 +420,7 @@ function render() {
   }
   app.innerHTML = shell(route, inner);
   if (route === "mapa") initMapScreen(geoCtx, { demo: arg === "demo" });
-  else if (route === "schrony") initSheltersScreen(geoCtx);
+  else if (route === "schrony") initSheltersScreen(geoCtx, { demo: arg === "demo" });
   const titles = { pulpit: "Pulpit", alerty: "Alerty", mapa: "Mapa", poradnik: "Poradnik", plecak: "Plecak", "pierwsza-pomoc": "Pierwsza pomoc", test: "Test gotowości", ustawienia: "Ustawienia", zrodla: "Źródła", telegram: "Powiadomienia Telegram", schrony: "Schrony" };
   document.title = `EGIDA – ${titles[route] || "Pulpit"}`;
   window.scrollTo(0, 0);

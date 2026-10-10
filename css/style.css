@@ -217,3 +217,17 @@ table.t th{font-family:var(--font-h);font-size:.75rem;color:var(--muted);border-
 .leaflet-touch .leaflet-bar a{width:40px;height:40px;line-height:40px}
 textarea.sel{width:100%;resize:vertical;font-weight:400}
 input.sel{width:100%;font-weight:400}
+
+/* ---- ekran Schrony i ukrycia ---- */
+.shfeat{background:var(--card);border:2px solid var(--brand);border-radius:var(--r-card);padding:16px;margin:12px 0}
+.shlist{list-style:none;margin:0;padding:0;display:grid;gap:12px}
+.shitem{background:var(--card);border:1px solid var(--line);border-radius:var(--r-card);padding:14px 16px}
+.shdist{font-family:var(--font-h);white-space:nowrap}
+.howbox{background:var(--info-bg);color:var(--text-card);border-radius:16px;padding:12px 14px;margin:8px 0}
+.howbox b{color:var(--info);font-family:var(--font-h)}
+.howbox p{margin:4px 0}
+.shbtns{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}
+.shbtns .btn{width:100%;min-height:48px;justify-content:center;text-align:center}
+.shbtns .howbtn{background:var(--card);border:2px solid var(--info);color:var(--info)}
+.shbtns .howbtn[aria-expanded="true"]{background:var(--info-bg)}
+.btn.disabled{background:var(--note);color:var(--muted);border-color:var(--line);cursor:default;font-size:.8125rem}

@@ -37,7 +37,7 @@ Bez tokenu skrypt działa „na sucho”: zapisuje dane, niczego nie wysyła. Pr
 
 ## Etap 2 (jest): mapa, schrony, obiekty przy granicy
 - **Mapa** (`#/mapa`): Leaflet 1.9.4 (lokalnie, ładowany dopiero na tym ekranie). Podkłady: OSM, OpenTopoMap (teren), EOX Sentinel-2 (satelita) – adresy w `js/config.js` (`tiles`). Domyślny OSM nadaje się tylko do małego ruchu – przed premierą wymień na własnego dostawcę.
-- **Schrony** (`#/schrony`): odsyłacz do oficjalnej mapy PSP „Gdzie się ukryć”, własne miejsca (zapis tylko w telefonie), wyniki OSM (Overpass; wysyłany jest tylko przybliżony prostokąt, nigdy dokładna pozycja). Dane OSM są niezweryfikowane.
+- **Schrony** (`#/schrony`, podgląd z wymyślonymi danymi: `#/schrony/demo`): lista najbliższych wg odległości z czasem pieszo, mini-mapa, blok „Jak wejść”, przyciski Pieszo/Autem, filtry, własne miejsca (tylko w telefonie). Dane: `shelters.json` z OpenStreetMap, odświeżany raz na dobę przez serwer (`server/shelters-sync.mjs`, wywoływany z `run.sh`) i publikowany na gałąź `data`; telefon nie pyta wtedy Overpass. Baza jest niepełna i niezweryfikowana, a ekran mówi o tym wprost.
 - **Obiekty znad Ukrainy** (NEPTUN, poziom 2 = nieoficjalne): domyślnie wyłączone, włączane zgodą użytkownika (przeglądarka łączy się wtedy bezpośrednio z neptun.in.ua). Wyłącznik awaryjny: `neptun.enabled=false` w `js/config.js`. Podgląd z wymyślonymi danymi: `#/mapa/demo`.
 - Ocena toru: tylko dla dronów i tylko przy świeżych danych; przy braku danych zawsze „Brak aktualnych danych”.
 - **Testy**: `npm test` (logika) oraz scenariusze przeglądarkowe Playwright (poza repozytorium).

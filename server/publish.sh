@@ -5,6 +5,7 @@
 set -euo pipefail
 cd "$DATA_DIR"
 git add alerts.json
+[ -f shelters.json ] && git add shelters.json
 if git rev-parse -q --verify HEAD >/dev/null; then
   git -c user.name="egida-bot" -c user.email="egida-bot@users.noreply.github.com" commit --amend --reset-author -q -m "Dane komunikatów"
 else
