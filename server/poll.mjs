@@ -1,6 +1,7 @@
 // Odpytuje RSO, zapisuje ../data/alerts.json i (opcjonalnie) wysyła NOWE komunikaty na Telegram.
 // Uruchamianie: `node poll.mjs` co 5 min (cron/systemd timer). `--dump` pokazuje strukturę XML.
 import { readFile, writeFile, mkdir } from "node:fs/promises";
+import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { fetchRso, parseRso, findItems } from "./rso.mjs";
@@ -19,6 +20,22 @@ try { TG_CHANNELS = JSON.parse(process.env.TELEGRAM_CHANNELS || "{}"); } catch {
 for (const id of (process.env.TELEGRAM_REGIONS || "").split(",").map((x) => x.trim()).filter(Boolean)) {
   TG_CHANNELS[id] ??= "@" + (process.env.TELEGRAM_PREFIX || "egida_") + id.replace(/-/g, "_");
 }
+// Kanały PRYWATNE (poza limitem publicznych adresów): TELEGRAM_PRIVATE={"opolskie":{"chat":"-1001234567890","link":"https://t.me/+AbCdEf"}}
+const PRIVATE_LINKS = {};
+try {
+  for (const [id, v] of Object.entries(JSON.parse(process.env.TELEGRAM_PRIVATE || "{}"))) {
+    if (/^-?\d{5,}$/.test(String(v?.chat))) TG_CHANNELS[id] = String(v.chat);
+    if (/^https:\/\/t\.me\/(\+|joinchat\/)[\w-]+$/.test(v?.link || "")) PRIVATE_LINKS[id] = v.link;
+  }
+} catch { console.error("TELEGRAM_PRIVATE: niepoprawny JSON"); }
+// Plik tworzony przez tg-sync.mjs: { "lodzkie": { "chat": -100…, "link": "https://t.me/+…" }, … }
+try {
+  const f = JSON.parse(readFileSync(process.env.CHANNELS_FILE || path.join(here, "channels.json"), "utf8"));
+  for (const [id, v] of Object.entries(f)) {
+    if (/^-?\d{5,}$/.test(String(v?.chat))) TG_CHANNELS[id] = String(v.chat);
+    if (/^https:\/\/t\.me\/(\+|joinchat\/)[\w-]+$/.test(v?.link || "")) PRIVATE_LINKS[id] = v.link;
+  }
+} catch { /* brak pliku – OK */ }
 const APP_URL = process.env.APP_URL || "";
 
 const NAMES = { dolnoslaskie: "Dolnośląskie", "kujawsko-pomorskie": "Kujawsko-pomorskie", lubelskie: "Lubelskie", lubuskie: "Lubuskie", lodzkie: "Łódzkie", malopolskie: "Małopolskie", mazowieckie: "Mazowieckie", opolskie: "Opolskie", podkarpackie: "Podkarpackie", podlaskie: "Podlaskie", pomorskie: "Pomorskie", slaskie: "Śląskie", swietokrzyskie: "Świętokrzyskie", "warminsko-mazurskie": "Warmińsko-mazurskie", wielkopolskie: "Wielkopolskie", zachodniopomorskie: "Zachodniopomorskie" };
@@ -37,12 +54,18 @@ async function sendTelegram(channel, html) {
   });
   if (!r.ok) throw new Error(`Telegram ${r.status}: ${(await r.text()).slice(0, 200)}`);
 }
+const TYPE_ICON = { rcb: "🚨", pogoda: "⛈", woda: "🌊", drogi: "🚧", inne: "ℹ️" };
+const when = (iso) => { if (!iso) return ""; const d = new Date(iso); return isNaN(d) ? "" : d.toLocaleString("pl-PL", { timeZone: "Europe/Warsaw", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }); };
 const tgText = (a) => {
-  const head = `<b>${escHtml(TYPE_NAMES[a.type] || "Komunikat")}</b> · ${escHtml(a.voivodeship === "all" ? "cała Polska" : NAMES[a.voivodeship] || a.voivodeship)}`;
+  const region = a.voivodeship === "all" ? "cała Polska" : NAMES[a.voivodeship] || a.voivodeship;
+  const head = `${a.alarm ? "🚨 " : (TYPE_ICON[a.type] || "ℹ️") + " "}<b>${escHtml(TYPE_NAMES[a.type] || "Komunikat")}</b> · ${escHtml(region)}`;
+  const t = when(a.published);
   const body = a.body ? `\n${escHtml(a.body.slice(0, 500))}` : "";
+  const time = t ? `\n🕒 ${escHtml(t)}` : "";
   const src = `\n\nŹródło: ${escHtml(a.source)}${a.url ? ` · ${escHtml(a.url)}` : ""}`;
-  const foot = `\n<i>EGIDA – nieoficjalna aplikacja informacyjna. Kieruj się syrenami, Alertem RCB, służbami i numerem 112.</i>${APP_URL ? `\n${escHtml(APP_URL)}` : ""}`;
-  return `${head}\n${escHtml(a.title)}${body}${src}${foot}`;
+  const follow = `\n\n📲 <b>Śledź rozwój sytuacji w aplikacji EGIDA</b>${APP_URL ? `: ${escHtml(APP_URL)}` : ""}\n🛡 Stosuj się do zaleceń służb, kieruj się syrenami i Alertem RCB. W zagrożeniu życia dzwoń <b>112</b>.`;
+  const foot = `\n<i>EGIDA to nieoficjalna aplikacja informacyjna. Dane mogą być opóźnione lub niepełne.</i>`;
+  return `${head}\n<b>${escHtml(a.title)}</b>${body}${time}${src}${follow}${foot}`;
 };
 
 async function main() {
@@ -75,7 +98,7 @@ async function main() {
   for (const a of fresh) if (!byId.has(a.id) && !(a.validTo && new Date(a.validTo).getTime() < now)) byId.set(a.id, a);
   const items = [...byId.values()].sort((a, b) => (b.published || "").localeCompare(a.published || "")).slice(0, MAX_ITEMS);
   await mkdir(path.dirname(OUT), { recursive: true });
-  await writeFile(OUT, JSON.stringify({ updated: new Date().toISOString(), source: "RSO (komunikaty.tvp.pl)", telegram: Object.fromEntries(Object.entries(TG_CHANNELS).filter(([, c]) => /^@[A-Za-z0-9_]{5,32}$/.test(c)).map(([id, c]) => [id, "https://t.me/" + c.slice(1)])), items }, null, 1));
+  await writeFile(OUT, JSON.stringify({ updated: new Date().toISOString(), source: "RSO (komunikaty.tvp.pl)", telegram: { ...Object.fromEntries(Object.entries(TG_CHANNELS).filter(([, c]) => /^@[A-Za-z0-9_]{5,32}$/.test(c)).map(([id, c]) => [id, "https://t.me/" + c.slice(1)])), ...PRIVATE_LINKS }, items }, null, 1));
   console.log(`Zapisano ${items.length} komunikatów (nowych w pobraniu: ${fresh.filter((a) => !(previous.items || []).some((p) => p.id === a.id)).length}).`);
 
   // Telegram: tylko nowe, tylko ważne typy, tylko z ostatnich 6 godzin (żeby po pierwszym uruchomieniu nie zalać kanałów).

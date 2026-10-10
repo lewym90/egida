@@ -190,3 +190,11 @@ table.t th{font-family:var(--font-h);font-size:.75rem;color:var(--muted);border-
 @media (max-width:359px){.wordmark{letter-spacing:.14em}.tagline{display:none}}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 @media print{.tabbar,.side,.topbar,.btn,.chips{display:none!important}.main{max-width:none;padding:0}body{background:#fff}.card{break-inside:avoid}}
+
+/* Powiadomienia Telegram */
+.how{margin:8px 0;padding-left:22px}.how li{margin:6px 0}
+.how2{margin:8px 0;padding-left:20px}.how2 li{margin:4px 0}
+.tglist .tgrow{display:flex;justify-content:space-between;align-items:center;gap:10px;min-height:52px;padding:14px 16px;margin:-14px -16px;text-decoration:none;color:var(--text);font-weight:600;font-family:var(--font-h)}
+.tglist .tgrow.off{color:var(--muted);font-weight:500}
+.tglist a.tgrow:hover{background:var(--brand-tint)}
+.tgrow .tggo{display:inline-flex;align-items:center;gap:6px;color:var(--brand);font-size:.875rem}

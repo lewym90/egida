@@ -8,6 +8,7 @@ set -a; . "$BASE/env"; set +a
 export PATH="$BASE/node/bin:$PATH"
 export EGIDA_REMOTE="${EGIDA_REMOTE:-https://github.com/${EGIDA_REPO:-lewym90/egida}.git}"
 export DATA_DIR="$BASE/data-repo" GH_TOKEN="${GH_TOKEN:-}"
+export CHANNELS_FILE="$BASE/channels.json"
 export ALERTS_OUT="$DATA_DIR/alerts.json" STATE_FILE="$BASE/state.json"
 LOG="$BASE/log.txt"
 [ -f "$LOG" ] && [ "$(stat -c %s "$LOG")" -gt 1000000 ] && tail -n 200 "$LOG" > "$LOG.tmp" && mv "$LOG.tmp" "$LOG"

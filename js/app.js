@@ -27,6 +27,7 @@ const I = {
   gear: ic('<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.8l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.8-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 11-4 0v-.1a1.7 1.7 0 00-1.1-1.5 1.7 1.7 0 00-1.8.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.8 1.7 1.7 0 00-1.5-1H3a2 2 0 110-4h.1a1.7 1.7 0 001.5-1.1 1.7 1.7 0 00-.3-1.8l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.8.3H9a1.7 1.7 0 001-1.5V3a2 2 0 114 0v.1a1.7 1.7 0 001 1.5 1.7 1.7 0 001.8-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.8V9a1.7 1.7 0 001.5 1H21a2 2 0 110 4h-.1a1.7 1.7 0 00-1.5 1z"/>'),
   test: ic('<rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 8h6M9 12h6M9 16h3"/>'),
   back: ic('<path d="M15 6l-6 6 6 6"/>', 20),
+  send: ic('<path d="M21 3L3 10.5l6.5 2.5L12 20z"/><path d="M21 3L9.5 13"/>'),
   ext: ic('<path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 01-1 1H5a1 1 0 01-1-1V7a1 1 0 011-1h5"/>', 16),
 };
 const LOGO = `<svg width="34" height="34" viewBox="0 0 512 512" aria-hidden="true"><rect width="512" height="512" rx="112" fill="#0B6B63"/><path d="M256 92l140 52v104c0 86-58 142-140 172-82-30-140-86-140-172V144z" fill="none" stroke="#fff" stroke-width="28" stroke-linejoin="round"/><circle cx="256" cy="240" r="42" fill="none" stroke="#fff" stroke-width="26"/></svg>`;
@@ -103,6 +104,7 @@ const NAV = [
 ];
 const SIDE = [
   ...NAV.slice(0, 2),
+  { h: "#/telegram", k: "telegram", t: "Powiadomienia Telegram", i: I.send },
   { h: "#/mapa", k: "mapa", t: "Mapa zagrożeń", i: I.map },
   { h: "#/schrony", k: "schrony", t: "Schrony i ukrycia", i: I.shield, soon: 1 },
   { h: "#/poradnik", k: "poradnik", t: "Co robić", i: I.list },
@@ -113,7 +115,7 @@ const SIDE = [
   { h: "#/ustawienia", k: "ustawienia", t: "Ustawienia", i: I.gear },
   { h: "#/zrodla", k: "zrodla", t: "Źródła i licencje", i: I.book },
 ];
-const GROUP = { "co-robic": "poradnik", "pierwsza-pomoc": "poradnik", test: "poradnik", schrony: "mapa", zrodla: "ustawienia", "plan-rodziny": "pulpit" };
+const GROUP = { telegram: "alerty", "co-robic": "poradnik", "pierwsza-pomoc": "poradnik", test: "poradnik", schrony: "mapa", zrodla: "ustawienia", "plan-rodziny": "pulpit" };
 
 function shell(route, inner) {
   const cur = GROUP[route] || route;
@@ -181,6 +183,7 @@ function screenPulpit() {
   <div class="card"><div class="row"><div><div class="muted small">Twoja gotowość</div><div class="big-num">${r.pct}%</div></div><div style="flex:1"><div class="progress" role="progressbar" aria-valuenow="${r.pct}" aria-valuemin="0" aria-valuemax="100" aria-label="Gotowość"><i style="width:${r.pct}%"></i></div></div></div>
   <ul class="steps">${steps}</ul></div>
   <div class="grid2 grid-d grid4">${tile("#/pierwsza-pomoc", I.heart, "Pierwsza pomoc")}${tile("#/plecak", I.bag, "Plecak i zapas na 3 dni")}${tile("#/poradnik", I.list, "Co robić")}${tile("#/schrony", I.shield, "Schrony i ukrycia", 1)}</div>
+  <a class="tile" style="flex-direction:row;align-items:center;margin-top:12px" href="#/telegram"><span class="ti">${I.send}</span><b>Powiadomienia na Telegramie dla Twojego województwa</b></a>
   ${last ? `<h2 style="margin-top:20px">Ostatnie komunikaty</h2><div class="card flat"><ul class="list">${last}</ul></div>` : ""}`;
 }
 
@@ -229,7 +232,38 @@ function screenAlerty() {
   else body = `<div class="card flat"><ul class="list">${groupAlerts(list).map(groupItem).join("")}</ul></div>`;
   const stale = alertsData.ok && !alertsFresh() ? `<div class="banner-offline">Dane mogą być nieaktualne (ostatnia aktualizacja: ${esc(fmtDate(alertsData.updated) || "brak")}).</div>` : "";
   return `<div class="hero"><h1>Alerty</h1><p>Oficjalne komunikaty (RSO: Alert RCB, IMGW, woda, drogi) dla Twojego województwa.</p></div>
+  <a class="tile" style="flex-direction:row;align-items:center;margin-bottom:12px" href="#/telegram"><span class="ti">${I.send}</span><b>Chcesz dostawać ważne komunikaty na telefon? Powiadomienia Telegram</b></a>
   <div class="chips" role="group" aria-label="Filtry">${chips}</div>${stale}${body}`;
+}
+
+/* ---------- powiadomienia Telegram ---------- */
+const tgLinks = () => ({ ...CONFIG.telegram, ...(alertsData.telegram || {}) });
+function screenTelegram() {
+  const links = tgLinks();
+  const rows = VOIVODESHIPS.map((v) => {
+    const u = safeUrl(links[v.id] || "");
+    const mine = state.region === v.id ? ' <span class="badge ok">Twoje</span>' : "";
+    return u
+      ? `<li><a class="tgrow" href="${esc(u)}" target="_blank" rel="noopener noreferrer"><span>${esc(v.name)}${mine}</span><span class="tggo">Dołącz ${I.ext}</span></a></li>`
+      : `<li><span class="tgrow off"><span>${esc(v.name)}${mine}</span><span class="badge soon">wkrótce</span></span></li>`;
+  }).join("");
+  return `<div class="hero"><h1>Powiadomienia Telegram</h1><p>Ważne komunikaty dla Twojego województwa prosto na telefon, także wtedy, gdy nie masz otwartej aplikacji.</p></div>
+  <div class="card"><h2>Jak to działa</h2>
+  <ol class="how"><li>EGIDA co kilka minut sprawdza oficjalne komunikaty (RSO).</li>
+  <li>Gdy pojawi się nowy ważny komunikat dla Twojego województwa, bot publikuje go na kanale Telegram tego województwa.</li>
+  <li>Jeśli subskrybujesz kanał, dostajesz powiadomienie. W treści jest odsyłacz do aplikacji, gdzie możesz śledzić rozwój sytuacji.</li></ol>
+  <p class="muted small">To kanały „tylko do czytania”: nikt poza botem nie może w nich pisać, nie ma czatu ani komentarzy, a Twoje dane nie są nikomu udostępniane.</p></div>
+  <div class="card"><h2>Co będzie przychodzić</h2>
+  <ul class="how2"><li><b>Alerty RCB</b> i komunikaty ewakuacyjne,</li><li><b>ostrzeżenia pogodowe</b> (IMGW),</li><li><b>komunikaty o wodzie</b>: susza, wysoki stan rzek, jakość wody,</li><li><b>komunikaty oznaczone w RSO jako alarm</b>.</li></ul>
+  <p class="muted small">Komunikaty drogowe zostają tylko w aplikacji, żeby nie zasypywać telefonu.</p>
+  <div class="note warn" style="margin-top:10px"><span class="badge soon">Wkrótce</span> <b>Obiekty latające w pobliżu granicy.</b> Alert RCB dostajesz SMS-em, ale nie podaje on szczegółów. Chcemy dodać informacje, których RCB nie podaje: <b>czas, kierunek i przewidywany tor</b> obiektów w pobliżu granicy Polski, oraz czy omijają Twoją okolicę. Będą oznaczone jako <b>nieoficjalne</b>, pochodzące z zewnętrznych źródeł i mogące być spóźnione lub błędne. To jeszcze nie działa. Zanim to uruchomimy, przez kilka tygodni testujemy dane po cichu.</div></div>
+  <div class="card"><h2>Jak dołączyć</h2>
+  <ol class="how"><li>Zainstaluj aplikację <b>Telegram</b> (jeśli jej nie masz) i załóż konto. Wystarczy numer telefonu.</li>
+  <li>Poniżej dotknij nazwy swojego województwa. Telegram otworzy kanał.</li>
+  <li>Dotknij <b>Dołącz</b> (albo „Subskrybuj”). Kanały są prywatne, więc dołączasz tylko przez ten odsyłacz.</li>
+  <li>Na górze kanału dotknij dzwonka, żeby włączyć powiadomienia.</li></ol>
+  <p class="muted small">Powiadomienia Telegrama mogą nie przebić trybu „Nie przeszkadzać” i nie zastępują syren ani Alertu RCB. Przy zagrożeniu życia dzwoń <b>112</b>.</p></div>
+  <div class="card flat"><h2 style="padding:16px 16px 4px">Wybierz województwo</h2><ul class="list tglist">${rows}</ul></div>`;
 }
 
 function screenMapa() {
@@ -329,13 +363,13 @@ function screenWynik() {
 
 function screenUstawienia() {
   const c = state.consent;
-  const tg = state.region ? safeUrl(CONFIG.telegram[state.region] || alertsData.telegram?.[state.region] || "") : "";
+  const tg = state.region ? safeUrl(tgLinks()[state.region] || "") : "";
   const opt = (v, cur, t) => `<option value="${v}" ${cur === v ? "selected" : ""}>${t}</option>`;
   return `<div class="hero"><h1>Ustawienia</h1></div>
   <div class="card"><h2>Region i lokalizacja</h2><div class="field" style="margin-top:8px"><label for="setRegion" class="muted small">Województwo${state.regionSource === "gps" ? ' <span class="tag-gps">wg GPS (przybliżone – sprawdź)</span>' : ""}</label>
   <select class="sel" id="setRegion"><option value="">— wybierz —</option>${VOIVODESHIPS.map((v) => `<option value="${v.id}" ${state.region === v.id ? "selected" : ""}>${esc(v.name)}</option>`).join("")}</select></div>
   <button class="btn" id="useGps" style="margin-top:10px">${I.pin}Użyj lokalizacji GPS</button><p class="muted small">Pozycja jest używana tylko w Twoim telefonie, do wskazania najbliższego województwa. Nie jest wysyłana na serwer.</p></div>
-  <div class="card"><h2>Powiadomienia</h2>${tg ? `<p>Kanał Telegram dla Twojego województwa:</p><a class="btn primary" href="${esc(tg)}" target="_blank" rel="noopener noreferrer">Otwórz kanał Telegram ${I.ext}</a>` : `<p class="muted">Kanały Telegram na województwa są w przygotowaniu. Powiadomienia nie przebijają trybu „Nie przeszkadzać” i nie zastępują syren ani Alertu RCB.</p>`}</div>
+  <div class="card"><h2>Powiadomienia</h2>${tg ? `<p>Kanał Telegram dla Twojego województwa:</p><a class="btn primary" href="${esc(tg)}" target="_blank" rel="noopener noreferrer">Otwórz kanał Telegram ${I.ext}</a>` : `<p class="muted">Kanał Telegram dla Twojego województwa jest w przygotowaniu. Powiadomienia nie przebijają trybu „Nie przeszkadzać” i nie zastępują syren ani Alertu RCB.</p>`}<p style="margin-top:10px"><a href="#/telegram">Jak działają powiadomienia Telegram i lista kanałów</a></p></div>
   <div class="card"><h2>Prywatność</h2>
   <label class="switch"><input type="checkbox" id="setCounter" ${c.counter ? "checked" : ""}><span><b>Anonimowy licznik odwiedzin</b><span class="muted small">Bez cookies i identyfikatorów. ${CONFIG.goatcounter ? "" : "(Licznik nie jest jeszcze skonfigurowany, więc nic nie jest zliczane.)"}</span></span></label></div>
   <div class="card"><h2>Wygląd</h2><div class="grid2" style="margin-top:8px"><div class="field"><label for="setFs" class="muted small">Rozmiar tekstu</label><select class="sel" id="setFs">${opt("normal", state.fs, "Normalny")}${opt("large", state.fs, "Duży")}${opt("xlarge", state.fs, "Bardzo duży")}</select></div>
@@ -369,12 +403,13 @@ function render() {
     case "pierwsza-pomoc": inner = screenPierwszaPomoc(); break;
     case "plecak": inner = screenPlecak(); break;
     case "test": inner = arg === "wynik" ? screenWynik() : screenTest(); break;
+    case "telegram": inner = screenTelegram(); break;
     case "ustawienia": inner = screenUstawienia(); break;
     case "zrodla": inner = screenZrodla(); break;
     default: inner = screenPulpit();
   }
   app.innerHTML = shell(route, inner);
-  const titles = { pulpit: "Pulpit", alerty: "Alerty", mapa: "Mapa", poradnik: "Poradnik", plecak: "Plecak", "pierwsza-pomoc": "Pierwsza pomoc", test: "Test gotowości", ustawienia: "Ustawienia", zrodla: "Źródła" };
+  const titles = { pulpit: "Pulpit", alerty: "Alerty", mapa: "Mapa", poradnik: "Poradnik", plecak: "Plecak", "pierwsza-pomoc": "Pierwsza pomoc", test: "Test gotowości", ustawienia: "Ustawienia", zrodla: "Źródła", telegram: "Powiadomienia Telegram" };
   document.title = `EGIDA – ${titles[route] || "Pulpit"}`;
   window.scrollTo(0, 0);
 }
@@ -443,6 +478,6 @@ window.addEventListener("hashchange", () => { if (parse().route === "test" && !p
 applyPrefs(); applyCounter();
 testAnswers = { ...(state.test?.answers || {}) };
 render();
-loadAlerts().then(() => { if (state.onboarded && ["pulpit", "alerty", "ustawienia", ""].includes(parse().route) && !document.activeElement?.closest?.("select")) render(); });
-setInterval(() => loadAlerts().then(() => { if (["pulpit", "alerty", "ustawienia"].includes(parse().route) && !document.activeElement?.closest?.("select")) render(); }), 5 * 60 * 1000);
+loadAlerts().then(() => { if (state.onboarded && ["pulpit", "alerty", "ustawienia", "telegram", ""].includes(parse().route) && !document.activeElement?.closest?.("select")) render(); });
+setInterval(() => loadAlerts().then(() => { if (["pulpit", "alerty", "ustawienia", "telegram"].includes(parse().route) && !document.activeElement?.closest?.("select")) render(); }), 5 * 60 * 1000);
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});

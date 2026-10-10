@@ -8,7 +8,12 @@ const api = async (m, body) => (await fetch(`https://api.telegram.org/bot${token
 const me = await api("getMe");
 if (!me.ok) { console.log("Token odrzucony przez Telegram:", me.description); process.exit(1); }
 console.log(`Bot: @${me.result.username} – token działa.`);
-for (const ch of process.argv.slice(2).filter((a) => a.startsWith("@"))) {
+let targets = process.argv.slice(2).filter((a) => a.startsWith("@") || /^-?\d{5,}$/.test(a));
+if (process.argv.includes("--all")) {   // wszystkie kanały z channels.json
+  const { readFile } = await import("node:fs/promises");
+  try { targets = Object.values(JSON.parse(await readFile(process.env.CHANNELS_FILE || new URL("./channels.json", import.meta.url).pathname, "utf8"))).map((v) => String(v.chat)).filter((x) => /^-?\d{5,}$/.test(x)); } catch { console.log("Brak pliku channels.json – najpierw uruchom tg-sync.mjs"); }
+}
+for (const ch of targets) {
   const chat = await api("getChat", { chat_id: ch });
   if (!chat.ok) { console.log(`${ch}: NIE ZNALEZIONO (${chat.description}). Sprawdź nazwę i czy kanał jest publiczny.`); continue; }
   const m = await api("getChatMember", { chat_id: ch, user_id: me.result.id });
