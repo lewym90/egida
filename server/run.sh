@@ -25,7 +25,7 @@ PSP_STAMP="$BASE/psp.checked"; PSP_NEW=0
 if [ ! -f "$PSP_STAMP" ] || [ "$(( $(date +%s) - $(stat -c %Y "$PSP_STAMP") ))" -gt 21600 ]; then
   PSP_LOG="$(PSP_OUT="$DATA_DIR/psp" timeout 200 node psp-sync.mjs 2>&1)"; PSP_RC=$?; echo "$PSP_LOG" | tail -n 6
   if [ "$PSP_RC" -eq 0 ]; then touch "$PSP_STAMP"; echo "$PSP_LOG" | grep -q '^Zapisano' && PSP_NEW=1
-  else echo "psp-sync nieudany – zostaje poprzednia baza, ponowię za ok. godzinę"; touch -d '-5 hours' "$PSP_STAMP"; fi
+  else echo "psp-sync nieudany (np. serwer PSP odrzuca skrypty) – zostaje poprzednia baza; kolejna próba za ok. 6 h. Ręczny import: patrz README"; touch "$PSP_STAMP"; fi
 fi
 # Raz na dobę odśwież bazę schronów z OpenStreetMap (błąd tu nie zatrzymuje komunikatów).
 SH_FILE="$DATA_DIR/shelters.json"; SH_NEW=0

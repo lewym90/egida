@@ -11,10 +11,17 @@ export const PSP_URL = "https://gdziesieukryc.pl";
 export const CELL_LAT = 0.2, CELL_LON = 0.3;
 export const pspCellId = (lat, lon) => `${Math.floor(lat / CELL_LAT + 1e-9)}_${Math.floor(lon / CELL_LON + 1e-9)}`;
 /** Kafelki 3×3 wokół pozycji (pozycja w środkowym). */
-export function pspCellsAround(lat, lon) {
+export function pspCellsAround(lat, lon, r = 1) {
   const a = Math.floor(lat / CELL_LAT + 1e-9), b = Math.floor(lon / CELL_LON + 1e-9), out = [];
-  for (let i = a - 1; i <= a + 1; i++) for (let j = b - 1; j <= b + 1; j++) out.push(`${i}_${j}`);
+  for (let i = a - r; i <= a + r; i++) for (let j = b - r; j <= b + r; j++) out.push(`${i}_${j}`);
   return out;
+}
+/** Promień (km), w którym blok kafelków (2r+1)² wokół pozycji pokrywa WSZYSTKIE punkty: odległość od pozycji do najbliższej krawędzi bloku. */
+export function guaranteedKm(lat, lon, r = 1) {
+  const a = Math.floor(lat / CELL_LAT + 1e-9), b = Math.floor(lon / CELL_LON + 1e-9);
+  const kmLat = 111.19, kmLon = 111.19 * Math.cos((lat * Math.PI) / 180);
+  const dS = lat - (a - r) * CELL_LAT, dN = (a + r + 1) * CELL_LAT - lat, dW = lon - (b - r) * CELL_LON, dE = (b + r + 1) * CELL_LON - lon;
+  return Math.min(dS * kmLat, dN * kmLat, dW * kmLon, dE * kmLon);
 }
 const inPolandBox = (lat, lon) => lat >= 48.9 && lat <= 55.0 && lon >= 14.0 && lon <= 24.3;
 /** Walidacja i podział pakietu PSP na kafelki. Zwraca { tiles: Map(id → rows), count, rejected }. Rzuca błąd przy obcym formacie. */
@@ -37,8 +44,8 @@ export function pspRowToShelter([id, lat, lon, addr, city, avail]) {
   return { id: "OZO-" + id, lat, lon, name: clean(addr, 120) || (city ? `Punkt schronienia, ${city}` : "Punkt schronienia"), kind: "ukrycie", addr: "", city: clean(city, 60), access: clean(avail, 60), hours: "", capacity: "", level: "", how: "", osmUrl: "", src: "psp" };
 }
 /** Pobiera kafelki wokół pozycji (równolegle); cache: { get(key) → Promise<obj|null>, set(key, obj) }. Brak kafelka (404) = pusty obszar. */
-export async function loadPspAround(baseUrl, lat, lon, { fetchImpl = (...a) => fetch(...a), cache = null, memo = new Map() } = {}) {
-  const ids = pspCellsAround(lat, lon);
+export async function loadPspAround(baseUrl, lat, lon, { fetchImpl = (...a) => fetch(...a), cache = null, memo = new Map(), r = 1 } = {}) {
+  const ids = pspCellsAround(lat, lon, r);
   let failed = 0;
   const res = await Promise.all(ids.map(async (id) => {
     if (memo.has(id)) return memo.get(id);
@@ -53,6 +60,26 @@ export async function loadPspAround(baseUrl, lat, lon, { fetchImpl = (...a) => f
     return rows || [];
   }));
   return { items: res.flat().map(pspRowToShelter), failed, total: ids.length };
+}
+/**
+ * Szuka punktów w promieniu maxKm: zaczyna od 3×3 kafelków i rozszerza (5×5, 7×7), dopóki 5 najbliższych nie jest PEWNE
+ * (tzn. leży w promieniu pokrytym wczytanymi kafelkami) albo nie osiągnięto maxKm. W gęstej zabudowie wystarcza 9 kafelków.
+ * Zwraca { items, failed, total, coveredKm, rings }.
+ */
+export async function loadPspNearest(baseUrl, lat, lon, { maxKm = 50, want = 5, rMax = 3, ...opts } = {}) {
+  let res = null, rings = 0;
+  const seen = new Set();
+  for (let r = 1; r <= rMax; r++) {
+    const part = await loadPspAround(baseUrl, lat, lon, { ...opts, r });
+    rings = r;
+    res = { items: part.items, failed: part.failed, total: part.total };
+    const g = guaranteedKm(lat, lon, r);
+    const within = part.items.filter((x) => haversineKm({ lat, lon }, x) <= Math.min(g, maxKm)).length;
+    if (part.failed > 0 && r === 1) break; // brak sieci/danych: nie mnożymy żądań
+    if (within >= want || g >= maxKm) { res.coveredKm = Math.min(g, maxKm); break; }
+    res.coveredKm = g;
+  }
+  return { ...res, rings };
 }
 /** Pamięć podręczna kafelków w telefonie (Cache API) – działa offline po pierwszym pobraniu okolicy. */
 export function makePspCache(baseUrl) {

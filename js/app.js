@@ -21,6 +21,7 @@ const I = {
   heart: ic('<path d="M12 21s-8-5.2-8-11a4.5 4.5 0 018-2.7A4.5 4.5 0 0120 10c0 5.8-8 11-8 11z"/>'),
   shield: ic('<path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/>'),
   pin: ic('<path d="M12 21s7-6.3 7-12a7 7 0 10-14 0c0 5.7 7 12 7 12z"/><circle cx="12" cy="9" r="2.5"/>', 18),
+  chevr: ic('<path d="M9 6l6 6-6 6"/>', 18),
   chev: ic('<path d="M6 9l6 6 6-6"/>', 18),
   phone: ic('<path d="M5 4h4l2 5-2.5 1.5a11 11 0 005 5L15 13l5 2v4a2 2 0 01-2 2A16 16 0 013 6a2 2 0 012-2z"/>', 18),
   check: ic('<path d="M5 12l5 5 9-10"/>', 20),
@@ -29,6 +30,7 @@ const I = {
   gear: ic('<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.8l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.8-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 11-4 0v-.1a1.7 1.7 0 00-1.1-1.5 1.7 1.7 0 00-1.8.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.8 1.7 1.7 0 00-1.5-1H3a2 2 0 110-4h.1a1.7 1.7 0 001.5-1.1 1.7 1.7 0 00-.3-1.8l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.8.3H9a1.7 1.7 0 001-1.5V3a2 2 0 114 0v.1a1.7 1.7 0 001 1.5 1.7 1.7 0 001.8-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.8V9a1.7 1.7 0 001.5 1H21a2 2 0 110 4h-.1a1.7 1.7 0 00-1.5 1z"/>'),
   test: ic('<rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 8h6M9 12h6M9 16h3"/>'),
   back: ic('<path d="M15 6l-6 6 6 6"/>', 20),
+  users: ic('<circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><circle cx="17" cy="9" r="2.6"/><path d="M16.5 14.2c2.7 0 4.5 2 4.5 4.8"/>'),
   send: ic('<path d="M21 3L3 10.5l6.5 2.5L12 20z"/><path d="M21 3L9.5 13"/>'),
   ext: ic('<path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 01-1 1H5a1 1 0 01-1-1V7a1 1 0 011-1h5"/>', 16),
 };
@@ -62,7 +64,7 @@ async function loadAlerts() {
     const r = await fetch(`${CONFIG.alertsUrl}${CONFIG.alertsUrl.includes("?") ? "&" : "?"}t=${Math.floor(Date.now() / 60000)}`, { cache: "no-store" });
     if (!r.ok) throw new Error(r.status);
     const j = await r.json();
-    alertsData = { loaded: true, ok: true, updated: j.updated || null, items: Array.isArray(j.items) ? j.items : [], telegram: j.telegram && typeof j.telegram === "object" ? j.telegram : {} };
+    alertsData = { loaded: true, ok: true, live: true, checkedAt: Date.now(), updated: j.updated || null, items: Array.isArray(j.items) ? j.items : [], telegram: j.telegram && typeof j.telegram === "object" ? j.telegram : {} };
     try { localStorage.setItem(ALERTS_CACHE, JSON.stringify({ updated: alertsData.updated, items: alertsData.items, telegram: alertsData.telegram })); } catch { /* brak miejsca / tryb prywatny */ }
   } catch {
     // Brak sieci: pokaż ostatnio pobrane dane. O tym, czy są aktualne, decyduje alertsFresh() (wiek danych).
@@ -173,10 +175,21 @@ function screenStart() {
   <a class="btn112" style="justify-content:center;min-height:48px" href="tel:112">${I.phone}Zagrożenie życia? Zadzwoń 112</a></div></main>`;
 }
 
+/* Poziom komunikatów dla Pulpitu: alarm (czerwony) → ostrzeżenie (bursztyn) → spokojnie (zielony). Czerwień tylko dla realnego alarmu. */
+const degreeOf = (a) => { const m = /(\d)\s*\.?\s*stopie/i.exec(String(a.title || "")); return m ? Number(m[1]) : 0; };
+const alertLevel = (list) => (list.some((a) => a.alarm) ? "alarm" : list.some((a) => a.type === "rcb" || (a.type === "pogoda" && degreeOf(a) >= 2)) ? "warn" : "calm");
+const hhmm = (ms) => new Date(ms).toLocaleTimeString("pl-PL", { hour: "2-digit", minute: "2-digit" });
+const DOT = { rcb: "#B3261E", pogoda: "#B45309", drogi: "#2A4DA0", woda: "#0B6B63" };
+function nearestMinutes() { try { const j = JSON.parse(sessionStorage.getItem("egida.nearest") || "null"); return j && Date.now() - j.t < 600000 && Number.isFinite(j.min) ? j.min : null; } catch { return null; } }
+function ring(pct) {
+  const R = 30, C = 2 * Math.PI * R;
+  return `<svg class="ring" viewBox="0 0 72 72" width="72" height="72" role="img" aria-label="Gotowość: ${pct}%"><circle cx="36" cy="36" r="${R}" fill="none" stroke="var(--line-in)" stroke-width="8"/><circle cx="36" cy="36" r="${R}" fill="none" stroke="var(--brand)" stroke-width="8" stroke-linecap="round" stroke-dasharray="${(C * pct / 100).toFixed(1)} ${C.toFixed(1)}" transform="rotate(-90 36 36)"/><text x="36" y="41" text-anchor="middle" font-family="var(--font-h)" font-weight="800" font-size="17" fill="var(--text)">${pct}%</text></svg>`;
+}
 function screenPulpit() {
   const r = readiness();
   const fresh = alertsFresh();
   const list = regionAlerts();
+  const name = esc(regionById(state.region)?.name);
   let status;
   if (!state.region) {
     status = `<div class="status warn"><span class="ico">${I.pin}</span><div><h2>Wybierz województwo</h2><p>Pokażemy komunikaty dla Twojej okolicy. Użyj listy u góry ekranu.</p></div></div>`;
@@ -184,20 +197,33 @@ function screenPulpit() {
     status = `<div class="status warn"><span class="ico">${I.bell}</span><div><h2>Sprawdzam komunikaty…</h2></div></div>`;
   } else if (!fresh) {
     status = `<div class="status warn"><span class="ico">${I.alert}</span><div><h2>Brak aktualnych danych</h2><p>Nie udało się pobrać świeżych komunikatów. To nie znaczy, że jest bezpiecznie. Słuchaj syren, sprawdź Alerty RCB w telefonie i oficjalne komunikaty.</p></div></div>`;
-  } else if (list.length) {
-    status = `<a class="status alert" style="text-decoration:none" href="#/alerty"><span class="ico">${I.alert}</span><div><h2>Aktywne komunikaty: ${list.length}</h2><p>Dla: ${esc(regionById(state.region)?.name)}. Dotknij, aby zobaczyć.</p></div></a>`;
   } else {
-    status = `<div class="status ok"><span class="ico">${I.check}</span><div><h2>Brak aktywnych komunikatów</h2><p>Dla: ${esc(regionById(state.region)?.name)}. Dane z ${esc(fmtDate(alertsData.updated))}. Aplikacja nie zastępuje syren ani Alertu RCB.</p></div></div>`;
+    const lvl = alertLevel(list);
+    const when = alertsData.live && alertsData.checkedAt ? `Sprawdzono dziś o ${hhmm(alertsData.checkedAt)}.` : `Dane z ${esc(fmtDate(alertsData.updated))}.`;
+    const chips = [...new Set(list.map((a) => String(a.source || "RSO").replace(/\s*\(.*\)/, "")).concat(["RSO"]))].slice(0, 4).map((c) => `<span class="srcchip">${esc(c)}</span>`).join("");
+    if (lvl === "alarm") {
+      const al = list.find((a) => a.alarm);
+      status = `<a class="status alert" style="text-decoration:none" href="#/alerty"><span class="ico">${I.alert}</span><div><h2>Alarm w Twoim województwie</h2><p>${esc(al?.title || "")} Dotknij, aby zobaczyć wszystkie komunikaty (${list.length}).</p></div></a>`;
+    } else if (lvl === "warn") {
+      status = `<a class="status warn" style="text-decoration:none" href="#/alerty"><span class="ico">${I.alert}</span><div><h2>Są aktywne komunikaty (${list.length})</h2><p>Dla: ${name}. Dotknij, aby zobaczyć. ${when}</p><div class="chips">${chips}</div></div></a>`;
+    } else {
+      status = `<div class="status ok"><span class="ico">${I.check}</span><div><h2>W Twojej okolicy jest spokojnie</h2><p>Brak aktywnych ostrzeżeń alarmowych dla województwa ${name}. ${when}</p><div class="chips">${chips}</div>${list.length ? `<p class="small" style="margin-top:8px"><a href="#/alerty">Komunikaty informacyjne: ${list.length}. Zobacz w Alertach</a></p>` : ""}<p class="small" style="margin-top:8px;opacity:.85">Aplikacja nie zastępuje syren ani Alertu RCB.</p></div></div>`;
+    }
   }
-  const tile = (h, i, t, soon) => `<a class="tile ${soon ? "soon" : ""}" href="${h}"><span class="ti">${i}</span><b>${t}</b>${soon ? '<span class="badge soon" style="align-self:flex-start">wkrótce</span>' : ""}</a>`;
-  const steps = r.steps.map((s, i) => `<li><span class="dot ${s.done ? "done" : ""}">${s.done ? "✓" : i + 1}</span>${s.done ? `<span class="muted">${esc(s.t)}</span>` : `<a href="${s.h}">${esc(s.t)}</a>`}</li>`).join("");
-  const last = groupAlerts(list).slice(0, 3).map(groupItem).join("");
+  const nm = nearestMinutes();
+  const tile = (h, cls, i, t, sub, soon) => `<a class="tile ${soon ? "soon" : ""}" href="${h}"><span class="ti ${cls}">${i}</span><b>${t}</b><span class="muted small">${sub}</span>${soon ? '<span class="badge soon" style="align-self:flex-start">wkrótce</span>' : ""}</a>`;
+  const nPack = plecakDone(), tPack = PLECAK.start.length;
+  const steps = r.steps.map((st, i) => {
+    const label = i === 1 ? `${st.t.replace("Przygotuj", "Spakuj")} <span class="muted small">· ${nPack} z ${tPack}</span>` : esc(st.t);
+    return st.done ? `<li><a href="${st.h}"><span class="muted">${i === 1 ? label : esc(st.t)}</span><span class="stp">✓</span></a></li>` : `<li><a href="${st.h}"><span>${label}</span>${I.chevr}</a></li>`;
+  }).join("");
+  const last = groupAlerts(list).slice(0, 3).map((g) => { const a = g.items[0]; const dot = a.alarm ? DOT.rcb : DOT[a.type] || DOT.drogi; return `<li class="lastmsg"><span class="ldot" style="background:${dot}"></span><div><b>${esc(a.title)}</b><div class="muted small">${esc(String(a.source || "RSO").replace(/\s*\(.*\)/, ""))} · ${esc(regionById(a.voivodeship)?.name?.toLowerCase() || "cała Polska")} · ${esc(fmtDate(a.published))}${g.items.length > 1 ? ` · ${g.items.length} ${plural(g.items.length)}` : ""}</div></div></li>`; }).join("");
   return `<div class="hero"><h1>Pulpit</h1></div>${status}
-  <div class="card"><div class="row"><div><div class="muted small">Twoja gotowość</div><div class="big-num">${r.pct}%</div></div><div style="flex:1"><div class="progress" role="progressbar" aria-valuenow="${r.pct}" aria-valuemin="0" aria-valuemax="100" aria-label="Gotowość"><i style="width:${r.pct}%"></i></div></div></div>
-  <ul class="steps">${steps}</ul></div>
-  <div class="grid2 grid-d grid4">${tile("#/pierwsza-pomoc", I.heart, "Pierwsza pomoc")}${tile("#/plecak", I.bag, "Plecak i zapas na 3 dni")}${tile("#/poradnik", I.list, "Co robić")}${tile("#/schrony", I.shield, "Schrony i ukrycia")}</div>
-  <a class="tile" style="flex-direction:row;align-items:center;margin-top:12px" href="#/telegram"><span class="ti">${I.send}</span><b>Powiadomienia na Telegramie dla Twojego województwa</b></a>
-  ${last ? `<h2 style="margin-top:20px">Ostatnie komunikaty</h2><div class="card flat"><ul class="list">${last}</ul></div>` : ""}`;
+  <div class="card ready"><div class="row" style="gap:16px">${ring(r.pct)}<div style="flex:1"><h2 style="margin:0">Twoja gotowość</h2><p class="muted small" style="margin:2px 0 0">Trzy małe kroki, żeby poczuć się pewniej.</p></div></div>
+  <ul class="steps stepsnav">${steps}</ul></div>
+  <div class="grid2 grid-d grid4">${tile("#/schrony", "t-green", I.pin, "Schrony blisko", nm != null ? `Najbliżej: ${nm} min pieszo` : "Najbliższe punkty schronienia")}${tile("#/pierwsza-pomoc", "t-red", I.heart, "Pierwsza pomoc", "Krok po kroku, offline")}${tile("#/plecak", "t-blue", I.bag, "Plecak i zapasy", "Zestaw na 72 godziny")}${tile("#/plan-rodziny", "t-amber", I.users, "Plan rodziny", "Kontakty i miejsce spotkania", true)}</div>
+  <div class="grid2 grid-d" style="margin-top:12px"><a class="tile" style="flex-direction:row;align-items:center" href="#/poradnik"><span class="ti t-green">${I.list}</span><b>Co robić, gdy…</b></a><a class="tile" style="flex-direction:row;align-items:center" href="#/telegram"><span class="ti t-blue">${I.send}</span><b>Powiadomienia Telegram dla Twojego województwa</b></a></div>
+  ${last ? `<div class="card" style="margin-top:16px"><div class="row"><h2 style="margin:0">Ostatnie komunikaty</h2><span class="spacer"></span><a href="#/alerty" class="all"><b>Wszystkie</b></a></div><ul class="lastlist">${last}</ul></div>` : ""}`;
 }
 
 /* Pilne na górze (alarm/RCB → pogoda → drogi → reszta), w obrębie grupy najnowsze pierwsze. Takie same tytuły zwijamy w jedną pozycję. */

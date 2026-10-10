@@ -5,7 +5,7 @@ import { haversineKm, bearingDeg, destination, crossTrack, pointInRing, distToRi
 import { POLAND_RING } from "../js/poland-border.js";
 import { normalizeThreat, ThreatStore, applyEnvelope, applySnapshotJson, predict, assess, buildView, zoneOf, coneOutline, parseTime, ageText, LIMITS } from "../js/neptun.js";
 import { createFeed } from "../js/neptun-feed.js";
-import { coarseBbox, overpassQuery, parseOverpass, makeShelter, withDistance, walkMin, dirUrl, fetchOsmShelters, loadShelterDb, nearest, overpassQueryPoland, DB_CACHE, buildPspTiles, pspCellId, pspCellsAround, pspRowToShelter, loadPspAround, mergeSources } from "../js/shelters.js";
+import { coarseBbox, overpassQuery, parseOverpass, makeShelter, withDistance, walkMin, dirUrl, fetchOsmShelters, loadShelterDb, nearest, overpassQueryPoland, DB_CACHE, buildPspTiles, pspCellId, pspCellsAround, pspRowToShelter, loadPspAround, mergeSources, loadPspNearest, guaranteedKm } from "../js/shelters.js";
 import { demoThreats, DEMO_USER } from "../js/demo.js";
 
 let n = 0;
@@ -274,6 +274,29 @@ ok("odległość, czas pieszo, linki do tras", () => {
   // scalanie: wpis OSM (z opisem wejścia) wygrywa z punktem PSP w promieniu 30 m
   const osm = [{ id: "node/1", lat: 51.250478, lon: 22.56159 + 0.0001, name: "Schron OSM", how: "Wejście od podwórka", src: "osm" }];
   const merged = mergeSources(r1.items, osm); assert.equal(merged.length, 2); assert.ok(merged.some((x) => x.id === "node/1")); assert.ok(!merged.some((x) => x.id === "OZO-AAA")); assert.ok(merged.some((x) => x.id === "OZO-BBB")); n++;
+}
+
+/* promień 50 km: rozszerzanie kafelków tylko gdy trzeba */
+{
+  const g1 = guaranteedKm(51.25, 22.56, 1), g2 = guaranteedKm(51.25, 22.56, 2), g3 = guaranteedKm(51.25, 22.56, 3);
+  assert.ok(g1 >= 19 && g2 > g1 && g3 >= 50, `pokrycie: ${g1.toFixed(1)} / ${g2.toFixed(1)} / ${g3.toFixed(1)} km`); n++;
+  const lat = 51.25, lon = 22.56; const reqs = [];
+  const mkTile = (id, k) => Array.from({ length: k }, (_, i) => ["T" + id + i, +(lat + 0.001 * i).toFixed(5), +(lon + 0.001 * i).toFixed(5), "ul. " + id + i, "M", "x"]);
+  const here = pspCellId(lat, lon);
+  // gęsto: 6 punktów w środkowym kafelku ⇒ wystarczy 3×3 (9 żądań)
+  let f = async (u) => { reqs.push(u); return u.endsWith(`c/${here}.json`) ? { ok: true, status: 200, json: async () => ({ rows: mkTile("a", 6) }) } : { ok: false, status: 404 }; };
+  let r = await loadPspNearest("https://x.test/p/", lat, lon, { fetchImpl: f, memo: new Map() });
+  assert.equal(reqs.length, 9); assert.equal(r.rings, 1); assert.equal(r.items.length, 6); n++;
+  // rzadko: tylko 2 punkty, i to dwa kafelki dalej ⇒ rozszerza do 5×5, potem 7×7 (pokrycie ≥ 50 km)
+  reqs.length = 0;
+  const [ia, ib] = here.split("_").map(Number); const far = `${ia + 2}_${ib}`;
+  f = async (u) => { reqs.push(u); return u.endsWith(`c/${far}.json`) ? { ok: true, status: 200, json: async () => ({ rows: [["F1", (ia + 2) * 0.2 + 0.05, ib * 0.3 + 0.1, "ul. Daleka 1", "M", "x"]] }) } : { ok: false, status: 404 }; };
+  r = await loadPspNearest("https://x.test/p/", lat, lon, { fetchImpl: f, memo: new Map() });
+  assert.equal(r.rings, 3); assert.equal(reqs.length, 49); assert.equal(r.items.length, 1); assert.ok(r.coveredKm >= 50); n++;
+  // awaria sieci: nie mnoży żądań (tylko 9)
+  reqs.length = 0;
+  r = await loadPspNearest("https://x.test/p/", lat, lon, { fetchImpl: async (u) => { reqs.push(u); throw new Error("offline"); }, memo: new Map() });
+  assert.equal(reqs.length, 9); assert.equal(r.failed, 9); n++;
 }
 
 console.log(`OK: ${n} grup testów logiki klienta przeszło (limity: strefa ${LIMITS.zoneKm} km, uspokajanie ≤ ${LIMITS.reassureAgeSec} s)`);

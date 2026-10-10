@@ -4,7 +4,10 @@
 import { CONFIG } from "./config.js";
 import { fmtKmPl } from "./neptun.js";
 import { DEMO_USER } from "./demo.js";
-import { PSP_URL, nearest, walkMin, dirUrl, makeShelter, loadShelterDb, loadPspAround, makePspCache, mergeSources } from "./shelters.js";
+import { PSP_URL, nearest, withDistance, walkMin, dirUrl, makeShelter, loadShelterDb, loadPspAround, loadPspNearest, makePspCache, mergeSources } from "./shelters.js";
+import { haversineKm } from "./geo.js";
+
+const RADIUS_KM = 50, SHOW = 5; // szukamy w promieniu 50 km, na liście pokazujemy 5 najbliższych
 import { esc, loadLeaflet, baseLayer, shelterIcon, getUser, locate, setActive, destroyScreens, fmtDt } from "./mapscreen.js";
 
 /** Wymyślone obiekty do podglądu wyglądu ekranu (nie są to prawdziwe schrony). */
@@ -32,6 +35,8 @@ export function renderSheltersHtml(ctx, { demo = false } = {}) {
   <div class="row" id="shChips" style="flex-wrap:wrap;margin:10px 0" role="group" aria-label="Filtr listy">${FILTERS.map(([k, n], i) => `<button class="chip" data-f="${k}" aria-pressed="${i === 0}">${n}</button>`).join("")}</div>
   <div id="shMap" class="map map-sm" role="region" aria-label="Mapa najbliższych schronów. Te same obiekty są wypisane w liście poniżej."><p class="muted" style="padding:12px">Ładuję mapę…</p></div>
   <p id="shTileMsg" class="note warn" hidden role="status"></p>
+  <p id="shMapHint" class="muted small" aria-live="polite" style="margin:6px 2px"></p>
+  <p id="shLive" class="muted small" aria-live="polite" style="margin:6px 2px"></p>
   <div id="shStatus" aria-live="polite"></div>
   <div id="shFeat"></div>
   <ul class="list shlist" id="shList"></ul>
@@ -78,14 +83,14 @@ export function initSheltersScreen(ctx, { demo = false } = {}) {
   const draw = () => {
     if (dead) return;
     $("shGate").hidden = !!pos;
-    const list = pos ? nearest(all(), pos, { maxKm: demo ? 150 : 15, limit: 60 }) : [];
+    const list = pos ? nearest(all(), pos, { maxKm: demo ? 150 : RADIUS_KM, limit: 400 }) : [];
     const shown = filtered(list);
-    const feat = shown[0], rest = shown.slice(1, 15);
+    const feat = shown[0], rest = shown.slice(1, SHOW);
     let status = "";
     if (!pos) status = "";
     else if (pspState === "loading" && !shown.length) status = `<p class="muted">Wczytuję punkty schronienia z Twojej okolicy…</p>`;
     else if (pspState === "none" && !shown.length) status = `<div class="note warn"><b>Nie udało się wczytać punktów schronienia</b> (brak internetu albo dane jeszcze nie zostały opublikowane). Brak danych nie oznacza, że schronów nie ma. Oficjalna mapa PSP: <a href="${PSP_URL}" target="_blank" rel="noopener noreferrer">${PSP_URL.replace("https://", "")}</a>.</div>`;
-    else if (!shown.length) status = `<div class="note neutral">${filter === "all" ? "W promieniu ok. 15 km nie ma punktów w rejestrze." : "Brak obiektów dla tego filtra."} <b>To nie znaczy, że nie ma schronów</b>: rejestr może być niepełny. Sprawdź oficjalną mapę PSP: <a href="${PSP_URL}" target="_blank" rel="noopener noreferrer">${PSP_URL.replace("https://", "")}</a> albo dodaj własne miejsce poniżej.</div>`;
+    else if (!shown.length) status = `<div class="note neutral">${filter === "all" ? `W promieniu ${RADIUS_KM} km nie ma punktów w rejestrze.` : "Brak obiektów dla tego filtra."} <b>To nie znaczy, że nie ma schronów</b>: rejestr może być niepełny. Sprawdź oficjalną mapę PSP: <a href="${PSP_URL}" target="_blank" rel="noopener noreferrer">${PSP_URL.replace("https://", "")}</a> albo dodaj własne miejsce poniżej.</div>`;
     else if (pspState === "none") status = `<div class="note warn">Nie wszystkie dane z okolicy udało się wczytać (brak internetu?). Lista może być niepełna.</div>`;
     else if (feat.distKm > 5 && !demo) status = `<div class="note neutral">Najbliższy punkt w rejestrze jest ${esc(fmtKmPl(feat.distKm))} od Ciebie. <b>Bliżej mogą być miejsca, których w rejestrze nie ma</b>. Oficjalna mapa PSP: <a href="${PSP_URL}" target="_blank" rel="noopener noreferrer">${PSP_URL.replace("https://", "")}</a>.</div>`;
     $("shStatus").innerHTML = status;
@@ -97,51 +102,103 @@ export function initSheltersScreen(ctx, { demo = false } = {}) {
     if (pspIdx) parts.push(`Rejestr Punktów Schronienia (MSWiA / PSP): ${esc(String(pspIdx.count))} punktów w Polsce${pspIdx.builtAt ? `, stan z ${esc(fmtDt(pspIdx.builtAt))}` : ""}`);
     if (db?.count) parts.push(`OpenStreetMap: ${esc(String(db.count))} wpisów, niezweryfikowane${db.stale ? " (kopia z telefonu)" : ""}`);
     $("shMeta").innerHTML = demo ? "" : parts.length ? "Źródła: " + parts.join("; ") + "." : "";
-    drawMap(list, feat);
+    if (!demo && feat && feat.distKm != null && !manualPos) { try { sessionStorage.setItem("egida.nearest", JSON.stringify({ min: walkMin(feat.distKm), t: Date.now() })); } catch { /* tryb prywatny */ } }
+    drawMap();
   };
 
   /* ---- mapa ---- */
-  const drawMap = (list, feat) => {
-    if (!map || !L) return;
+  const popup = (s) => `<div class="pop"><b>${esc(s.name)}</b><br><span class="small muted">${esc(kindLabel(s))}${s.distKm != null ? " · " + esc(fmtDist(s.distKm)) : ""}</span>${s.access ? `<br><span class="small">Dostępność: ${esc(s.access)}</span>` : ""}<p class="small" style="margin:6px 0"><a href="${esc(dirUrl(s, "walking"))}" target="_blank" rel="noopener noreferrer">Trasa pieszo</a> · <a href="${esc(dirUrl(s, "driving"))}" target="_blank" rel="noopener noreferrer">Autem</a></p></div>`;
+  // Rysujemy WSZYSTKIE punkty widoczne na mapie (od zoomu 12), a nie tylko najbliższe z listy.
+  const drawMap = () => {
+    if (!map || !L || dead) return;
     gMarks.clearLayers(); gUser.clearLayers();
     if (pos) L.circleMarker([pos.lat, pos.lon], { radius: 8, color: "#fff", weight: 3, fillColor: "#2A4DA0", fillOpacity: 1 }).bindTooltip(demo ? "Ty (demo)" : "Ty", { direction: "top" }).addTo(gUser);
-    const pts = [];
-    for (const s of filtered(list).slice(0, 15)) {
-      const m = L.marker([s.lat, s.lon], { icon: shelterIcon(L, !!s.mine), keyboard: false }).bindPopup(`<div class="pop"><b>${esc(s.name)}</b><br><span class="small muted">${esc(kindLabel(s))} · ${esc(fmtKmPl(s.distKm))}</span><p class="small" style="margin:6px 0"><a href="${esc(dirUrl(s, "walking"))}" target="_blank" rel="noopener noreferrer">Trasa pieszo</a> · <a href="${esc(dirUrl(s, "driving"))}" target="_blank" rel="noopener noreferrer">Autem</a></p></div>`).addTo(gMarks);
-      pts.push([s.lat, s.lon]);
+    const hint = $("shMapHint");
+    if (map.getZoom() < 12) { if (hint) hint.textContent = "Przybliż mapę (zoom 12 lub więcej), aby zobaczyć punkty schronienia. Lista poniżej pokazuje najbliższe od Ciebie."; }
+    else {
+      if (hint) hint.textContent = "";
+      const bounds = map.getBounds().pad(0.1);
+      const base = pos ? withDistance(all(), pos) : all().map((x) => ({ ...x, distKm: null }));
+      let n = 0;
+      for (const x of filtered(base)) {
+        if (!bounds.contains([x.lat, x.lon])) continue;
+        if (n >= 1500) break;
+        n++;
+        if (x.mine || x.src === "osm" || x.src === "demo") L.marker([x.lat, x.lon], { icon: shelterIcon(L, !!x.mine), keyboard: false }).bindPopup(popup(x)).addTo(gMarks);
+        else L.circleMarker([x.lat, x.lon], { renderer: canvas, radius: 7, color: "#fff", weight: 2, fillColor: "#2A4DA0", fillOpacity: 1 }).bindPopup(popup(x)).addTo(gMarks);
+      }
     }
-    if (pos && !fitted) {
-      fitted = true;
-      const near = pts.slice(0, 4); const b = L.latLngBounds([[pos.lat, pos.lon], ...near]);
-      map.fitBounds(b.pad(0.25), { maxZoom: 16, animate: false });
+    $("shMap").dataset.markers = String(map.getZoom() < 12 ? 0 : gMarks.getLayers().length);
+    if (pos && needFit && pspState !== "loading") {
+      needFit = false;
+      let near = nearest(all(), pos, { maxKm: demo ? 150 : RADIUS_KM, limit: 4 }).filter((x) => x.distKm <= 3);
+      if (!near.length) near = nearest(all(), pos, { maxKm: demo ? 150 : RADIUS_KM, limit: 1 });
+      map.fitBounds(L.latLngBounds([[pos.lat, pos.lon], ...near.map((x) => [x.lat, x.lon])]).pad(0.25), { maxZoom: 16, animate: false });
     }
   };
-  let fitted = false;
+  let canvas = null, viewTimer = null;
+  const loadView = () => {
+    if (demo || !map || dead || map.getZoom() < 12) return;
+    const c = map.getCenter();
+    loadPspAround(CONFIG.pspUrl, c.lat, c.lng, { cache: pspCache, memo: pspMemo }).then((r) => {
+      if (dead) return;
+      const before = pspItems.length;
+      pspItems = [...new Map([...pspItems, ...r.items].map((x) => [x.id, x])).values()];
+      if (pspItems.length !== before) drawMap();
+    }).catch(() => {});
+  };
+  let needFit = true;
 
+  let loadedAt = null; // pozycja, dla której ostatnio wczytano kafelki
   const loadPsp = () => {
     if (demo || !pos) return;
-    const seq = ++pspSeq; pspState = "loading"; draw();
-    loadPspAround(CONFIG.pspUrl, pos.lat, pos.lon, { cache: pspCache, memo: pspMemo }).then((r) => {
+    loadedAt = { lat: pos.lat, lon: pos.lon };
+    const seq = ++pspSeq; if (!pspItems.length) pspState = "loading"; draw();
+    loadPspNearest(CONFIG.pspUrl, pos.lat, pos.lon, { maxKm: RADIUS_KM, want: SHOW, cache: pspCache, memo: pspMemo }).then((r) => {
       if (dead || seq !== pspSeq) return;
       pspItems = [...new Map([...pspItems, ...r.items].map((x) => [x.id, x])).values()];
-      pspState = r.failed === r.total ? "none" : r.failed ? "none" : "ok"; draw();
+      pspState = r.failed ? "none" : "ok"; draw();
     }).catch(() => { if (!dead && seq === pspSeq) { pspState = "none"; draw(); } });
   };
-  const setPos = (p, manual) => { pos = p; manualPos = !!manual; fitted = false; loadPsp(); draw(); };
+  // explicit: pierwsze ustalenie pozycji lub świadomy wybór (dotknięcie mapy, przycisk) ⇒ ustaw widok mapy; zwykła aktualizacja GPS tylko przesuwa „Ty”
+  const setPos = (p, manual, explicit = true) => {
+    pos = p; manualPos = !!manual; if (explicit) needFit = true;
+    if (!loadedAt || haversineKm(loadedAt, pos) > 2) loadPsp(); else draw();
+    setLive();
+  };
+  const setLive = () => { const el = $("shLive"); if (!el) return; el.textContent = demo ? "" : manualPos ? "Miejsce wskazane ręcznie. Wybierz „Użyj mojej pozycji”, aby lista śledziła Cię na żywo." : liveOn ? "● Na żywo: lista odświeża się, gdy się przemieszczasz." : ""; };
+  let liveOn = false, stopWatch = null, lastTick = 0;
+  const startWatch = () => {
+    stopWatch?.(); liveOn = true; manualPos = false; let first = true;
+    stopWatch = locate((p) => {
+      if (dead || manualPos) return;
+      const now = Date.now();
+      if (!first && pos && haversineKm(pos, p) < 0.015 && now - lastTick < 5000) return; // bez migotania: ignoruj drobne zmiany
+      lastTick = now;
+      const wasFirst = first; first = false;
+      $("shLocMsg").textContent = "";
+      setPos(p, false, wasFirst);
+      if (wasFirst && map) map.setView([p.lat, p.lon], 15, { animate: false });
+    }, () => { liveOn = false; setLive(); if (!dead) $("shLocMsg").textContent = "Nie udało się ustalić pozycji. Dotknij mapy poniżej, aby wskazać miejsce ręcznie."; }, true);
+    cleanups.push(() => stopWatch?.());
+    setLive();
+  };
 
   loadLeaflet().then((Lf) => {
     if (dead) return;
-    L = Lf; const el = $("shMap"); el.innerHTML = "";
+    L = Lf; const el = $("shMap"); el.innerHTML = ""; canvas = L.canvas({ padding: 0.3 });
     map = L.map(el, { center: pos ? [pos.lat, pos.lon] : [51.6, 22.8], zoom: pos ? 15 : 6, minZoom: 4 });
     cleanups.push(() => map.remove());
     const fail = (k) => { const n = $("shTileMsg"); if (n) { n.hidden = false; n.textContent = "Mapa podkładowa nie odpowiada. Lista poniżej działa bez niej."; } };
     baseLayer(L, "map", fail).addTo(map);
     gMarks = L.layerGroup().addTo(map); gUser = L.layerGroup().addTo(map);
+    map.on("moveend", () => { drawMap(); clearTimeout(viewTimer); viewTimer = setTimeout(loadView, 400); });
+    cleanups.push(() => clearTimeout(viewTimer));
     setTimeout(() => { if (!dead) map.invalidateSize(); }, 0);
     map.on("click", (e) => {
       const p = { lat: e.latlng.lat, lon: e.latlng.lng };
       if ($("addBox").open) { setPick(p); return; }
-      if (!demo) setPos({ ...p, accKm: 0 }, true);
+      if (!demo) { stopWatch?.(); liveOn = false; setPos({ ...p, accKm: 0 }, true); }
     });
     draw();
   }).catch((e) => { console.error("EGIDA mapa schronów:", e); if (!dead) $("shMap").innerHTML = `<p class="note warn" style="margin:12px">Nie udało się załadować mapy. Lista działa bez niej.</p>`; });
@@ -149,7 +206,7 @@ export function initSheltersScreen(ctx, { demo = false } = {}) {
   /* ---- filtry, rozwijanie opisu, usuwanie ---- */
   $("shChips").addEventListener("click", (e) => {
     const b = e.target.closest("[data-f]"); if (!b) return;
-    filter = b.dataset.f; fitted = false;
+    filter = b.dataset.f;
     document.querySelectorAll("#shChips [data-f]").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
     draw();
   });
@@ -162,12 +219,9 @@ export function initSheltersScreen(ctx, { demo = false } = {}) {
   $("shFeat").addEventListener("click", onClick); $("shList").addEventListener("click", onClick);
 
   /* ---- pozycja ---- */
-  const doLocate = (silent) => {
-    if (!silent) $("shLocMsg").textContent = "Ustalam pozycję…";
-    locate((p) => { if (dead) return; $("shLocMsg").textContent = ""; setPos(p, false); if (map) map.setView([p.lat, p.lon], 15, { animate: false }); }, () => { if (!dead && !silent) $("shLocMsg").textContent = "Nie udało się ustalić pozycji. Dotknij mapy poniżej, aby wskazać miejsce ręcznie."; }, false);
-  };
+  const doLocate = (silent) => { if (!silent) $("shLocMsg").textContent = "Ustalam pozycję…"; startWatch(); };
   $("shLocate").addEventListener("click", () => doLocate(false));
-  if (!pos && st().consent?.gps) doLocate(true);
+  if (!demo && (pos || st().consent?.gps)) startWatch();
 
   /* ---- dodawanie własnego miejsca ---- */
   const setPick = (p) => { pick = p; $("pickInfo").textContent = `Wskazano: ${p.lat.toFixed(5)}, ${p.lon.toFixed(5)}`; if (map && L) { if (pmarker) pmarker.setLatLng([p.lat, p.lon]); else pmarker = L.marker([p.lat, p.lon]).addTo(map); } };
