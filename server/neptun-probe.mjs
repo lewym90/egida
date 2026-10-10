@@ -48,11 +48,19 @@ async function probe(path) {
     if (!r.ok) return { ...out, head: text.slice(0, 200) };
     let json; try { json = JSON.parse(text); } catch { return { ...out, error: "notjson", head: text.slice(0, 200) }; }
     const list = Array.isArray(json) ? json : Object.values(json || {}).find(Array.isArray);
-    return { ...out, topLevel: Array.isArray(json) ? "array" : Object.keys(json || {}), shape: shape(json), samples: (list || []).slice(0, 3).map((x) => clip(x)), scalarFields: Array.isArray(json) ? null : clip(Object.fromEntries(Object.entries(json || {}).filter(([, v]) => typeof v !== "object"))) };
+    // wartości pól wyliczeniowych z CAŁEJ listy obiektów oraz próbki rekordów ze śladem / celem (nie tylko pierwsze 3)
+    const threats = Array.isArray(json?.threats) ? json.threats : Array.isArray(json) ? json : [];
+    const enums = {};
+    for (const k of ["type", "status", "lifecycle", "positionQuality", "confidenceLevel", "displayConfidence"]) {
+      const c = {}; for (const t of threats) if (t && t[k] != null) c[String(t[k])] = (c[String(t[k])] || 0) + 1; if (Object.keys(c).length) enums[k] = c;
+    }
+    const pick = (f) => threats.filter(f).slice(0, 2).map((x) => clip(x));
+    const extra = threats.length ? { enums, withTrail: pick((t) => Array.isArray(t.trail) && t.trail.length), withCount: pick((t) => t.count > 1), areaOnly: pick((t) => t.areaOnly === true), stale: pick((t) => t.status && t.status !== "active") } : {};
+    return { ...out, ...extra, topLevel: Array.isArray(json) ? "array" : Object.keys(json || {}), shape: shape(json), samples: (list || []).slice(0, 3).map((x) => clip(x)), scalarFields: Array.isArray(json) ? null : clip(Object.fromEntries(Object.entries(json || {}).filter(([, v]) => typeof v !== "object"))) };
   } catch (e) { return { path, error: "network", msg: String(e.message || e), ms: Date.now() - t0 }; }
 }
 
-function probeWs(ms = 8000) {
+function probeWs(ms = 20000) {
   return new Promise((resolve) => {
     const res = { url: "/stream", frames: [], opened: false };
     if (typeof WebSocket === "undefined") return resolve({ ...res, error: "brak WebSocket w tej wersji Node" });
@@ -62,6 +70,7 @@ function probeWs(ms = 8000) {
     const timer = setTimeout(() => done(), ms);
     ws.onopen = () => { res.opened = true; };
     ws.onmessage = (ev) => {
+      if (res.frames.length >= 6) return;
       let j = null; try { j = JSON.parse(String(ev.data)); } catch {}
       if (res.frames.length < 6) res.frames.push(j ? { type: j.type ?? null, keys: Object.keys(j), shape: shape(j.data ?? null), sample: clip(j.data ?? j) } : { raw: String(ev.data).slice(0, 200) });
     };

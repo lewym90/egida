@@ -31,6 +31,7 @@ export const LIMITS = {
 export const TYPES = {
   uav: { label: "Dron", kind: "slow" },
   recon: { label: "Dron rozpoznawczy", kind: "slow" },
+  fpv: { label: "Dron FPV (pole walki)", kind: "slow" },
   missile: { label: "Rakieta", kind: "fast" },
   ballistic: { label: "Rakieta balistyczna", kind: "fast" },
   kab: { label: "Bomba kierowana (KAB)", kind: "fast" },
@@ -46,7 +47,21 @@ const TYPE_ALIAS = {
   bm: "ballistic", ballistic_missile: "ballistic", "ballistic-missile": "ballistic",
   glide_bomb: "kab", "glide-bomb": "kab", guided_bomb: "kab",
   mig31: "mig31k", "mig-31k": "mig31k",
+  "fpv-drone": "fpv", fpvdrone: "fpv",
 };
+/** Typ z ukraińskiego/rosyjskiego tytułu (gdy pole type jest nieznane). */
+function typeFromTitle(title) {
+  const t = String(title || "").toLowerCase();
+  if (!t) return null;
+  if (/балістич|баллистич/.test(t)) return "ballistic";
+  if (/мі?г-?31|миг-?31/.test(t)) return "mig31k";
+  if (/фпв|fpv/.test(t)) return "fpv";
+  if (/авіабомб|авиабомб|\bкаб\b|умпк/.test(t)) return "kab";
+  if (/ракет|крилат|крылат|калібр|х-\d|іскандер|кинджал/.test(t)) return "missile";
+  if (/розвід|развед|орлан|supercam|zala/.test(t)) return "recon";
+  if (/бпла|шахед|герань|geran|дрон|безпілот|беспилот/.test(t)) return "uav";
+  return null;
+}
 
 /* ---------- normalizacja ---------- */
 const num = (v) => (typeof v === "number" ? v : typeof v === "string" && v.trim() !== "" ? Number(v) : NaN);
@@ -83,7 +98,8 @@ export function normalizeThreat(input) {
   if (!(lat >= -90 && lat <= 90 && lon >= -180 && lon <= 180)) return null;
   let rawType = str(String(raw.type ?? raw.kind ?? raw.category ?? "unknown"), 30).toLowerCase();
   rawType = TYPE_ALIAS[rawType] || rawType;
-  const type = Object.hasOwn(TYPES, rawType) ? rawType : "unknown";
+  let type = Object.hasOwn(TYPES, rawType) ? rawType : "unknown";
+  if (type === "unknown") type = typeFromTitle(raw.title) || "unknown";
   const vel = raw.velocity && typeof raw.velocity === "object" ? raw.velocity : {};
   let heading = num(vel.bearingDeg);
   if (!Number.isFinite(heading)) heading = num(raw.heading ?? raw.bearingDeg ?? raw.course ?? raw.direction);
@@ -91,8 +107,9 @@ export function normalizeThreat(input) {
   let speed = num(vel.speedKmh ?? raw.speedKmh ?? raw.speed);
   speed = Number.isFinite(speed) && speed > 0 && speed <= 4000 ? speed : null;
   const unc = num(raw.uncertaintyKm);
-  const conf = str(String(raw.confidenceLevel ?? ""), 10).toLowerCase();
-  const status = str(String(raw.status ?? "active"), 12).toLowerCase() || "active";
+  const conf = str(String(raw.confidenceLevel ?? raw.displayConfidence ?? ""), 10).toLowerCase();
+  let status = str(String(raw.status ?? "active"), 12).toLowerCase() || "active";
+  if (status === "active" && /^(ended|expired|lost|resolved|cancelled|canceled|closed)$/.test(str(String(raw.lifecycle ?? ""), 16).toLowerCase())) status = "resolved";
   const count = num(raw.count);
   return {
     id: String(id).slice(0, 80),
@@ -111,6 +128,12 @@ export function normalizeThreat(input) {
     advisory: raw.advisory === true,
     areaOnly: raw.areaOnly === true,
     note: str(raw.description ?? raw.details ?? raw.note ?? "", 240),
+    // Pola z prawdziwego API (sprawdzone 10.10.2026): kurs przypuszczalny, „kurs na miejscowość” (pozycja = okolica celu, nie obiektu),
+    // jakość pozycji (confirmed / approx), etap życia rekordu.
+    presumptive: raw.presumptiveCourse === true,
+    destination: raw.destination === true,
+    posQuality: str(String(raw.positionQuality ?? ""), 16).toLowerCase() || null,
+    lifecycle: str(String(raw.lifecycle ?? ""), 16).toLowerCase() || null,
     launchedAt: parseTime(raw.launchedAt ?? raw.firstSeenAt ?? raw.createdAt),
   };
 }
@@ -123,19 +146,33 @@ const listOf = (json, ...keys) => {
 };
 const OFF = new Set(["inactive", "ended", "end", "cleared", "clear", "finished", "resolved", "off", "false", "0", "n", "none", "over"]);
 
-/** Alarm powietrzny w obwodzie Ukrainy. Zwraca null, gdy rekord nie wygląda na alarm z nazwą obszaru. */
-export function normalizeAlert(raw) {
+/** Powód alarmu (ukraiński tekst NEPTUN) → polski opis; nieznane pomijamy. */
+export function reasonPl(txt) {
+  const t = String(txt || "").toLowerCase();
+  if (/ракет/.test(t)) return "zagrożenie rakietowe";
+  if (/бпла|шахед|дрон|безпілот/.test(t)) return "zagrożenie dronami";
+  if (/авіа|авиа|літак|самол/.test(t)) return "zagrożenie lotnicze";
+  if (/балістич|баллистич/.test(t)) return "zagrożenie rakietami balistycznymi";
+  return null;
+}
+/** Alarm powietrzny w Ukrainie. Prawdziwy format: { oblasts: [...], raions: [...] } z polami key/name/oblast/since/level/reasons. */
+export function normalizeAlert(raw, scope) {
   if (!raw || typeof raw !== "object") return null;
-  const region = polishPlace(str(String(raw.region ?? raw.oblast ?? raw.regionName ?? raw.location_title ?? raw.locationTitle ?? raw.area ?? raw.name ?? ""), 80));
+  const oblast = polishPlace(str(String(raw.oblast ?? raw.region ?? raw.regionName ?? raw.location_title ?? raw.locationTitle ?? raw.area ?? ""), 80));
+  const name = polishPlace(str(String(raw.name ?? ""), 80));
+  const region = oblast || name;
   if (!region) return null;
   const status = str(String(raw.status ?? raw.state ?? ""), 20).toLowerCase();
+  const level = str(String(raw.level ?? ""), 12).toLowerCase();
   let active = raw.active ?? raw.isActive ?? raw.is_active;
-  if (typeof active !== "boolean") active = !(OFF.has(status) || raw.finishedAt || raw.endedAt || raw.finished_at);
+  if (typeof active !== "boolean") active = !(OFF.has(status) || OFF.has(level) || raw.finishedAt || raw.endedAt || raw.finished_at);
+  const sc = scope || (raw.oblast && raw.name && raw.oblast !== raw.name && /район|raion|rejon/i.test(String(raw.name)) ? "raion" : "oblast");
+  const reasons = [...new Set((Array.isArray(raw.reasons) ? raw.reasons : []).map(reasonPl).filter(Boolean))];
   return {
-    id: String(raw.id ?? raw.regionId ?? region).slice(0, 80),
-    region, active,
+    id: String(raw.key ?? raw.id ?? raw.regionId ?? `${region}|${name}`).slice(0, 80) + "|" + sc,
+    region, name: sc === "raion" ? name : "", scope: sc, level, active, reasons,
     kind: str(String(raw.type ?? raw.alertType ?? raw.alert_type ?? raw.kind ?? ""), 40).toLowerCase(),
-    since: parseTime(raw.startedAt ?? raw.startAt ?? raw.since ?? raw.createdAt ?? raw.started_at ?? raw.updatedAt),
+    since: parseTime(raw.since ?? raw.startedAt ?? raw.startAt ?? raw.createdAt ?? raw.started_at ?? raw.updatedAt),
   };
 }
 
@@ -151,9 +188,10 @@ export function normalizeMessage(raw) {
 /** Magazyn obiektów + korekta zegara urządzenia względem zegara serwera NEPTUN. */
 export class ThreatStore {
   constructor() { this.items = new Map(); this.skewMs = 0; this.stats = { seen: 0, bad: 0 }; this.alerts = new Map(); this.messages = []; this.extras = { alertsAt: null, messagesAt: null, alertsErr: null, messagesErr: null }; }
-  applyAlerts(list) {
+  applyAlerts(list, raions) {
     const m = new Map();
-    for (const r of Array.isArray(list) ? list : []) { const a = normalizeAlert(r); if (a) m.set(a.id, a); }
+    for (const r of Array.isArray(list) ? list : []) { const a = normalizeAlert(r, "oblast"); if (a) m.set(a.id, a); }
+    for (const r of Array.isArray(raions) ? raions : []) { const a = normalizeAlert(r, "raion"); if (a) m.set(a.id, a); }
     this.alerts = m; this.extras.alertsAt = Date.now(); this.extras.alertsErr = null;
   }
   applyMessages(list) {
@@ -193,6 +231,7 @@ export function applySnapshotJson(store, json) {
 }
 
 export function applyAlertsJson(store, json) {
+  if (json && !Array.isArray(json) && (Array.isArray(json.oblasts) || Array.isArray(json.raions))) { store.applyAlerts(json.oblasts, json.raions); return; } // prawdziwy format
   const list = listOf(json, "alerts");
   if (!list) throw new Error("Nieoczekiwany format alarmów NEPTUN");
   store.applyAlerts(list);
@@ -216,7 +255,7 @@ export function applyEnvelope(store, env) {
     case "upsert": store.upsert(d && typeof d === "object" && d.threat ? d.threat : d); return "upsert";
     case "remove": store.remove(d && typeof d === "object" ? d.id ?? d.threatId : d); return "remove";
     case "heartbeat": return "heartbeat";
-    case "alerts": { const l = listOf(d, "alerts"); if (l) store.applyAlerts(l); return "alerts"; }
+    case "alerts": { if (d && !Array.isArray(d) && (Array.isArray(d.oblasts) || Array.isArray(d.raions))) store.applyAlerts(d.oblasts, d.raions); else { const l = listOf(d, "alerts"); if (l) store.applyAlerts(l); } return "alerts"; }
     case "messages": { const l = listOf(d, "messages"); if (l) store.applyMessages(l); return "messages"; }
     case "message": { const x = normalizeMessage(d); if (x) { store.messages = [x, ...store.messages.filter((m) => m.id !== x.id)].slice(0, 50); store.extras.messagesAt = Date.now(); } return "messages"; }
     default: return "unknown";
@@ -234,6 +273,7 @@ export function zoneOf(p) {
 export function predict(t, nowMs, over = {}) {
   const Lm = { ...LIMITS, ...over };
   if (t.areaOnly) return { ok: false, reason: "area" };
+  if (t.destination) return { ok: false, reason: "destination" };
   if (t.headingDeg == null) return { ok: false, reason: "heading" };
   const at = t.confirmedAt ?? t.updatedAt;
   if (at == null) return { ok: false, reason: "time" };
@@ -298,9 +338,11 @@ export function assess(t, user, nowMs, ctx = {}) {
     return { kind: "near", severity: "watch", distKm: dist, text: `Obiekt jest blisko Twojej pozycji (ok. ${dTxt}). Nasłuchuj syren i Alertów RCB. ${SAFETY}` };
   }
   if (!pred.ok) {
+    if (t.destination) return { kind: "dest", severity: "info", distKm: dist, text: `NEPTUN podaje tylko kierunek na miejscowość, bez dokładnej pozycji obiektu (okolica ok. ${dTxt} od Ciebie). Nie oceniamy toru.` };
     return { kind: "nodir", severity: "info", distKm: dist, text: `Odległość od Twojej pozycji: ok. ${dTxt}. Brak aktualnego kursu, więc nie oceniamy toru.` };
   }
-  const reliable = ctx.feedFresh !== false && t.status === "active" && pred.ageSec <= Lm.reassureAgeSec && t.confidence != null && t.confidence !== "low" && acc <= Lm.poorFixKm;
+  // Uspokajającej oceny nie wydajemy, gdy kurs jest tylko przypuszczalny albo pozycja przybliżona.
+  const reliable = ctx.feedFresh !== false && t.status === "active" && pred.ageSec <= Lm.reassureAgeSec && t.confidence != null && t.confidence !== "low" && acc <= Lm.poorFixKm && !t.presumptive && t.posQuality !== "approx";
   if (!reliable) {
     return { kind: "unsure", severity: "info", distKm: dist, text: `Odległość od Twojej pozycji: ok. ${dTxt}. Dane są zbyt stare lub zbyt mało pewne, by ocenić tor.` };
   }
@@ -357,7 +399,7 @@ export function buildView(store, user, feedFresh, opts = {}) {
   }
   rows.sort((a, b) => a.zone.distKm - b.zone.distKm);
   areaRows.sort((a, b) => a.zone.distKm - b.zone.distKm);
-  const alerts = [...store.alerts.values()].filter((a) => a.active).sort((a, b) => a.region.localeCompare(b.region, "uk"));
+  const alerts = [...store.alerts.values()].filter((a) => a.active).sort((a, b) => a.region.localeCompare(b.region, "pl") || a.name.localeCompare(b.name, "pl"));
   return { rows, areaRows, areaOnly, farHidden, counts, alerts, messages: store.messages, now };
 }
 
@@ -369,6 +411,7 @@ export const NOTIFY = {
   rayKm: 150,        // jak daleko sprawdzamy tor (dalej niż 150 km przed obiektem tor jest zbyt niepewny)
   stepKm: 2,
   maxAgeSec: 600,    // pozycja starsza niż 10 min nie wywołuje powiadomienia
+  maxUncertaintyKm: 30, // pozycja mniej dokładna niż ±30 km nie wywołuje powiadomienia
 };
 
 /**
@@ -380,6 +423,9 @@ export function borderApproach(t, nowMs, over = {}) {
   const N = { ...NOTIFY, ...over };
   if (t.areaOnly) return { ok: false, reason: "area" };
   if (t.advisory) return { ok: false, reason: "advisory" };
+  if (t.destination) return { ok: false, reason: "destination" }; // pozycja to okolica celu, nie obiektu
+  if (t.type === "fpv") return { ok: false, reason: "fpv" };
+  if ((t.uncertaintyKm ?? 0) > N.maxUncertaintyKm) return { ok: false, reason: "imprecise" };
   if (t.status !== "active") return { ok: false, reason: "status:" + t.status };
   if (t.confidence === "low") return { ok: false, reason: "lowconf" };
   const at = t.confirmedAt ?? t.updatedAt;
@@ -389,7 +435,7 @@ export function borderApproach(t, nowMs, over = {}) {
   const pred = predict(t, nowMs);
   const here = pred.ok ? pred.here : { lat: t.lat, lon: t.lon };
   const zone = zoneOf(here);
-  if (zone.inPoland) return { ok: true, level: 0, distKm: 0, entry: { lat: here.lat, lon: here.lon, alongKm: 0 }, etaMin: 0, centerHit: true, here };
+  if (zone.inPoland) return { ok: true, level: 0, distKm: 0, entry: { lat: here.lat, lon: here.lon, alongKm: 0 }, etaMin: 0, centerHit: true, here, presumptive: false };
   if (zone.distKm > N.maxKm) return { ok: false, reason: "far", distKm: zone.distKm };
   if (t.headingDeg == null) return { ok: false, reason: "heading", distKm: zone.distKm };
   let best = null;
@@ -401,5 +447,5 @@ export function borderApproach(t, nowMs, over = {}) {
   }
   if (!best) return { ok: false, reason: "away", distKm: zone.distKm };
   const speed = t.speedKmh;
-  return { ok: true, level: zone.distKm <= N.strongKm ? 50 : 100, distKm: zone.distKm, entry: best, centerHit: best.centerHit, etaMin: speed ? (best.alongKm / speed) * 60 : null, here };
+  return { ok: true, level: zone.distKm <= N.strongKm ? 50 : 100, distKm: zone.distKm, entry: best, centerHit: best.centerHit, etaMin: speed ? (best.alongKm / speed) * 60 : null, here, presumptive: t.presumptive === true };
 }

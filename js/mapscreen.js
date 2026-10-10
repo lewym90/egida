@@ -5,7 +5,7 @@ import { CONFIG } from "./config.js";
 import { createFeed } from "./neptun-feed.js";
 import { ThreatStore, buildView, coneOutline, fmtKmPl, ageText, TYPES, LIMITS } from "./neptun.js";
 import { compassPl, destination } from "./geo.js";
-import { demoThreats, demoAlerts, demoMessages, DEMO_USER } from "./demo.js";
+import { demoThreats, demoAlerts, demoRaions, demoMessages, DEMO_USER } from "./demo.js";
 import { dirUrl, loadShelterDb, loadPspAround, makePspCache, mergeSources } from "./shelters.js";
 
 export const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -79,8 +79,8 @@ export const shelterIcon = (L, mine) => L.divIcon({
 function threatIcon(L, row) {
   const t = row.t, fast = TYPES[t.type].kind === "fast";
   const col = fast ? "#8A3B00" : "#B45309"; // bursztyn/brąz: czerwień zarezerwowana dla realnego alarmu
-  const op = t.advisory || t.status === "stale" || !row.pred.ok ? 0.55 : 1;
-  const shape = t.headingDeg != null
+  const op = t.advisory || t.status === "stale" || !row.pred.ok || t.presumptive || t.posQuality === "approx" ? 0.6 : 1;
+  const shape = t.headingDeg != null && !t.destination
     ? `<g transform="rotate(${Math.round(t.headingDeg)} 14 14)"><path d="M14 2 L24 25 L14 20 L4 25 Z" fill="${col}" stroke="#fff" stroke-width="2" stroke-linejoin="round"/></g>`
     : `<circle cx="14" cy="14" r="9" fill="${col}" stroke="#fff" stroke-width="2"/>`;
   return L.divIcon({ className: "thr-ic", iconSize: [30, 30], iconAnchor: [15, 15], html: `<svg viewBox="0 0 28 28" width="30" height="30" style="opacity:${op}" aria-hidden="true">${shape}</svg>` });
@@ -91,9 +91,11 @@ function threatText(row) {
   const { t, zone, pred, ageSec } = row;
   const place = esc(t.locality || t.district || t.region || "");
   const where = zone.inPoland ? "nad terytorium Polski (wg NEPTUN)" : `ok. ${fmtKmPl(zone.distKm)} od granicy Polski (szacunek)`;
-  const move = t.headingDeg != null ? `kurs ${Math.round(t.headingDeg)}° (${compassPl(t.headingDeg)})${t.speedKmh != null ? `, ok. ${Math.round(t.speedKmh)} km/h` : ", prędkość nieznana"}` : "kurs nieznany";
-  const conf = t.confidence ? `pewność: ${CONF[t.confidence]}${t.sourceCount != null ? ` (${t.sourceCount} ${t.sourceCount === 1 ? "źródło" : "źródeł"})` : ""}` : "pewność nieznana";
-  return `${place ? `${place} · ` : ""}${where} · ${move} · ${esc(ageText(ageSec))} · ${conf}${pred.ok && pred.advancedKm > 1 ? " · pozycja przeliczona na teraz" : ""}`;
+  const move = t.destination ? "kurs na tę miejscowość (dokładnej pozycji obiektu nie znamy)"
+    : t.headingDeg != null ? `kurs ${Math.round(t.headingDeg)}° (${compassPl(t.headingDeg)})${t.presumptive ? ", przypuszczalny" : ""}${t.speedKmh != null ? `, ok. ${Math.round(t.speedKmh)} km/h` : ""}` : "kurs nieznany";
+  const posn = !t.destination && t.posQuality === "approx" ? `pozycja przybliżona${t.uncertaintyKm ? ` (±${Math.round(t.uncertaintyKm)} km)` : ""}` : "";
+  const conf = t.confidence ? `pewność: ${CONF[t.confidence]}${t.sourceCount != null ? ` (${t.sourceCount} ${t.sourceCount === 1 ? "źródło" : t.sourceCount < 5 ? "źródła" : "źródeł"})` : ""}` : "pewność nieznana";
+  return [place ? `${place}` : "", where, move, posn, esc(ageText(ageSec)), conf, pred.ok && pred.advancedKm > 1 ? "pozycja przeliczona na teraz" : ""].filter(Boolean).join(" · ");
 }
 function badgesHtml(row) {
   const t = row.t;
@@ -165,8 +167,9 @@ export function renderMapHtml(ctx, { demo = false, diag = false } = {}) {
     <div id="nepAlertsWrap" hidden><h2 style="margin-top:16px">Alarmy powietrzne w Ukrainie</h2>
       <p class="muted small" style="margin:0 0 6px">Obwody z aktywnym alarmem wg NEPTUN. To informacja o Ukrainie, nie o Polsce.</p>
       <div class="card flat"><p id="nepAlerts" class="small" style="margin:0;padding:12px 16px"></p></div></div>
-    <div id="nepMsgWrap" hidden><h2 style="margin-top:16px">Ostatnie wiadomości NEPTUN</h2>
-      <div class="card flat"><ul class="list" id="nepMsgs"></ul></div></div>
+    <div id="nepMsgWrap" hidden><details class="card flat" style="margin-top:16px"><summary style="cursor:pointer;padding:12px 16px;font-weight:700">Wiadomości źródłowe NEPTUN (po ukraińsku lub rosyjsku)</summary>
+      <p class="muted small" style="margin:0;padding:0 16px 8px">Surowe wpisy z kanałów, które obserwuje NEPTUN. Nie tłumaczymy ich i nie weryfikujemy, mogą być błędne.</p>
+      <ul class="list" id="nepMsgs"></ul></details></div>
     <details class="card flat" style="margin-top:12px"><summary style="cursor:pointer;padding:12px 16px;font-weight:600">Szczegóły połączenia</summary><div id="nepDiag" class="small muted" style="padding:0 16px 12px"></div></details>
     <p class="src">${NEPTUN_ATTR}</p>
     <div class="note warn" style="margin-top:8px">${NEPTUN_NOTICE}</div>
@@ -294,7 +297,7 @@ export function initMapScreen(ctx, { demo = false, diag = false } = {}) {
       redrawing = true;
       gThreats.clearLayers();
       if (!on) { redrawing = false; openId = null; $("btnObjects").hidden = true; return; }
-      if (demo) { store.applySnapshot(demoThreats(Date.now())); store.applyAlerts(demoAlerts()); store.applyMessages(demoMessages(Date.now())); }
+      if (demo) { store.applySnapshot(demoThreats(Date.now())); store.applyAlerts(demoAlerts(), demoRaions()); store.applyMessages(demoMessages(Date.now())); }
       const s = demo ? store : feed.store;
       const view = buildView(s, user, feedFresh(), { all: ml().nepAll === true, filter: nepFilter });
       lastRows = view.rows;
@@ -323,7 +326,11 @@ export function initMapScreen(ctx, { demo = false, diag = false } = {}) {
       $("nepArea").innerHTML = dataOk ? view.areaRows.slice(0, 20).map(areaItemHtml).join("") : "";
       const aw = dataOk && view.alerts.length;
       $("nepAlertsWrap").hidden = !aw;
-      if (aw) $("nepAlerts").textContent = view.alerts.map((a) => a.region).join(" · ");
+      if (aw) {
+        const by = new Map();
+        for (const a of view.alerts) { const g = by.get(a.region) || { whole: false, raions: [], reasons: new Set() }; if (a.scope === "oblast") g.whole = true; else g.raions.push(a.name); a.reasons.forEach((r) => g.reasons.add(r)); by.set(a.region, g); }
+        $("nepAlerts").innerHTML = [...by].map(([reg, g]) => `<b>${esc(reg)}</b>${g.whole ? " (cały obwód)" : g.raions.length ? ` (${g.raions.length} ${g.raions.length === 1 ? "rejon" : g.raions.length < 5 ? "rejony" : "rejonów"})` : ""}${g.reasons.size ? ` · ${esc([...g.reasons].join(", "))}` : ""}`).join("<br>");
+      }
       const mw = dataOk && view.messages.length;
       $("nepMsgWrap").hidden = !mw;
       if (mw) $("nepMsgs").innerHTML = view.messages.slice(0, 8).map(msgHtml).join("");
@@ -340,6 +347,7 @@ export function initMapScreen(ctx, { demo = false, diag = false } = {}) {
       view.rows.forEach((row, idx) => {
         const t = row.t, col = TYPES[t.type].kind === "fast" ? "#8A3B00" : "#B45309";
         const here = row.pred.ok ? row.pred.here : { lat: t.lat, lon: t.lon };
+        if (t.posQuality === "approx" && t.uncertaintyKm >= 5) L.circle([t.lat, t.lon], { radius: Math.min(t.uncertaintyKm, 60) * 1000, color: col, weight: 1, opacity: 0.5, dashArray: "4 4", fillColor: col, fillOpacity: 0.06, interactive: false }).addTo(gThreats);
         if (row.pred.ok) {
           const end = destination(row.pred.here, row.pred.bearing, row.pred.horizonKm);
           if (row.pred.timed && TYPES[t.type].kind === "slow") {

@@ -55,8 +55,9 @@ function line(c) {
   const typ = `${TYPES[t.type].label}${t.count > 1 ? ` ×${t.count}` : ""}`;
   const place = t.locality || t.district || t.region;
   const where = ap.level === 0 ? "nad terytorium Polski (wg NEPTUN)" : `ok. ${fmtKm(ap.distKm)} od granicy Polski`;
-  const move = t.headingDeg != null ? `, kurs ${Math.round(t.headingDeg)}° (${compassPl(t.headingDeg)})${t.speedKmh ? `, ok. ${Math.round(t.speedKmh)} km/h` : ""}` : "";
-  const trk = ap.level === 0 ? "" : `\n   Tor ${ap.centerHit ? "prowadzi" : "może prowadzić"} w stronę granicy${ap.etaMin != null && ap.etaMin <= 180 ? `, przy stałej prędkości za ok. ${Math.max(1, Math.round(ap.etaMin))} min` : ""}.`;
+  const move = t.headingDeg != null ? `, kurs ${Math.round(t.headingDeg)}° (${compassPl(t.headingDeg)})${t.presumptive ? " przypuszczalny" : ""}${t.speedKmh ? `, ok. ${Math.round(t.speedKmh)} km/h` : ""}` : "";
+  const posn = t.posQuality === "approx" && t.uncertaintyKm ? `\n   Pozycja przybliżona (±${Math.round(t.uncertaintyKm)} km).` : "";
+  const trk = ap.level === 0 ? "" : `\n   Tor ${ap.centerHit ? "prowadzi" : "może prowadzić"} w stronę granicy${ap.etaMin != null && ap.etaMin <= 180 ? `, przy stałej prędkości za ok. ${Math.max(1, Math.round(ap.etaMin))} min` : ""}.${posn}`;
   const fast = TYPES[t.type].kind === "fast" ? "\n   Rakiety i bomby kierowane lecą bardzo szybko, a tor może się szybko zmienić." : "";
   return `• <b>${esc(typ)}</b>${place ? ` (${esc(place)})` : ""} – ${esc(where)}${esc(move)}${trk}${fast}`;
 }

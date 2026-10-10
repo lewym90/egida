@@ -138,13 +138,13 @@ const NAV = [
   { h: "#/alerty", k: "alerty", t: "Alerty", i: I.bell },
   { h: "#/mapa", k: "mapa", t: "Mapa", i: I.map },
   { h: "#/poradnik", k: "poradnik", t: "Poradnik", i: I.book },
-  { h: "#/plecak", k: "plecak", t: "Plecak", i: I.bag },
+  { h: "#/schrony", k: "schrony", t: "Schrony", i: I.shield },
 ];
 const TABS = [...NAV, { h: "#/wiecej", k: "wiecej", t: "Więcej", i: I.more }];
 const MORE = [
   { h: "#/ustawienia", t: "Ustawienia", d: "Województwo, zgody, wygląd, Twoje dane", i: I.gear },
   { h: "#/plan-rodziny", t: "Plan rodziny", d: "Kontakty, miejsce spotkania, karty ICE", i: I.users },
-  { h: "#/schrony", t: "Schrony i ukrycia", d: "Najbliższe punkty schronienia", i: I.shield },
+  { h: "#/plecak", t: "Plecak i zapasy", d: "Zestaw na 72 godziny, zapas domowy, dokumenty", i: I.bag },
   { h: "#/pierwsza-pomoc", t: "Pierwsza pomoc", d: "Krok po kroku, działa offline", i: I.heart },
   { h: "#/test", t: "Test gotowości", d: "Sprawdź, jak jesteś przygotowany", i: I.test },
   { h: "#/zagrozenie", t: "Tryb zagrożenia", d: "112, schron i trzy kroki", i: I.alert },
@@ -168,7 +168,7 @@ const SIDE = [
   { h: "#/ustawienia", k: "ustawienia", t: "Ustawienia", i: I.gear },
   { h: "#/zrodla", k: "zrodla", t: "Źródła i licencje", i: I.book },
 ];
-const GROUP = { ustawienia: "wiecej", zrodla: "wiecej", prywatnosc: "wiecej", telegram: "alerty", "co-robic": "poradnik", "pierwsza-pomoc": "poradnik", test: "poradnik", schrony: "mapa", "plan-rodziny": "pulpit", zagrozenie: "pulpit", miejsca: "pulpit" };
+const GROUP = { ustawienia: "wiecej", zrodla: "wiecej", prywatnosc: "wiecej", telegram: "alerty", "co-robic": "poradnik", "pierwsza-pomoc": "poradnik", test: "poradnik", plecak: "wiecej", "plan-rodziny": "pulpit", zagrozenie: "pulpit", miejsca: "pulpit" };
 
 function shell(route, inner) {
   const cur = GROUP[route] || route;
