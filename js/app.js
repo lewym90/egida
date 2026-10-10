@@ -25,6 +25,7 @@ const I = {
   heart: ic('<path d="M12 21s-8-5.2-8-11a4.5 4.5 0 018-2.7A4.5 4.5 0 0120 10c0 5.8-8 11-8 11z"/>'),
   shield: ic('<path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/>'),
   pin: ic('<path d="M12 21s7-6.3 7-12a7 7 0 10-14 0c0 5.7 7 12 7 12z"/><circle cx="12" cy="9" r="2.5"/>', 18),
+  more: ic('<circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/>'),
   chevr: ic('<path d="M9 6l6 6-6 6"/>', 18),
   chev: ic('<path d="M6 9l6 6 6-6"/>', 18),
   phone: ic('<path d="M5 4h4l2 5-2.5 1.5a11 11 0 005 5L15 13l5 2v4a2 2 0 01-2 2A16 16 0 013 6a2 2 0 012-2z"/>', 18),
@@ -44,18 +45,27 @@ const LOGO = `<svg width="34" height="34" viewBox="0 0 512 512" aria-hidden="tru
 const KEY = "egida.v1";
 const defaults = () => ({
   onboarded: false,
-  consent: { gps: false, counter: false, ack: false, neptun: false },
+  consent: { gps: false, counter: false, ack: false, neptun: true },
   region: null, regionSource: null, regionNear: null, // regionSource: "manual" | "gps" | "gps-edge" | "place"; regionNear: { km, id } gdy GPS wskazał miejsce blisko granicy województw
   plan: emptyPlan(), // plan rodziny i karty ICE (tylko w urządzeniu)
   places: [], // ważne miejsca: dom, praca, rodzina (tylko w urządzeniu)
   shelters: [], // „Moje miejsca schronienia” (tylko w urządzeniu)
-  map: { base: "map", layers: { shelters: true, neptun: false } },
+  map: { base: "map", layers: { shelters: true, neptun: true } },
+  mig: {}, // znaczniki jednorazowych migracji ustawień
   checked: {},
   test: null, // {answers:{}, score, at}
   fs: "normal", contrast: "normal",
 });
 let state = defaults();
 try { state = { ...defaults(), ...JSON.parse(localStorage.getItem(KEY) || "{}") }; } catch { /* brak/uszkodzone dane */ }
+// v15: NEPTUN (nieoficjalne obiekty znad Ukrainy) jest domyślnie włączony. Jednorazowo włączamy go też osobom, które aplikację już miały;
+// kto potem sam go wyłączy, ma wyłączony na stałe (znacznik mig.neptunOn).
+if (!state.mig?.neptunOn) {
+  state.mig = { ...(state.mig || {}), neptunOn: true };
+  state.consent = { ...(state.consent || {}), neptun: true };
+  state.map = { ...(state.map || { base: "map" }), layers: { shelters: true, ...(state.map?.layers || {}), neptun: true } };
+  try { localStorage.setItem(KEY, JSON.stringify(state)); } catch { /* */ }
+}
 state.plan = normalizePlan(state.plan); state.places = normalizePlaces(state.places);
 const save = () => { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch { /* tryb prywatny */ } };
 const applyPrefs = () => {
@@ -130,6 +140,19 @@ const NAV = [
   { h: "#/poradnik", k: "poradnik", t: "Poradnik", i: I.book },
   { h: "#/plecak", k: "plecak", t: "Plecak", i: I.bag },
 ];
+const TABS = [...NAV, { h: "#/wiecej", k: "wiecej", t: "Więcej", i: I.more }];
+const MORE = [
+  { h: "#/ustawienia", t: "Ustawienia", d: "Województwo, zgody, wygląd, Twoje dane", i: I.gear },
+  { h: "#/plan-rodziny", t: "Plan rodziny", d: "Kontakty, miejsce spotkania, karty ICE", i: I.users },
+  { h: "#/schrony", t: "Schrony i ukrycia", d: "Najbliższe punkty schronienia", i: I.shield },
+  { h: "#/pierwsza-pomoc", t: "Pierwsza pomoc", d: "Krok po kroku, działa offline", i: I.heart },
+  { h: "#/test", t: "Test gotowości", d: "Sprawdź, jak jesteś przygotowany", i: I.test },
+  { h: "#/zagrozenie", t: "Tryb zagrożenia", d: "112, schron i trzy kroki", i: I.alert },
+  { h: "#/miejsca", t: "Ważne miejsca", d: "Dom, praca, rodzina", i: I.pin },
+  { h: "#/telegram", t: "Powiadomienia Telegram", d: "Kanał dla Twojego województwa", i: I.send },
+  { h: "#/zrodla", t: "Źródła i licencje", d: "Skąd mamy dane", i: I.book },
+  { h: "#/prywatnosc", t: "Polityka prywatności", d: "Co zostaje w telefonie", i: I.list },
+];
 const SIDE = [
   ...NAV.slice(0, 2),
   { h: "#/telegram", k: "telegram", t: "Powiadomienia Telegram", i: I.send },
@@ -145,12 +168,12 @@ const SIDE = [
   { h: "#/ustawienia", k: "ustawienia", t: "Ustawienia", i: I.gear },
   { h: "#/zrodla", k: "zrodla", t: "Źródła i licencje", i: I.book },
 ];
-const GROUP = { telegram: "alerty", "co-robic": "poradnik", "pierwsza-pomoc": "poradnik", test: "poradnik", schrony: "mapa", zrodla: "ustawienia", prywatnosc: "ustawienia", "plan-rodziny": "pulpit", zagrozenie: "pulpit", miejsca: "pulpit" };
+const GROUP = { ustawienia: "wiecej", zrodla: "wiecej", prywatnosc: "wiecej", telegram: "alerty", "co-robic": "poradnik", "pierwsza-pomoc": "poradnik", test: "poradnik", schrony: "mapa", "plan-rodziny": "pulpit", zagrozenie: "pulpit", miejsca: "pulpit" };
 
 function shell(route, inner) {
   const cur = GROUP[route] || route;
   const side = SIDE.map((n) => `<a class="nav ${n.soon ? "soon" : ""}" href="${n.h}" ${n.k === route || (n.k === "poradnik" && route === "co-robic" && n.t === "Co robić") ? 'aria-current="page"' : ""}>${n.i}<span>${n.t}</span>${n.soon ? '<span class="badge soon">wkrótce</span>' : ""}</a>`).join("");
-  const tabs = NAV.map((n) => `<a href="${n.h}" ${n.k === cur ? 'aria-current="page"' : ""}>${n.i}<span>${n.t}</span></a>`).join("");
+  const tabs = TABS.map((n) => `<a href="${n.h}" ${n.k === cur ? 'aria-current="page"' : ""}>${n.i}<span>${n.t}</span></a>`).join("");
   return `<div class="shell"><nav class="side" aria-label="Menu główne"><a class="brand" href="#/pulpit">${LOGO}<span><span class="wordmark">EGIDA</span><span class="tagline">Twoje centrum bezpieczeństwa</span></span></a>${side}</nav>
   <main class="main" id="main" tabindex="-1">${topbar()}${inner}${legal()}</main>
   <a class="fab112" href="tel:112" aria-label="Zagrożenie życia? Zadzwoń 112">${I.phone}112</a>
@@ -181,6 +204,7 @@ function screenStart() {
   <div class="card"><h2>Twoje wybory</h2><p class="muted small">Wszystko jest dobrowolne. Aplikacja działa także bez żadnej zgody.</p>
   <label class="switch"><input type="checkbox" id="cGps" ${c.gps ? "checked" : ""}><span><b>Lokalizacja (GPS)</b><span class="muted small">Po co: ustawimy województwo, żeby pokazywać tylko Twoje komunikaty. Gdzie trafia: pozycja zostaje w telefonie i nie jest nigdzie wysyłana. Zamiast tego możesz wybrać województwo ręcznie.</span></span></label>
   <label class="switch"><input type="checkbox" disabled><span><b>Powiadomienia w aplikacji <span class="badge soon">wkrótce</span></b><span class="muted small">Na razie ostrzeżenia dla województwa wysyłamy przez publiczne kanały Telegram (link znajdziesz w Ustawieniach). Powiadomienia nie przebijają trybu „Nie przeszkadzać” i nie zastępują syren ani Alertu RCB.</span></span></label>
+  <label class="switch"><input type="checkbox" id="cNeptun" ${c.neptun ? "checked" : ""}><span><b>Obiekty znad Ukrainy na mapie <span class="badge unofficial">nieoficjalne · beta</span></b><span class="muted small">Po co: na mapie zobaczysz drony i rakiety w pobliżu granicy wg serwisu NEPTUN. Gdzie trafia: przeglądarka łączy się wtedy bezpośrednio z neptun.in.ua, który widzi Twój adres IP. To nieoficjalne dane, mogą być spóźnione lub błędne i nie zastępują syren ani Alertu RCB. Możesz wyłączyć tutaj i później w Ustawieniach.</span></span></label>
   <label class="switch"><input type="checkbox" id="cCounter" ${c.counter ? "checked" : ""}><span><b>Anonimowy licznik odwiedzin</b><span class="muted small">Zlicza wejścia na stronę, bez cookies i bez identyfikatorów. Pomaga ocenić, czy aplikacja jest potrzebna. Wyłączona domyślnie – możesz włączyć lub wyłączyć w Ustawieniach.</span></span></label></div>
   <div class="card"><div class="field"><label for="startRegion"><b>Województwo (ręcznie)</b></label>
   <select class="sel" id="startRegion"><option value="">Wybiorę później</option>${VOIVODESHIPS.map((v) => `<option value="${v.id}" ${state.region === v.id ? "selected" : ""}>${esc(v.name)}</option>`).join("")}</select></div></div>
@@ -450,6 +474,12 @@ function screenWynik() {
   <a class="btn" href="#/test">Zrób test jeszcze raz</a>`;
 }
 
+function screenWiecej() {
+  const rows = MORE.map((n) => `<li><a href="${n.h}"><span class="mi">${n.i}</span><span class="mt"><b>${n.t}</b><span class="muted small">${n.d}</span></span>${I.chevr}</a></li>`).join("");
+  return `<div class="hero"><h1>Więcej</h1><p>Wszystkie funkcje w jednym miejscu.</p></div>
+  <div class="card"><ul class="list morelist">${rows}</ul></div>
+  <p class="vers">EGIDA ${esc(APP_VERSION)} · ${esc(APP_BUILD)}</p>`;
+}
 function screenUstawienia() {
   const c = state.consent;
   const tg = state.region ? safeUrl(tgLinks()[state.region] || "") : "";
@@ -466,7 +496,7 @@ function screenUstawienia() {
   <div class="card"><h2>Powiadomienia</h2>${tg ? `<p>Kanał Telegram dla Twojego województwa:</p><a class="btn primary" href="${esc(tg)}" target="_blank" rel="noopener noreferrer">Otwórz kanał Telegram ${I.ext}</a>` : `<p class="muted">Kanał Telegram dla Twojego województwa jest w przygotowaniu. Powiadomienia nie przebijają trybu „Nie przeszkadzać” i nie zastępują syren ani Alertu RCB.</p>`}<p style="margin-top:10px"><a href="#/telegram">Jak działają powiadomienia Telegram i lista kanałów</a></p></div>
   <div class="card"><h2>Prywatność</h2>
   <label class="switch"><input type="checkbox" id="setCounter" ${c.counter ? "checked" : ""}><span><b>Anonimowy licznik odwiedzin</b><span class="muted small">Bez cookies i identyfikatorów. ${CONFIG.goatcounter ? "" : "(Licznik nie jest jeszcze skonfigurowany, więc nic nie jest zliczane.)"}</span></span></label>
-  ${CONFIG.neptun?.enabled === false ? "" : `<label class="switch"><input type="checkbox" id="setNeptun" ${c.neptun ? "checked" : ""}><span><b>Obiekty znad Ukrainy na mapie (NEPTUN) <span class="badge unofficial">nieoficjalne · beta</span></b><span class="muted small">Zgoda na bezpośrednie połączenie z neptun.in.ua, gdy włączysz tę warstwę na mapie. Serwis zobaczy Twój adres IP. Dane mogą być spóźnione lub błędne.</span></span></label>`}
+  ${CONFIG.neptun?.enabled === false ? "" : `<label class="switch"><input type="checkbox" id="setNeptun" ${c.neptun ? "checked" : ""}><span><b>Obiekty znad Ukrainy na mapie (NEPTUN) <span class="badge unofficial">nieoficjalne · beta</span></b><span class="muted small">Domyślnie włączone. Na ekranie Mapa przeglądarka łączy się bezpośrednio z neptun.in.ua, a serwis widzi Twój adres IP. To nieoficjalne dane, mogą być spóźnione lub błędne. Wyłączysz to tutaj.</span></span></label>`}
   <p style="margin-top:6px"><a href="#/prywatnosc">Polityka prywatności</a></p></div>
   <div class="card"><h2>Wygląd</h2><div class="grid2" style="margin-top:8px"><div class="field"><label for="setFs" class="muted small">Rozmiar tekstu</label><select class="sel" id="setFs">${opt("normal", state.fs, "Normalny")}${opt("large", state.fs, "Duży")}${opt("xlarge", state.fs, "Bardzo duży")}</select></div>
   <div class="field"><label for="setContrast" class="muted small">Kontrast</label><select class="sel" id="setContrast">${opt("normal", state.contrast, "Normalny")}${opt("high", state.contrast, "Wysoki")}</select></div></div></div>
@@ -507,6 +537,7 @@ function render() {
     case "plecak": inner = screenPlecak(); break;
     case "test": inner = arg === "wynik" ? screenWynik() : screenTest(); break;
     case "telegram": inner = screenTelegram(); break;
+    case "wiecej": inner = screenWiecej(); break;
     case "ustawienia": inner = screenUstawienia(); break;
     case "zrodla": inner = screenZrodla(); break;
     default: inner = screenPulpit();
@@ -518,7 +549,7 @@ function render() {
   else if (route === "zagrozenie") initEmergency(geoCtx);
   else if (route === "miejsca") initPlaces(geoCtx);
   else if (route === "ustawienia") showSwVersion();
-  const titles = { pulpit: "Pulpit", alerty: "Alerty", mapa: "Mapa", poradnik: "Poradnik", plecak: "Plecak", "pierwsza-pomoc": "Pierwsza pomoc", test: "Test gotowości", ustawienia: "Ustawienia", zrodla: "Źródła", telegram: "Powiadomienia Telegram", schrony: "Schrony", "plan-rodziny": "Plan rodziny", zagrozenie: "Tryb zagrożenia", miejsca: "Ważne miejsca", prywatnosc: "Polityka prywatności" };
+  const titles = { pulpit: "Pulpit", alerty: "Alerty", mapa: "Mapa", poradnik: "Poradnik", plecak: "Plecak", "pierwsza-pomoc": "Pierwsza pomoc", test: "Test gotowości", ustawienia: "Ustawienia", zrodla: "Źródła", telegram: "Powiadomienia Telegram", schrony: "Schrony", "plan-rodziny": "Plan rodziny", zagrozenie: "Tryb zagrożenia", miejsca: "Ważne miejsca", prywatnosc: "Polityka prywatności", wiecej: "Więcej" };
   document.title = `EGIDA – ${titles[route] || "Pulpit"}`;
   window.scrollTo(0, 0);
 }
@@ -590,12 +621,13 @@ document.addEventListener("change", (e) => {
   } else if (t.id === "startRegion") { state.region = t.value || null; state.regionSource = "manual"; state.regionNear = null; save(); }
   else if (t.id === "cGps") state.consent.gps = t.checked;
   else if (t.id === "cCounter") { state.consent.counter = t.checked; save(); }
+  else if (t.id === "cNeptun") { state.consent.neptun = t.checked; if (state.map?.layers) state.map.layers.neptun = t.checked; save(); }
   else if (t.id === "cAck") { state.consent.ack = t.checked; save(); $("#goStart").disabled = !t.checked; }
   else if (t.id === "setRegion") { state.region = t.value || null; state.regionSource = "manual"; state.regionNear = null; save(); render(); }
   else if (t.id === "setGps") { state.consent.gps = t.checked; save(); }
   else if (t.id === "importFile") importFromFile(t);
   else if (t.id === "setCounter") { state.consent.counter = t.checked; save(); applyCounter(); }
-  else if (t.id === "setNeptun") { state.consent.neptun = t.checked; if (!t.checked && state.map?.layers) state.map.layers.neptun = false; save(); }
+  else if (t.id === "setNeptun") { state.consent.neptun = t.checked; if (state.map?.layers) state.map.layers.neptun = t.checked; save(); }
   else if (t.id === "setFs") { state.fs = t.value; save(); applyPrefs(); }
   else if (t.id === "setContrast") { state.contrast = t.value; save(); applyPrefs(); }
   else if (t.dataset.check) { state.checked[t.dataset.check] = t.checked; save(); render(); const el = document.querySelector(`[data-check="${t.dataset.check}"]`); el?.focus(); }

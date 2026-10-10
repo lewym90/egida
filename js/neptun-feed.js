@@ -2,7 +2,7 @@
 // Warunki NEPTUN: REST nie częściej niż co 5 s (my: co 15 s); widoczny link do neptun.in.ua przy danych;
 // zastrzeżenie, że to nie jest oficjalny system ostrzegania (oba elementy są w interfejsie mapy).
 // Połączenie otwieramy tylko po wyraźnej zgodzie użytkownika i tylko gdy ekran mapy jest otwarty.
-import { ThreatStore, applyEnvelope, applySnapshotJson, LIMITS } from "./neptun.js";
+import { ThreatStore, applyEnvelope, applySnapshotJson, applyAlertsJson, applyMessagesJson, LIMITS } from "./neptun.js";
 
 /**
  * opts: { restUrl, wsUrl, onChange(), onStatus(status), store?, pollMs?, fetchImpl?, WS? }
@@ -11,7 +11,7 @@ import { ThreatStore, applyEnvelope, applySnapshotJson, LIMITS } from "./neptun.
 export function createFeed(opts) {
   const o = { pollMs: 15000, wsRetryMs: 60000, wsRetryMaxMs: 300000, watchdogMs: 10000, staleMs: LIMITS.feedFreshSec * 1000, fetchImpl: (...a) => fetch(...a), WS: globalThis.WebSocket, ...opts };
   const store = opts.store || new ThreatStore();
-  let ws = null, wsOpen = false, pollT = null, retryT = null, dogT = null, connT = null, running = false, retryMs = o.wsRetryMs;
+  let ws = null, wsOpen = false, extraT = null, pollT = null, retryT = null, dogT = null, connT = null, running = false, retryMs = o.wsRetryMs;
   let status = { state: "off", via: null, lastOkAt: null, error: null, formatWarning: false };
   const set = (p) => { status = { ...status, ...p }; o.onStatus?.({ ...status }); };
   const touch = (via) => set({ state: via === "ws" ? "live" : "polling", via, lastOkAt: Date.now(), error: null });
@@ -29,6 +29,21 @@ export function createFeed(opts) {
     } catch (e) {
       if (running) set({ error: String(e?.message || e) });
     }
+  }
+  /** Alarmy w Ukrainie i wiadomości: wolniej (co extrasMs), a ich błąd nigdy nie wpływa na „świeżość” obiektów. */
+  async function extrasOnce() {
+    if (!running) return;
+    const one = async (url, apply, key) => {
+      if (!url) return;
+      try {
+        const r = await o.fetchImpl(url, { cache: "no-store", signal: AbortSignal.timeout(10000) });
+        if (!r.ok) throw new Error("HTTP " + r.status);
+        apply(store, await r.json());
+      } catch (e) { store.extras[key] = String(e?.message || e); }
+    };
+    await one(o.alertsUrl, applyAlertsJson, "alertsErr");
+    await one(o.messagesUrl, applyMessagesJson, "messagesErr");
+    if (running) o.onChange?.();
   }
   function startPolling() { if (!pollT && running) { pollOnce(); pollT = setInterval(pollOnce, o.pollMs); } }
   function stopPolling() { if (pollT) { clearInterval(pollT); pollT = null; } }
@@ -49,7 +64,7 @@ export function createFeed(opts) {
         const kind = applyEnvelope(store, JSON.parse(ev.data));
         if (kind === "invalid" || kind === "unknown") return;
         touch("ws");
-        if (kind === "snapshot" || kind === "upsert" || kind === "remove") { checkFormat(); o.onChange?.(); }
+        if (kind === "snapshot" || kind === "upsert" || kind === "remove" || kind === "alerts" || kind === "messages") { checkFormat(); o.onChange?.(); }
       } catch { /* uszkodzona ramka – pomijamy */ }
     };
     const lost = () => {
@@ -81,6 +96,7 @@ export function createFeed(opts) {
       set({ state: "connecting", error: null });
       openWs();
       pollOnce();                      // pierwsze dane bez czekania na WebSocket
+      if (o.alertsUrl || o.messagesUrl) { extrasOnce(); extraT = setInterval(extrasOnce, o.extrasMs ?? 60000); }
       // Gdyby WebSocket zawisł bez błędu, po 5 s przechodzimy na odpytywanie REST.
       connT = setTimeout(() => { connT = null; if (running && !wsOpen) startPolling(); }, o.wsGraceMs ?? 5000);
       dogT = setInterval(watchdog, o.watchdogMs);
@@ -90,6 +106,7 @@ export function createFeed(opts) {
       stopPolling();
       if (retryT) { clearTimeout(retryT); retryT = null; }
       if (dogT) { clearInterval(dogT); dogT = null; }
+      if (extraT) { clearInterval(extraT); extraT = null; }
       if (connT) { clearTimeout(connT); connT = null; }
       if (ws) { const w = ws; ws = null; wsOpen = false; try { w.close(); } catch { /* */ } }
       set({ state: "off" });

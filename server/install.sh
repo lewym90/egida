@@ -6,6 +6,7 @@
 #          bash install.sh --cron   (włączenie automatycznego uruchamiania co 5 min)
 #          bash install.sh --uncron (wyłączenie)
 #          bash install.sh --neptun-cron  (dziennik NEPTUN co minutę, tryb cichy) / --neptun-uncron
+#          bash install.sh --neptun-tg-cron  (powiadomienia Telegram z NEPTUN: obiekt <100 km od granicy i tor w jej stronę) / --neptun-tg-uncron
 #          bash install.sh --watchdog-cron  (strażnik komunikatów co 10 min; pisze do Ciebie na Telegram, gdy dane nie docierają) / --watchdog-uncron
 set -euo pipefail
 BASE=/opt/egida
@@ -27,6 +28,14 @@ if [ "${1:-}" = "--neptun-cron" ]; then
 fi
 if [ "${1:-}" = "--neptun-uncron" ]; then
   ( crontab -u "$US" -l 2>/dev/null | grep -v '# egida_neptun' || true ) | crontab -u "$US" - ; echo "Wyłączono dziennik NEPTUN."; exit 0
+fi
+if [ "${1:-}" = "--neptun-tg-cron" ]; then
+  [ -f "$BASE/env" ] || die "Najpierw zrób zwykłą instalację: bash install.sh"
+  ( crontab -u "$US" -l 2>/dev/null | grep -v '# egida_neptun_tg' || true; echo "* * * * * bash $BASE/repo/server/run-neptun-watch.sh # egida_neptun_tg" ) | crontab -u "$US" -
+  echo "Włączono powiadomienia NEPTUN → Telegram. Podgląd bez wysyłki: runuser -u egida -- bash -c 'set -a; . $BASE/env; cd $BASE/repo/server && $BASE/node/bin/node neptun-watch.mjs --preview'"; echo "Log: tail -n 20 $BASE/neptun-watch-log.txt"; exit 0
+fi
+if [ "${1:-}" = "--neptun-tg-uncron" ]; then
+  ( crontab -u "$US" -l 2>/dev/null | grep -v '# egida_neptun_tg' || true ) | crontab -u "$US" - ; echo "Wyłączono powiadomienia NEPTUN → Telegram."; exit 0
 fi
 if [ "${1:-}" = "--watchdog-cron" ]; then
   [ -f "$BASE/env" ] || die "Najpierw zrób zwykłą instalację: bash install.sh"

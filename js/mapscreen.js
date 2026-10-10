@@ -5,7 +5,7 @@ import { CONFIG } from "./config.js";
 import { createFeed } from "./neptun-feed.js";
 import { ThreatStore, buildView, coneOutline, fmtKmPl, ageText, TYPES, LIMITS } from "./neptun.js";
 import { compassPl, destination } from "./geo.js";
-import { demoThreats, DEMO_USER } from "./demo.js";
+import { demoThreats, demoAlerts, demoMessages, DEMO_USER } from "./demo.js";
 import { dirUrl, loadShelterDb, loadPspAround, makePspCache, mergeSources } from "./shelters.js";
 
 export const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -100,10 +100,15 @@ function badgesHtml(row) {
   return `<span class="badge unofficial">Nieoficjalne</span><span class="badge info">${esc(TYPES[t.type].label)}${t.count > 1 ? ` ×${esc(t.count)}` : ""}</span>${t.advisory ? '<span class="badge soon">obserwacja bez alarmu</span>' : ""}${t.status === "stale" ? '<span class="badge soon">nieaktualny wg NEPTUN</span>' : ""}`;
 }
 const itemHtml = (row) => `<li class="obj"><div class="meta">${badgesHtml(row)}</div>
-  <p class="muted small" style="margin:6px 0 0">${threatText(row)}</p>
+  ${row.t.title && row.t.title !== "DEMO" ? `<p class="small" style="margin:6px 0 0;font-weight:600">${esc(row.t.title)}</p>` : ""}
+  <p class="muted small" style="margin:6px 0 0">${threatText(row)}</p>${row.t.note ? `<p class="muted small" style="margin:4px 0 0">${esc(row.t.note)}</p>` : ""}
   <p class="assess assess-${esc(row.assess.severity)}">${esc(row.assess.text)}</p></li>`;
 const popupHtml = (row, demo) => `<div class="pop">${demo ? '<b>DANE WYMYŚLONE (DEMO)</b><br>' : ""}<div class="meta">${badgesHtml(row)}</div><p class="small" style="margin:6px 0">${threatText(row)}</p><p class="small"><b>${esc(row.assess.text)}</b></p></div>`;
 
+const hhmm = (ms) => (ms ? new Date(ms).toLocaleTimeString("pl-PL", { hour: "2-digit", minute: "2-digit" }) : "?");
+const areaItemHtml = (r) => `<li class="obj"><div class="meta"><span class="badge unofficial">Nieoficjalne</span><span class="badge info">${esc(TYPES[r.t.type].label)}${r.t.count > 1 ? ` ×${esc(r.t.count)}` : ""}</span>${r.t.advisory ? '<span class="badge soon">bez alarmu</span>' : ""}</div>
+  <p class="muted small" style="margin:6px 0 0">${esc(r.t.region || r.t.district || r.t.title || "obwód nieznany")}${r.t.locality ? ` · ${esc(r.t.locality)}` : ""} · ${esc(ageText(r.ageSec))}</p></li>`;
+const msgHtml = (m) => `<li class="obj"><p class="small" style="margin:0">${esc(m.text.length > 220 ? m.text.slice(0, 217).replace(/\s+\S*$/, "") + "…" : m.text)}</p><p class="muted small" style="margin:4px 0 0">${esc(hhmm(m.at))}${m.channel ? ` · ${esc(m.channel)}` : ""}</p></li>`;
 const NEPTUN_ATTR = `Dane o obiektach: <a href="https://neptun.in.ua/" target="_blank" rel="noopener noreferrer">Karta powitryanykh tryvoh — NEPTUN (neptun.in.ua)</a>.`;
 const NEPTUN_NOTICE = "NEPTUN to nieoficjalny agregator informacji z otwartych źródeł, a nie system ostrzegania. Dane mogą być spóźnione, niepełne lub błędne. Zawsze kieruj się syrenami, Alertami RCB i poleceniami służb. W zagrożeniu życia dzwoń 112.";
 
@@ -128,7 +133,7 @@ export function renderMapHtml(ctx, { demo = false, diag = false } = {}) {
   <div class="chips" role="group" aria-label="Podkład mapy">${chips}</div>
   <div class="card" style="padding:4px 16px">
     <label class="switch"><input type="checkbox" id="lyShelters" ${lay.shelters !== false ? "checked" : ""}><span><b>Schrony i ukrycia</b><span class="muted small">Punkty schronienia z Rejestru PSP oraz Twoje zapisane miejsca. Widoczne po przybliżeniu mapy. Lista z czasem dojścia jest w zakładce Schrony.</span><span id="shHint" class="muted small" aria-live="polite"></span></span></label>
-    ${nepEnabled() ? `<label class="switch"><input type="checkbox" id="lyNeptun" ${nepOn ? "checked" : ""} ${demo ? "disabled" : ""}><span><b>Obiekty znad Ukrainy <span class="badge unofficial">nieoficjalne · beta</span></b><span class="muted small">Drony i rakiety w pobliżu granicy wg NEPTUN. Domyślnie wyłączone. Po włączeniu przeglądarka łączy się bezpośrednio z neptun.in.ua.</span></span></label>` : ""}
+    ${nepEnabled() ? `<label class="switch"><input type="checkbox" id="lyNeptun" ${nepOn ? "checked" : ""} ${demo ? "disabled" : ""}><span><b>Obiekty znad Ukrainy <span class="badge unofficial">nieoficjalne · beta</span></b><span class="muted small">Drony i rakiety w pobliżu granicy wg NEPTUN. Domyślnie włączone (możesz wyłączyć tutaj lub w Ustawieniach). Przeglądarka łączy się bezpośrednio z neptun.in.ua, a serwis widzi Twój adres IP.</span></span></label>` : ""}
   </div>
   <div id="nepConsent" class="card" hidden role="dialog" aria-label="Zgoda na połączenie z NEPTUN">
     <h2>Włączyć obiekty znad Ukrainy?</h2>
@@ -145,8 +150,24 @@ export function renderMapHtml(ctx, { demo = false, diag = false } = {}) {
   <p id="locMsg" class="muted small" aria-live="polite"></p>
   <div id="nepBox" ${nepOn ? "" : "hidden"}>
     <div id="nepStatus" class="note neutral" aria-live="polite"></div>
-    <h2 style="margin-top:16px">Obiekty w pobliżu granicy</h2>
+    <p id="nepSummary" class="small" style="margin:10px 0 0;font-weight:600"></p>
+    <div class="chips" role="group" aria-label="Filtr obiektów" style="margin-top:10px">
+      <button class="chip" data-nf="all" aria-pressed="true">Wszystkie</button>
+      <button class="chip" data-nf="drones" aria-pressed="false">Drony</button>
+      <button class="chip" data-nf="fast" aria-pressed="false">Rakiety i bomby</button>
+    </div>
+    <label class="switch" style="margin-top:6px"><input type="checkbox" id="nepAll" ${lay.nepAll === true ? "checked" : ""}><span><b>Pokaż całą Ukrainę</b><span class="muted small">Domyślnie widać obiekty do ${LIMITS.zoneKm} km od granicy Polski. Po włączeniu także te dalej, bez oceny wpływu na Ciebie.</span></span></label>
+    <h2 style="margin-top:16px">Obiekty</h2>
     <div class="card flat"><ul class="list" id="nepList"></ul></div>
+    <div id="nepAreaWrap" hidden><h2 style="margin-top:16px">Obserwacje bez dokładnej pozycji</h2>
+      <p class="muted small" style="margin:0 0 6px">NEPTUN podaje tylko obwód. Nie rysujemy ich na mapie i nie oceniamy toru.</p>
+      <div class="card flat"><ul class="list" id="nepArea"></ul></div></div>
+    <div id="nepAlertsWrap" hidden><h2 style="margin-top:16px">Alarmy powietrzne w Ukrainie</h2>
+      <p class="muted small" style="margin:0 0 6px">Obwody z aktywnym alarmem wg NEPTUN. To informacja o Ukrainie, nie o Polsce.</p>
+      <div class="card flat"><p id="nepAlerts" class="small" style="margin:0;padding:12px 16px"></p></div></div>
+    <div id="nepMsgWrap" hidden><h2 style="margin-top:16px">Ostatnie wiadomości NEPTUN</h2>
+      <div class="card flat"><ul class="list" id="nepMsgs"></ul></div></div>
+    <details class="card flat" style="margin-top:12px"><summary style="cursor:pointer;padding:12px 16px;font-weight:600">Szczegóły połączenia</summary><div id="nepDiag" class="small muted" style="padding:0 16px 12px"></div></details>
     <p class="src">${NEPTUN_ATTR}</p>
     <div class="note warn" style="margin-top:8px">${NEPTUN_NOTICE}</div>
   </div>
@@ -166,8 +187,8 @@ export function initMapScreen(ctx, { demo = false, diag = false } = {}) {
   loadLeaflet().then((L) => {
     if (dead) return;
     const st = () => ctx.state;
-    if (!st().map) st().map = { base: "map", layers: { shelters: true, neptun: false } };
-    const ml = () => (st().map.layers ||= { shelters: true, neptun: false });
+    if (!st().map) st().map = { base: "map", layers: { shelters: true, neptun: true } };
+    const ml = () => (st().map.layers ||= { shelters: true, neptun: true });
     const $ = (id) => document.getElementById(id);
 
     root.innerHTML = "";
@@ -258,7 +279,9 @@ export function initMapScreen(ctx, { demo = false, diag = false } = {}) {
     $("lyShelters")?.addEventListener("change", (e) => { ml().shelters = e.target.checked; ctx.save(); drawShelters(); loadView(); });
 
     /* NEPTUN */
-    let feed = null, timer = null, pending = null, lastRows = [];
+    let feed = null, timer = null, pending = null, lastRows = [], nepFilter = "all";
+    let openId = null, redrawing = false; // id obiektu z otwartą etykietą: odświeżanie nie może jej zamykać
+    map.on("popupclose", () => { if (!redrawing) openId = null; });
     const store = demo ? new ThreatStore() : null;
     const neptunWanted = () => nepEnabled() && (demo || (ml().neptun === true && st().consent?.neptun === true));
     const scheduleRefresh = () => { if (pending) return; pending = setTimeout(() => { pending = null; refresh(); }, 300); };
@@ -268,11 +291,12 @@ export function initMapScreen(ctx, { demo = false, diag = false } = {}) {
       if (dead) return;
       const on = neptunWanted();
       $("nepBox").hidden = !on;
+      redrawing = true;
       gThreats.clearLayers();
-      if (!on) { $("btnObjects").hidden = true; return; }
-      if (demo) store.applySnapshot(demoThreats(Date.now()));
+      if (!on) { redrawing = false; openId = null; $("btnObjects").hidden = true; return; }
+      if (demo) { store.applySnapshot(demoThreats(Date.now())); store.applyAlerts(demoAlerts()); store.applyMessages(demoMessages(Date.now())); }
       const s = demo ? store : feed.store;
-      const view = buildView(s, user, feedFresh());
+      const view = buildView(s, user, feedFresh(), { all: ml().nepAll === true, filter: nepFilter });
       lastRows = view.rows;
       const fs = demo ? { state: "live", via: "demo" } : feed.status();
       // status źródła
@@ -282,17 +306,37 @@ export function initMapScreen(ctx, { demo = false, diag = false } = {}) {
       else if (!feed.isFresh()) {
         msg = fs.state === "connecting" ? "Łączę z NEPTUN…" : "Brak połączenia z NEPTUN. Nie wiemy, co dzieje się przy granicy. To nie znaczy, że jest bezpiecznie. Kieruj się syrenami, Alertami RCB i oficjalnymi komunikatami.";
         if (fs.state !== "connecting") cls = "warn";
-      } else if (!view.rows.length) {
+      } else if (!view.rows.length && !view.areaRows.length) {
         msg = `W danych NEPTUN nie ma teraz obiektów w pobliżu granicy (do ${LIMITS.zoneKm} km). To nie znaczy, że jest bezpiecznie: NEPTUN może nie obejmować wszystkich kierunków (np. od strony Białorusi i Kaliningradu) ani nisko lecących obiektów.`;
       } else {
-        msg = `Źródło odpowiada (${fs.via === "ws" ? "na żywo" : "odświeżanie co " + Math.round(CONFIG.neptun.pollMs / 1000) + " s"}). Obiektów w strefie: ${view.rows.length}.${view.areaOnly ? ` Pomijamy ${view.areaOnly} obserwacji bez dokładnej pozycji (tylko obwód).` : ""}`;
+        msg = `Źródło odpowiada (${fs.via === "ws" ? "na żywo" : "odświeżanie co " + Math.round(CONFIG.neptun.pollMs / 1000) + " s"}). Obiektów z pozycją: ${view.rows.length}.${view.areaOnly ? ` Bez dokładnej pozycji (tylko obwód): ${view.areaOnly}.` : ""}`;
       }
       const dataOk = demo || (feed.isFresh() && !fs.formatWarning);
       $("nepStatus").className = "note " + cls;
       $("nepStatus").textContent = msg;
       $("nepList").innerHTML = dataOk && view.rows.length ? view.rows.slice(0, 30).map(itemHtml).join("") + (view.rows.length > 30 ? `<li class="obj muted small">…i ${view.rows.length - 30} dalszych.</li>` : "") : `<li class="obj muted">${dataOk ? "Brak obiektów." : "Brak aktualnych danych."}</li>`;
       $("btnObjects").hidden = !(dataOk && view.rows.length);
-      if (!dataOk) return; // bez świeżych danych nie rysujemy nic, co mogłoby sugerować obraz sytuacji
+      // podsumowanie, obserwacje bez pozycji, alarmy w Ukrainie, wiadomości, diagnostyka
+      const sum = Object.entries(view.counts).sort((a, b) => b[1] - a[1]).map(([k, n]) => `${TYPES[k].label}: ${n}`).join(" · ");
+      $("nepSummary").textContent = dataOk && sum ? `W widoku: ${sum}` : "";
+      $("nepAreaWrap").hidden = !(dataOk && view.areaRows.length);
+      $("nepArea").innerHTML = dataOk ? view.areaRows.slice(0, 20).map(areaItemHtml).join("") : "";
+      const aw = dataOk && view.alerts.length;
+      $("nepAlertsWrap").hidden = !aw;
+      if (aw) $("nepAlerts").textContent = view.alerts.map((a) => a.region).join(" · ");
+      const mw = dataOk && view.messages.length;
+      $("nepMsgWrap").hidden = !mw;
+      if (mw) $("nepMsgs").innerHTML = view.messages.slice(0, 8).map(msgHtml).join("");
+      const ex = s.extras || {};
+      $("nepDiag").innerHTML = demo ? "Tryb demonstracyjny." : [
+        `Połączenie: ${esc({ live: "na żywo (WebSocket)", polling: "odpytywanie REST", connecting: "łączenie", offline: "brak", off: "wyłączone" }[fs.state] || fs.state)}`,
+        `Ostatnia odpowiedź: ${esc(hhmm(fs.lastOkAt))}${fs.error ? ` · błąd: ${esc(fs.error)}` : ""}`,
+        `Rekordy w ostatniej migawce: ${s.stats.seen}, odrzucone: ${s.stats.bad}`,
+        `Alarmy w Ukrainie: ${ex.alertsAt ? "odebrane " + esc(hhmm(ex.alertsAt)) : "brak"}${ex.alertsErr ? ` · ${esc(ex.alertsErr)}` : ""}`,
+        `Wiadomości: ${ex.messagesAt ? "odebrane " + esc(hhmm(ex.messagesAt)) : "brak"}${ex.messagesErr ? ` · ${esc(ex.messagesErr)}` : ""}`,
+        `Ukryte jako zbyt odległe: ${view.farHidden}`,
+      ].join("<br>");
+      if (!dataOk) { redrawing = false; openId = null; return; } // bez świeżych danych nie rysujemy nic, co mogłoby sugerować obraz sytuacji
       view.rows.forEach((row, idx) => {
         const t = row.t, col = TYPES[t.type].kind === "fast" ? "#8A3B00" : "#B45309";
         const here = row.pred.ok ? row.pred.here : { lat: t.lat, lon: t.lon };
@@ -306,13 +350,17 @@ export function initMapScreen(ctx, { demo = false, diag = false } = {}) {
           row.pred.marks.filter((k) => k.minutes <= 30).forEach((k) => L.circleMarker([k.lat, k.lon], { radius: 4, color: "#fff", weight: 1, fillColor: col, fillOpacity: 1, interactive: false }).bindTooltip(`+${k.minutes} min`, { permanent: idx < 4, direction: "right", className: "thr-tip", offset: [6, 0] }).addTo(gThreats));
           if (row.pred.advancedKm > 1) L.circleMarker([t.lat, t.lon], { radius: 3, color: col, weight: 1.5, fillOpacity: 0, interactive: false }).addTo(gThreats);
         }
-        L.marker([here.lat, here.lon], { icon: threatIcon(L, row), keyboard: false, zIndexOffset: 500 }).bindPopup(popupHtml(row, demo)).addTo(gThreats);
+        const mk = L.marker([here.lat, here.lon], { icon: threatIcon(L, row), keyboard: false, zIndexOffset: 500 }).bindPopup(popupHtml(row, demo), { autoClose: false, closeOnClick: false, autoPan: true, maxWidth: 300 }).addTo(gThreats);
+        mk.on("click", () => { openId = String(t.id); });
+        if (openId === String(t.id)) { const pp = mk.getPopup(); const ap = pp.options.autoPan; pp.options.autoPan = false; mk.openPopup(); pp.options.autoPan = ap; }
       });
+      redrawing = false;
+      if (openId != null && !view.rows.some((r) => String(r.t.id) === openId)) openId = null; // obiekt zniknął z danych
     }
 
     function startFeed() {
       if (demo || feed) return;
-      feed = createFeed({ restUrl: CONFIG.neptun.restUrl, wsUrl: CONFIG.neptun.wsUrl, pollMs: CONFIG.neptun.pollMs, onChange: scheduleRefresh, onStatus: scheduleRefresh });
+      feed = createFeed({ alertsUrl: CONFIG.neptun.alertsUrl, messagesUrl: CONFIG.neptun.messagesUrl, extrasMs: CONFIG.neptun.extrasMs, restUrl: CONFIG.neptun.restUrl, wsUrl: CONFIG.neptun.wsUrl, pollMs: CONFIG.neptun.pollMs, onChange: scheduleRefresh, onStatus: scheduleRefresh });
       cleanups.push(() => { feed?.stop(); feed = null; });
       feed.start();
     }
@@ -329,6 +377,12 @@ export function initMapScreen(ctx, { demo = false, diag = false } = {}) {
       $("nepConsent").hidden = true; $("lyNeptun").checked = true; startFeed(); refresh();
     });
     $("nepNo")?.addEventListener("click", () => { $("nepConsent").hidden = true; });
+    $("nepAll")?.addEventListener("change", (e) => { ml().nepAll = e.target.checked; ctx.save(); refresh(); });
+    document.querySelectorAll("[data-nf]").forEach((b) => b.addEventListener("click", () => {
+      nepFilter = b.dataset.nf;
+      document.querySelectorAll("[data-nf]").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+      refresh();
+    }));
     $("btnObjects")?.addEventListener("click", () => {
       const pts = lastRows.map((r) => [(r.pred.ok ? r.pred.here : r.t).lat, (r.pred.ok ? r.pred.here : r.t).lon]);
       if (user) pts.push([user.lat, user.lon]);

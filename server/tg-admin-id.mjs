@@ -3,7 +3,7 @@
 // Skrypt NIE wypisuje tokenu.
 const token = process.env.TELEGRAM_BOT_TOKEN;
 if (!token) { console.log("Brak TELEGRAM_BOT_TOKEN w pliku env."); process.exit(1); }
-const r = await fetch(`https://api.telegram.org/bot${token}/getUpdates`, { signal: AbortSignal.timeout(15000) }).then((x) => x.json()).catch((e) => ({ ok: false, description: e.message }));
+const r = await fetch(`https://api.telegram.org/bot${token}/getUpdates?allowed_updates=${encodeURIComponent(JSON.stringify(["message","channel_post","my_chat_member"]))}`, { signal: AbortSignal.timeout(15000) }).then((x) => x.json()).catch((e) => ({ ok: false, description: e.message }));
 if (!r.ok) { console.log("Telegram odpowiedział błędem:", r.description); process.exit(1); }
 const seen = new Map();
 for (const u of r.result || []) { const c = (u.message || u.edited_message)?.chat; if (c?.type === "private") seen.set(c.id, [c.first_name, c.last_name].filter(Boolean).join(" ") || c.username || "(bez nazwy)"); }

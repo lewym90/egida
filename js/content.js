@@ -129,7 +129,7 @@ export const SOURCES = [
   { n: "Komunikaty RSO (TVP Technologie)", l: "Dane publiczne", u: "https://komunikaty.tvp.pl", w: "Alerty RCB, ostrzeżenia IMGW, woda, drogi" },
   { n: "Rządowe Centrum Bezpieczeństwa (gov.pl/rcb)", l: "Teksty: CC BY-SA 4.0", u: "https://www.gov.pl/web/rcb", w: "Poradnik bezpieczeństwa, komunikaty" },
   { n: "Polska Rada Resuscytacji / ERC", l: "Wytyczne 2025", u: "https://www.prc.krakow.pl", w: "Pierwsza pomoc (opracowanie własne zgodne z wytycznymi)" },
-  { n: "NEPTUN (neptun.in.ua)", l: "Otwarte API, warunki: neptun.in.ua/api-terms. Nieoficjalny agregator, nie system ostrzegania", u: "https://neptun.in.ua", w: "Obserwacje dronów i rakiet nad Ukrainą (mapa, beta, nieoficjalne). Dane: Karta powitryanykh tryvoh — NEPTUN" },
+  { n: "NEPTUN (neptun.in.ua)", l: "Otwarte API, warunki: neptun.in.ua/api-terms. Nieoficjalny agregator, nie system ostrzegania", u: "https://neptun.in.ua", w: "Obserwacje dronów i rakiet nad Ukrainą (mapa, beta, nieoficjalne; powiadomienia na kanałach Telegram). Dane: Karta powitryanykh tryvoh — NEPTUN" },
   { n: "Rejestr Punktów Schronienia (MSWiA / Państwowa Straż Pożarna)", l: "Dane publiczne udostępniane przez PSP w pakiecie offline aplikacji „Gdzie się ukryć”. Licencja nie jest określona w repozytorium PSP; do zgody KG PSP: patrz uwagi wydawcy", u: "https://gdziesieukryc.pl", w: "Punkty schronienia (adres, dostępność). EGIDA nie jest aplikacją PSP; dane bywają niepełne lub nieaktualne" },
   { n: "OpenStreetMap", l: "ODbL, © współtwórcy OpenStreetMap", u: "https://www.openstreetmap.org/copyright", w: "Podkład „Mapa” oraz schrony (znaczniki shelter_type i bunker_type = bomb_shelter, dane niezweryfikowane)" },
   { n: "OpenTopoMap", l: "CC-BY-SA 3.0", u: "https://opentopomap.org", w: "Podkład „Teren”" },
@@ -164,7 +164,7 @@ export const PRIVACY = {
     { h: "Z kim łączy się Twoja przeglądarka", p: [
       "GitHub (strona aplikacji oraz pliki z komunikatami i punktami schronienia): widzi Twój adres IP i zwykłe dane przeglądarki. Punkty schronienia pobieramy jako kafelki danych obejmujące okolicę ok. 20 km. Nie wysyłamy dokładnej pozycji, ale nazwa kafelka wskazuje przybliżony obszar.",
       "Dostawcy map (OpenStreetMap, OpenTopoMap, EOX): widzą adres IP i obszary, które oglądasz. Łączymy się z nimi dopiero na ekranach z mapą.",
-      "NEPTUN (neptun.in.ua): tylko po Twojej zgodzie na warstwę „Obiekty znad Ukrainy”. Serwis widzi Twój adres IP.",
+      "NEPTUN (neptun.in.ua): warstwa „Obiekty znad Ukrainy” jest domyślnie włączona (na ekranie powitalnym i w Ustawieniach możesz ją wyłączyć). Gdy otwierasz mapę, przeglądarka łączy się z serwisem, który widzi Twój adres IP. To nieoficjalne dane.",
       "Telegram: jeśli dołączysz do kanału, Twoje dane przetwarza Telegram według własnych zasad. Kanały są prywatne i tylko do czytania.",
       "Przyciski „Pieszo” i „Autem” otwierają zewnętrzną aplikację map (domyślnie Mapy Google) z celem trasy.",
       "Anonimowy licznik odwiedzin jest domyślnie wyłączony. Jeśli włączysz go w Ustawieniach (i gdy zostanie skonfigurowany), zlicza wejścia bez cookies i bez identyfikatorów."] },

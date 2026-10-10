@@ -56,3 +56,14 @@ export async function regionFromGps(lat, lon) { return regionAt(lat, lon, await 
 
 /** Czy wynik jest „blisko granicy” (wymaga ostrzeżenia dla użytkownika). */
 export const nearBorder = (r, km = 5) => !!r && (r.outside === true || (Number.isFinite(r.borderKm) && r.borderKm < km));
+
+/** Województwa, w których leży punkt albo które są od niego nie dalej niż `km` (do wyboru kanałów powiadomień). Od najbliższego. */
+export function regionsWithin(lat, lon, regions, km = 50) {
+  const p = { lat, lon }, out = [];
+  for (const [id, parts] of Object.entries(regions)) {
+    if (parts.some((x) => inBox(p, x.bbox) && pointInRing(p, x.ring))) { out.push({ id, km: 0 }); continue; }
+    const d = Math.min(...parts.filter((x) => inBox(p, x.bbox, 1.0)).map((x) => distToRingKm(p, x.ring)), Infinity);
+    if (d <= km) out.push({ id, km: Math.round(d * 10) / 10 });
+  }
+  return out.sort((a, b) => a.km - b.km);
+}

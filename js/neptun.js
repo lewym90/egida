@@ -11,6 +11,7 @@
 //  - Brak świeżych danych ⇒ brak oceny.
 import { destination, crossTrack, haversineKm, pointInRing, distToRingKm, normDeg, rad } from "./geo.js";
 import { POLAND_RING } from "./poland-border.js";
+import { polishPlace, hasCyrillic } from "./polish.js";
 
 export const LIMITS = {
   zoneKm: 200,          // pokazujemy obiekty do 200 km od granicy Polski (lub nad Polską)
@@ -29,10 +30,22 @@ export const LIMITS = {
 
 export const TYPES = {
   uav: { label: "Dron", kind: "slow" },
+  recon: { label: "Dron rozpoznawczy", kind: "slow" },
   missile: { label: "Rakieta", kind: "fast" },
+  ballistic: { label: "Rakieta balistyczna", kind: "fast" },
   kab: { label: "Bomba kierowana (KAB)", kind: "fast" },
   mig31k: { label: "MiG-31K (nosiciel rakiet)", kind: "fast" },
   unknown: { label: "Obiekt (typ nieznany)", kind: "fast" }, // nieznany typ traktujemy ostrożnie jak szybki
+};
+
+/** Synonimy typów spotykane w danych (tolerancja na drobne różnice w nazewnictwie). */
+const TYPE_ALIAS = {
+  drone: "uav", shahed: "uav", geran: "uav", bpla: "uav", uas: "uav",
+  reconnaissance: "recon", scout: "recon",
+  rocket: "missile", cruise: "missile", cruise_missile: "missile", "cruise-missile": "missile",
+  bm: "ballistic", ballistic_missile: "ballistic", "ballistic-missile": "ballistic",
+  glide_bomb: "kab", "glide-bomb": "kab", guided_bomb: "kab",
+  mig31: "mig31k", "mig-31k": "mig31k",
 };
 
 /* ---------- normalizacja ---------- */
@@ -46,19 +59,36 @@ export function parseTime(v) {
 }
 
 /** Surowy rekord NEPTUN → obiekt, którego używa aplikacja. Zwraca null dla rekordów bezużytecznych. */
-export function normalizeThreat(raw) {
-  if (!raw || typeof raw !== "object") return null;
-  const id = raw.id ?? raw.threatId;
+/** Wyciąga współrzędne z kilku spotykanych układów: lat/lon, latitude/longitude, position/location/coords, GeoJSON. */
+function pickCoords(raw) {
+  const tryObj = (o) => {
+    if (Array.isArray(o) && o.length >= 2) { const lon = num(o[0]), lat = num(o[1]); return { lat, lon }; } // GeoJSON: [lon, lat]
+    if (o && typeof o === "object") return { lat: num(o.lat ?? o.latitude), lon: num(o.lon ?? o.lng ?? o.longitude) };
+    return null;
+  };
+  let c = { lat: num(raw.lat ?? raw.latitude), lon: num(raw.lon ?? raw.lng ?? raw.longitude) };
+  if (!Number.isFinite(c.lat) || !Number.isFinite(c.lon)) {
+    for (const k of ["position", "location", "coords", "coordinates", "point", "center"]) { const t = tryObj(raw[k]); if (t && Number.isFinite(t.lat) && Number.isFinite(t.lon)) { c = t; break; } }
+  }
+  return c;
+}
+
+export function normalizeThreat(input) {
+  if (!input || typeof input !== "object") return null;
+  // GeoJSON Feature: łączymy properties z geometry
+  const raw = input.properties && typeof input.properties === "object" ? { ...input.properties, geometry: input.geometry, id: input.id ?? input.properties.id } : input;
+  const id = raw.id ?? raw.threatId ?? raw.uuid;
   if (id == null || id === "") return null;
-  const lat = num(raw.lat), lon = num(raw.lon ?? raw.lng);
+  const { lat, lon } = pickCoords(raw.geometry && !raw.lat ? { ...raw, coordinates: raw.geometry.coordinates } : raw);
   if (!(lat >= -90 && lat <= 90 && lon >= -180 && lon <= 180)) return null;
-  const rawType = str(String(raw.type ?? "unknown"), 30).toLowerCase();
+  let rawType = str(String(raw.type ?? raw.kind ?? raw.category ?? "unknown"), 30).toLowerCase();
+  rawType = TYPE_ALIAS[rawType] || rawType;
   const type = Object.hasOwn(TYPES, rawType) ? rawType : "unknown";
   const vel = raw.velocity && typeof raw.velocity === "object" ? raw.velocity : {};
   let heading = num(vel.bearingDeg);
-  if (!Number.isFinite(heading)) heading = num(raw.heading);
+  if (!Number.isFinite(heading)) heading = num(raw.heading ?? raw.bearingDeg ?? raw.course ?? raw.direction);
   heading = Number.isFinite(heading) && heading >= 0 && heading <= 360 ? normDeg(heading) : null;
-  let speed = num(vel.speedKmh);
+  let speed = num(vel.speedKmh ?? raw.speedKmh ?? raw.speed);
   speed = Number.isFinite(speed) && speed > 0 && speed <= 4000 ? speed : null;
   const unc = num(raw.uncertaintyKm);
   const conf = str(String(raw.confidenceLevel ?? ""), 10).toLowerCase();
@@ -67,7 +97,9 @@ export function normalizeThreat(raw) {
   return {
     id: String(id).slice(0, 80),
     type, rawType,
-    title: str(raw.title), region: str(raw.region, 80), district: str(raw.district, 80), locality: str(raw.locality, 80),
+    // Nazwy po polsku (NEPTUN podaje je po ukraińsku/rosyjsku). Tytuł z cyrylicą pomijamy: to opis słowny, którego nie przetłumaczymy rzetelnie.
+    title: hasCyrillic(raw.title) ? "" : str(raw.title), titleRaw: str(raw.title),
+    region: polishPlace(str(raw.region, 80)), district: polishPlace(str(raw.district, 80)), locality: polishPlace(str(raw.locality, 80)),
     status,
     lat, lon,
     headingDeg: heading, speedKmh: speed,
@@ -78,12 +110,58 @@ export function normalizeThreat(raw) {
     count: Number.isFinite(count) && count > 0 ? count : null,
     advisory: raw.advisory === true,
     areaOnly: raw.areaOnly === true,
+    note: str(raw.description ?? raw.details ?? raw.note ?? "", 240),
+    launchedAt: parseTime(raw.launchedAt ?? raw.firstSeenAt ?? raw.createdAt),
   };
+}
+
+/* ---------- alarmy w Ukrainie i wiadomości (dodatkowe punkty końcowe NEPTUN) ---------- */
+const listOf = (json, ...keys) => {
+  if (Array.isArray(json)) return json;
+  if (json && typeof json === "object") for (const k of [...keys, "items", "data", "results"]) if (Array.isArray(json[k])) return json[k];
+  return null;
+};
+const OFF = new Set(["inactive", "ended", "end", "cleared", "clear", "finished", "resolved", "off", "false", "0", "n", "none", "over"]);
+
+/** Alarm powietrzny w obwodzie Ukrainy. Zwraca null, gdy rekord nie wygląda na alarm z nazwą obszaru. */
+export function normalizeAlert(raw) {
+  if (!raw || typeof raw !== "object") return null;
+  const region = polishPlace(str(String(raw.region ?? raw.oblast ?? raw.regionName ?? raw.location_title ?? raw.locationTitle ?? raw.area ?? raw.name ?? ""), 80));
+  if (!region) return null;
+  const status = str(String(raw.status ?? raw.state ?? ""), 20).toLowerCase();
+  let active = raw.active ?? raw.isActive ?? raw.is_active;
+  if (typeof active !== "boolean") active = !(OFF.has(status) || raw.finishedAt || raw.endedAt || raw.finished_at);
+  return {
+    id: String(raw.id ?? raw.regionId ?? region).slice(0, 80),
+    region, active,
+    kind: str(String(raw.type ?? raw.alertType ?? raw.alert_type ?? raw.kind ?? ""), 40).toLowerCase(),
+    since: parseTime(raw.startedAt ?? raw.startAt ?? raw.since ?? raw.createdAt ?? raw.started_at ?? raw.updatedAt),
+  };
+}
+
+/** Wiadomość z kanałów obserwowanych przez NEPTUN. */
+export function normalizeMessage(raw) {
+  if (!raw || typeof raw !== "object") return null;
+  const text = str(String(raw.text ?? raw.message ?? raw.body ?? raw.content ?? raw.title ?? ""), 600);
+  if (!text) return null;
+  const at = parseTime(raw.publishedAt ?? raw.date ?? raw.ts ?? raw.createdAt ?? raw.time ?? raw.timestamp);
+  return { id: String(raw.id ?? `${at}-${text.slice(0, 20)}`).slice(0, 80), text, at, channel: str(String(raw.channel ?? raw.source ?? raw.sourceName ?? raw.author ?? ""), 60) };
 }
 
 /** Magazyn obiektów + korekta zegara urządzenia względem zegara serwera NEPTUN. */
 export class ThreatStore {
-  constructor() { this.items = new Map(); this.skewMs = 0; this.stats = { seen: 0, bad: 0 }; }
+  constructor() { this.items = new Map(); this.skewMs = 0; this.stats = { seen: 0, bad: 0 }; this.alerts = new Map(); this.messages = []; this.extras = { alertsAt: null, messagesAt: null, alertsErr: null, messagesErr: null }; }
+  applyAlerts(list) {
+    const m = new Map();
+    for (const r of Array.isArray(list) ? list : []) { const a = normalizeAlert(r); if (a) m.set(a.id, a); }
+    this.alerts = m; this.extras.alertsAt = Date.now(); this.extras.alertsErr = null;
+  }
+  applyMessages(list) {
+    const arr = [];
+    for (const r of Array.isArray(list) ? list : []) { const x = normalizeMessage(r); if (x) arr.push(x); }
+    arr.sort((a, b) => (b.at ?? 0) - (a.at ?? 0));
+    this.messages = arr.slice(0, 50); this.extras.messagesAt = Date.now(); this.extras.messagesErr = null;
+  }
   /** „Teraz” wg zegara serwera (zegar telefonu bywa przestawiony; wiek obserwacji liczymy względem serwera). */
   nowMs() { return Date.now() + this.skewMs; }
   noteServerTime(v) {
@@ -114,6 +192,17 @@ export function applySnapshotJson(store, json) {
   store.applySnapshot(list);
 }
 
+export function applyAlertsJson(store, json) {
+  const list = listOf(json, "alerts");
+  if (!list) throw new Error("Nieoczekiwany format alarmów NEPTUN");
+  store.applyAlerts(list);
+}
+export function applyMessagesJson(store, json) {
+  const list = listOf(json, "messages");
+  if (!list) throw new Error("Nieoczekiwany format wiadomości NEPTUN");
+  store.applyMessages(list);
+}
+
 /** Koperta WebSocket { type, ts, data }. Zwraca nazwę obsłużonego typu. */
 export function applyEnvelope(store, env) {
   if (!env || typeof env !== "object") return "invalid";
@@ -127,7 +216,9 @@ export function applyEnvelope(store, env) {
     case "upsert": store.upsert(d && typeof d === "object" && d.threat ? d.threat : d); return "upsert";
     case "remove": store.remove(d && typeof d === "object" ? d.id ?? d.threatId : d); return "remove";
     case "heartbeat": return "heartbeat";
-    case "alerts": return "alerts";
+    case "alerts": { const l = listOf(d, "alerts"); if (l) store.applyAlerts(l); return "alerts"; }
+    case "messages": { const l = listOf(d, "messages"); if (l) store.applyMessages(l); return "messages"; }
+    case "message": { const x = normalizeMessage(d); if (x) { store.messages = [x, ...store.messages.filter((m) => m.id !== x.id)].slice(0, 50); store.extras.messagesAt = Date.now(); } return "messages"; }
     default: return "unknown";
   }
 }
@@ -238,22 +329,77 @@ export function ageText(sec) {
   return `${Math.round(sec / 3600)} godz. temu`;
 }
 
-/** Wiersze do wyświetlenia: tylko obiekty z dokładną pozycją, w strefie przygranicznej, od najbliższego granicy. */
-export function buildView(store, user, feedFresh) {
+/** Wiersze do wyświetlenia. Domyślnie: obiekty w strefie przygranicznej (do LIMITS.zoneKm), od najbliższego granicy.
+ *  opts.all = true: także głębiej w Ukrainie (bez ograniczenia strefy). opts.filter: "all" | "drones" | "fast". */
+export function buildView(store, user, feedFresh, opts = {}) {
   const now = store.nowMs();
-  const rows = [];
-  let areaOnly = 0;
+  const rows = [], areaRows = [];
+  const counts = {};
+  let areaOnly = 0, farHidden = 0;
+  const wantType = (t) => opts.filter === "drones" ? TYPES[t.type].kind === "slow" : opts.filter === "fast" ? TYPES[t.type].kind === "fast" : true;
   for (const t of store.items.values()) {
-    if (t.areaOnly) { areaOnly++; continue; }
     if (t.status === "resolved") continue;
     const upd = t.updatedAt ?? t.confirmedAt;
     if (upd != null && (now - upd) / 1000 > LIMITS.hideAfterSec) continue;
     const zone = zoneOf(t);
-    if (!zone.inPoland && zone.distKm > LIMITS.zoneKm) continue;
-    const pred = predict(t, now);
+    const far = !zone.inPoland && zone.distKm > LIMITS.zoneKm;
+    if (far && !opts.all) { farHidden++; continue; }
+    if (!wantType(t)) continue;
     const at = t.confirmedAt ?? t.updatedAt;
-    rows.push({ t, zone, pred, ageSec: at != null ? Math.max(0, (now - at) / 1000) : null, assess: assess(t, user, now, { feedFresh, pred }) });
+    const ageSec = at != null ? Math.max(0, (now - at) / 1000) : null;
+    counts[t.type] = (counts[t.type] || 0) + (t.count || 1);
+    if (t.areaOnly) { areaOnly++; areaRows.push({ t, zone, far, ageSec }); continue; }
+    const pred = predict(t, now);
+    const as = far
+      ? { kind: "far", severity: "info", text: `Obiekt jest daleko od granicy Polski (ok. ${fmtKm(zone.distKm)}). Poza strefą ${LIMITS.zoneKm} km nie oceniamy wpływu na Twoją pozycję.` }
+      : assess(t, user, now, { feedFresh, pred });
+    rows.push({ t, zone, far, pred, ageSec, assess: as });
   }
   rows.sort((a, b) => a.zone.distKm - b.zone.distKm);
-  return { rows, areaOnly, now };
+  areaRows.sort((a, b) => a.zone.distKm - b.zone.distKm);
+  const alerts = [...store.alerts.values()].filter((a) => a.active).sort((a, b) => a.region.localeCompare(b.region, "uk"));
+  return { rows, areaRows, areaOnly, farHidden, counts, alerts, messages: store.messages, now };
+}
+
+/* ---------- zbliżanie do granicy (podstawa powiadomień Telegram) ---------- */
+export const NOTIFY = {
+  maxKm: 100,        // powiadamiamy, gdy obiekt jest bliżej niż 100 km od granicy Polski (albo już nad Polską)
+  strongKm: 50,      // drugi próg (eskalacja): bliżej niż 50 km
+  coneDeg: 15,       // tor uznajemy za „w stronę granicy”, gdy któryś z promieni kursu ±15° wchodzi do Polski
+  rayKm: 150,        // jak daleko sprawdzamy tor (dalej niż 150 km przed obiektem tor jest zbyt niepewny)
+  stepKm: 2,
+  maxAgeSec: 600,    // pozycja starsza niż 10 min nie wywołuje powiadomienia
+};
+
+/**
+ * Czy obiekt spełnia warunki powiadomienia: (1) bliżej niż maxKm od granicy lub nad Polską, (2) tor w stronę granicy.
+ * Zwraca { ok, level, ... }. level: 100 (<100 km), 50 (<50 km), 0 (nad Polską). Pomija: obserwacje bez pozycji, „advisory”,
+ * nieaktywne, zbyt stare i o niskiej pewności. Obiekt bez znanego kursu (poza nad Polską) nie wywołuje powiadomienia.
+ */
+export function borderApproach(t, nowMs, over = {}) {
+  const N = { ...NOTIFY, ...over };
+  if (t.areaOnly) return { ok: false, reason: "area" };
+  if (t.advisory) return { ok: false, reason: "advisory" };
+  if (t.status !== "active") return { ok: false, reason: "status:" + t.status };
+  if (t.confidence === "low") return { ok: false, reason: "lowconf" };
+  const at = t.confirmedAt ?? t.updatedAt;
+  if (at == null) return { ok: false, reason: "time" };
+  const ageSec = Math.max(0, (nowMs - at) / 1000);
+  if (ageSec > N.maxAgeSec) return { ok: false, reason: "old" };
+  const pred = predict(t, nowMs);
+  const here = pred.ok ? pred.here : { lat: t.lat, lon: t.lon };
+  const zone = zoneOf(here);
+  if (zone.inPoland) return { ok: true, level: 0, distKm: 0, entry: { lat: here.lat, lon: here.lon, alongKm: 0 }, etaMin: 0, centerHit: true, here };
+  if (zone.distKm > N.maxKm) return { ok: false, reason: "far", distKm: zone.distKm };
+  if (t.headingDeg == null) return { ok: false, reason: "heading", distKm: zone.distKm };
+  let best = null;
+  for (const [ang, center] of [[t.headingDeg, true], [normDeg(t.headingDeg - N.coneDeg), false], [normDeg(t.headingDeg + N.coneDeg), false]]) {
+    for (let d = N.stepKm; d <= N.rayKm; d += N.stepKm) {
+      const pt = destination(here, ang, d);
+      if (pointInRing(pt, POLAND_RING)) { if (!best || (center && !best.centerHit) || (center === best.centerHit && d < best.alongKm)) best = { lat: pt.lat, lon: pt.lon, alongKm: d, centerHit: center }; break; }
+    }
+  }
+  if (!best) return { ok: false, reason: "away", distKm: zone.distKm };
+  const speed = t.speedKmh;
+  return { ok: true, level: zone.distKm <= N.strongKm ? 50 : 100, distKm: zone.distKm, entry: best, centerHit: best.centerHit, etaMin: speed ? (best.alongKm / speed) * 60 : null, here };
 }

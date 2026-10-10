@@ -32,6 +32,11 @@ SH_FILE="$DATA_DIR/shelters.json"; SH_NEW=0
 if [ ! -f "$SH_FILE" ] || [ "$(( $(date +%s) - $(stat -c %Y "$SH_FILE") ))" -gt 86400 ]; then
   if SHELTERS_OUT="$SH_FILE" timeout 200 node shelters-sync.mjs; then SH_NEW=1; else echo "shelters-sync nieudany – zostaje poprzednia baza"; fi
 fi
+# Co ~30 min sonda formatu NEPTUN (3 zapytania REST + 8 s WebSocket): raport trafia na gałąź data jako neptun-schema.json.
+NP_FILE="$DATA_DIR/neptun-schema.json"; NP_NEW=0
+if [ ! -f "$NP_FILE" ] || [ "$(( $(date +%s) - $(stat -c %Y "$NP_FILE") ))" -gt 1800 ]; then
+  if NEPTUN_SCHEMA_OUT="$NP_FILE" timeout 90 node neptun-probe.mjs; then NP_NEW=1; else echo "neptun-probe nieudany – pomijam"; fi
+fi
 # Licznik kolejnych porażek: po 3 z rzędu (≈15 min) wysyłamy wiadomość administratorowi (jeśli ustawiono ADMIN_CHAT_ID).
 fail() {
   local n=$(( $(cat "$BASE/fails" 2>/dev/null || echo 0) + 1 )); echo "$n" > "$BASE/fails"
@@ -49,7 +54,7 @@ NEW="$(node -e 'const j=JSON.parse(require("fs").readFileSync(process.env.ALERTS
 OLD="$(cat "$BASE/last.hash" 2>/dev/null || true)"
 AGE=99999
 [ -f "$BASE/last.push" ] && AGE=$(( ( $(date +%s) - $(stat -c %Y "$BASE/last.push") ) / 60 ))
-if [ "$NEW" != "$OLD" ] || [ "$AGE" -ge 25 ] || [ "$SH_NEW" = 1 ] || [ "$PSP_NEW" = 1 ]; then
+if [ "$NEW" != "$OLD" ] || [ "$AGE" -ge 25 ] || [ "$SH_NEW" = 1 ] || [ "$PSP_NEW" = 1 ] || [ "$NP_NEW" = 1 ]; then
   if bash "$SERVER_DIR/publish.sh"; then echo "$NEW" > "$BASE/last.hash"; touch "$BASE/last.push"; echo "opublikowano"; ok; else echo "publikacja nieudana"; fail; exit 1; fi
 else
   echo "bez zmian (ostatnia publikacja ${AGE} min temu)"; ok
