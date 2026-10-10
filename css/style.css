@@ -256,14 +256,22 @@ input.sel{width:100%;font-weight:400}
 .lastmsg b{font-family:var(--font-h);font-weight:700;display:block}
 a.all{color:var(--brand);text-decoration:none;font-size:.875rem}
 
-/* Dobrze wiedzieć (komunikaty informacyjne) i przełącznik Aktywne/Wcześniejsze */
-.tri{display:inline-flex;color:#B7791F;flex:none}
+/* Trzy poziomy (zielony / żółty / czerwony): wyraźne, gruba obwódka. „Dobrze wiedzieć”: jaśniejsza, bursztynowa, cienka obwódka. */
+.status.ok{background:#E3F4EC;border:4px solid #1F8F6B;color:#0B4F3C}
+.status.warn{background:#FFF1B8;border:4px solid #E0A800;color:#5A4300}
+.status.alert{background:#FDE3E1;border:4px solid #C62828;color:#7A1410}
+.status.warn .ico{color:#9A6B00}
+.status.warn .srcchip{color:#5A4300;border-color:#E0A800}
+.tri{display:inline-flex;color:#C2570C;flex:none}
 .tri svg{width:20px;height:20px}
-.goodtoknow{margin-top:12px}
-.goodtoknow h2{margin:0 0 6px;font-size:1rem}
+.goodtoknow{margin-top:12px;background:#FFF6EA;border:1px solid #F0C99A;border-radius:var(--radius,16px);padding:12px 16px;color:#5B3A12}
+.goodtoknow h2{margin:0 0 6px;font-size:1rem;display:flex;align-items:center;gap:8px;color:#8A4B0F}
 .goodtoknow ul{list-style:none;margin:0;padding:0}
 .goodtoknow li{display:flex;gap:10px;align-items:flex-start;padding:8px 0}
-.goodtoknow li+li{border-top:1px solid var(--line-in)}
-.goodtoknow a.small{display:inline-block;margin-top:6px;color:var(--brand-ink);font-weight:600}
+.goodtoknow li+li{border-top:1px solid #F0C99A}
+.goodtoknow .gcount{font-weight:600;opacity:.8}
+.goodtoknow .gsum{margin-top:2px;font-size:.9375rem}
+.goodtoknow .muted{color:#8A6A45}
+.goodtoknow a.small{display:inline-block;margin-top:6px;color:#8A4B0F;font-weight:700}
 .seg{display:flex;gap:8px;margin:0 0 10px}
 .msg .meta .tri svg{width:18px;height:18px}

@@ -338,7 +338,26 @@ ok("odległość, czas pieszo, linki do tras", () => {
     assert.equal(classifyOne({ type: "pogoda", title: "Upał 1. stopnia" }).sev, "info");
     assert.equal(classifyOne({ type: "pogoda", title: "Wichury 3. stopnia" }).sev, "danger");
   });
-  ok("pole alarm z RSO = zagrożenie", () => assert.equal(classifyOne({ type: "inne", alarm: true, title: "Alarm" }).sev, "danger"));
+  ok("pole alarm z RSO samo nie robi zagrożenia; liczy się treść", () => {
+    assert.equal(classifyOne({ type: "inne", alarm: true, title: "Uwaga! Alarm, kot mi uciekł" }).sev, "info");
+    assert.equal(classifyOne({ type: "woda", alarm: true, title: "Susza hydrologiczna", body: "przepływy poniżej SNQ" }).sev, "info");
+    assert.equal(classifyOne({ type: "inne", alarm: true, title: "Alarm powietrzny", body: "Zagrożenie atakiem z powietrza w Polsce" }).sev, "danger");
+  });
+  ok("pogoda 3. stopnia = zagrożenie; powódź 2. stopnia = ważne; susza zawsze info", () => {
+    assert.equal(classifyOne({ type: "pogoda", title: "Wichury 3. stopnia" }).sev, "danger");
+    assert.equal(classifyOne({ type: "woda", title: "Ostrzeżenie 2. stopnia", body: "Wezbranie wód, możliwe przekroczenie stanów ostrzegawczych" }).sev, "important");
+    assert.equal(classifyOne({ type: "woda", title: "Susza hydrologiczna 3. stopnia", body: "niskie przepływy" }).sev, "info");
+    assert.equal(classifyOne({ type: "inne", title: "Przekroczenie poziomu ozonu w powietrzu" }).sev, "info");
+  });
+  ok("RCB: nierozpoznany = ważne, wprost zagrożenie życia = zagrożenie", () => {
+    assert.equal(classifyOne({ type: "rcb", title: "Alert RCB", body: "Zamknięty most, utrudnienia" }).sev, "important");
+    assert.equal(classifyOne({ type: "rcb", title: "Alert RCB", body: "Zagrożenie życia! Natychmiast schroń się w budynku" }).sev, "danger");
+  });
+  ok("komunikaty informacyjne starsze niż 7 dni są wcześniejsze mimo „do odwołania”", () => {
+    const old = { id: "o", type: "woda", title: "Susza hydrologiczna", published: iso(0, 0).replace("2026-10-10", "2026-10-01"), validTo: "2027-01-01T00:00:00Z" };
+    assert.equal(analyze([old], NOW)[0].active, false);
+    assert.equal(analyze([{ ...old, published: iso(1, 0).replace("2026-10-10", "2026-10-08") }], NOW)[0].active, true);
+  });
   ok("komunikat z validTo w przeszłości jest nieaktywny", () => assert.equal(analyze([{ id: "v", type: "pogoda", title: "Burze 2. stopnia", published: iso(1, 0), validTo: iso(5, 0) }], NOW)[0].active, false));
 }
 

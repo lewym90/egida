@@ -181,6 +181,7 @@ function screenStart() {
 
 /* Poziom komunikatów dla Pulpitu: alarm (czerwony) → ostrzeżenie (bursztyn) → spokojnie (zielony). Czerwień tylko dla realnego alarmu. */
 const alertLevel = (list) => statusOf(list);
+const sentence = (t) => { const x = String(t || "").replace(/\s+/g, " ").trim(); const m = /^(.{40,}?[.!?])(\s|$)/.exec(x); const r = m ? m[1] : x; return r.length > 150 ? r.slice(0, 147).trimEnd() + "…" : r; };
 const hhmm = (ms) => new Date(ms).toLocaleTimeString("pl-PL", { hour: "2-digit", minute: "2-digit" });
 const DOT = { rcb: "#B3261E", pogoda: "#B45309", drogi: "#2A4DA0", woda: "#0B6B63" };
 function nearestMinutes() { try { const j = JSON.parse(sessionStorage.getItem("egida.nearest") || "null"); return j && Date.now() - j.t < 600000 && Number.isFinite(j.min) ? j.min : null; } catch { return null; } }
@@ -208,16 +209,18 @@ function screenPulpit() {
     const info = list.filter((a) => a.sev === "info" && !a.cancel);
     if (lvl === "alarm") {
       const al = danger[0], air = al.kind === "atak";
-      status = `<a class="status alert" style="text-decoration:none" href="#/alerty"><span class="ico">${I.alert}</span><div><h2>${air ? "Zagrożenie z powietrza" : "Alarm w Twoim województwie"}</h2><p>${esc(al.title)}${al.body ? " " + esc(al.body.slice(0, 160)) : ""}</p><p class="small" style="margin-top:6px">${air ? "Obowiązuje do odwołania komunikatem o zakończeniu ataku. " : ""}Dotknij, aby zobaczyć wszystkie komunikaty. ${when}</p></div></a>`;
+      status = `<a class="status alert" style="text-decoration:none" href="#/alerty"><span class="ico">${I.alert}</span><div><h2>${air ? "Zagrożenie z powietrza" : "Zagrożenie"}</h2><p>${esc(al.title)}${al.body ? " " + esc(al.body.slice(0, 160)) : ""}</p><p class="small" style="margin-top:6px">${air ? "Obowiązuje do odwołania komunikatem o zakończeniu ataku. " : ""}Dotknij, aby zobaczyć wszystkie komunikaty. ${when}</p></div></a>`;
     } else if (lvl === "warn") {
-      status = `<a class="status warn" style="text-decoration:none" href="#/alerty"><span class="ico">${I.alert}</span><div><h2>${important.length === 1 ? "Ważny komunikat" : `Ważne komunikaty (${important.length})`}</h2><p>${esc(important[0].title)}. Dla: ${name}. Dotknij, aby zobaczyć. ${when}</p><div class="chips">${chips}</div></div></a>`;
+      status = `<a class="status warn" style="text-decoration:none" href="#/alerty"><span class="ico">${I.alert}</span><div><h2>${important.length === 1 ? "Ostrzeżenie" : `Ostrzeżenia (${important.length})`}</h2><p>${esc(important[0].title)}${important[0].body ? ": " + esc(sentence(important[0].body)) : ""}</p><p class="small" style="margin-top:6px">Śledź rozwój sytuacji. Dla: ${name}. Dotknij, aby zobaczyć. ${when}</p><div class="chips">${chips}</div></div></a>`;
     } else {
       status = `<div class="status ok"><span class="ico">${I.check}</span><div><h2>W Twojej okolicy jest spokojnie</h2><p>Brak aktywnych ostrzeżeń w znanych nam źródłach (województwo ${name}). ${when}</p><div class="chips">${chips}</div><p class="small" style="margin-top:8px;opacity:.85">Aplikacja nie zastępuje syren ani Alertu RCB.</p></div></div>`;
     }
-    if (lvl !== "alarm" && info.length) {
-      const roads = info.filter((a) => a.type === "drogi"), rest = info.length - roads.length;
-      const rows = roads.slice(0, 3).map((a) => `<li><span class="tri">${I.alert}</span><div><b>${esc(a.title)}</b><div class="muted small">Droga · zgłoszono ${esc(fmtDate(a.published))}${a.expiresAt ? ` · prognoza do ok. ${hhmm(a.expiresAt)}` : ""}</div></div></li>`).join("");
-      status += `<div class="card goodtoknow"><h2>Dobrze wiedzieć</h2><ul>${rows}</ul>${rest > 0 ? `<a class="small" href="#/alerty">${rest} ${plural(rest)} informacyjn${rest === 1 ? "y" : "e"}: zobacz w Alertach</a>` : ""}</div>`;
+    if (info.length) {
+      const gs = groupAlerts(info), rows = gs.slice(0, 3).map((g) => {
+        const a = g.items[0];
+        return `<li><span class="tri">${I.alert}</span><div><b>${esc(a.title)}${g.items.length > 1 ? ` <span class="gcount">· ${g.items.length} ${plural(g.items.length)}</span>` : ""}</b>${a.body ? `<div class="gsum">${esc(sentence(a.body))}</div>` : ""}<div class="muted small">${esc(String(a.source || "RSO").replace(/\s*\(.*\)/, ""))} · ${esc(fmtDate(a.published))}${a.type === "drogi" && a.expiresAt ? ` · prognoza do ok. ${hhmm(a.expiresAt)}` : ""}</div></div></li>`;
+      }).join("");
+      status += `<div class="goodtoknow"><h2><span class="tri">${I.alert}</span>Dobrze wiedzieć</h2><ul>${rows}</ul>${gs.length > 3 ? `<a class="small" href="#/alerty">Zobacz wszystkie (${info.length})</a>` : ""}</div>`;
     }
   }
   const nm = nearestMinutes();

@@ -19,16 +19,23 @@ export function durationFromText(text) {
   return m[2] === "min" ? v * 6e4 : v * H;
 }
 
-/** Rodzaj i waga jednego komunikatu (bez uwzględniania odwołań innych komunikatów). */
+const LIFE_RE = /(zagrozenie\s+zycia|zagrozenie\s+dla\s+zycia|natychmiast\w*\s+(sie\s+)?(schron|ukry|opusc|ewakuuj)|schron\w*\s+sie\s+natychmiast|ukryj\s+sie)/;
+const FLOOD_RE = /(powodz|stan\s+alarmow|wezbran|przybor|przelanie|zalani)/;
+const DRY_RE = /(susz|nizowk|niskimi?\s+przeplyw|ponizej\s+snq)/;
+
+/** Rodzaj i waga jednego komunikatu. Ocena wg CAŁEJ treści; samo pole „alarm” z RSO ani pojedyncze słowo nie decyduje. */
 export function classifyOne(a) {
   const t = norm(`${a.title || ""} ${a.body || ""}`);
-  const cancel = CANCEL_RE.test(t) && (a.type === "rcb" || ATTACK_RE.test(t) || /ukrain|powietrzn/.test(t)) && !a.alarm;
-  const attack = !cancel && (a.alarm || ((a.type === "rcb" || AIR_RE.test(t)) && ATTACK_RE.test(t) && AIR_RE.test(t)));
-  let sev = "info", kind = a.type || "inne";
+  const type = a.type || "inne";
+  const cancel = CANCEL_RE.test(t) && (type === "rcb" || ATTACK_RE.test(t) || /ukrain|powietrzn/.test(t));
+  const airType = type === "rcb" || type === "inne";
+  const attack = !cancel && airType && ATTACK_RE.test(t) && AIR_RE.test(t);
+  let sev = "info", kind = type;
   if (cancel) { sev = "info"; kind = "odwolanie"; }
-  else if (attack) { sev = "danger"; kind = a.alarm ? "alarm" : "atak"; }
-  else if (a.type === "rcb") sev = "important";
-  else if (a.type === "pogoda") { const d = degreeOf(a); sev = d >= 3 ? "danger" : d === 2 ? "important" : "info"; }
+  else if (attack) { sev = "danger"; kind = "atak"; }
+  else if (type === "rcb") { if (LIFE_RE.test(t)) { sev = "danger"; kind = "zagrozenie"; } else sev = "important"; }
+  else if (type === "pogoda") { const d = degreeOf({ title: a.title }) || degreeOf({ title: a.body }); sev = d >= 3 ? "danger" : d === 2 ? "important" : "info"; if (sev === "danger") kind = "pogoda3"; }
+  else if (type === "woda" && FLOOD_RE.test(t) && !DRY_RE.test(t)) { const d = degreeOf({ title: a.title }) || degreeOf({ title: a.body }); sev = d >= 3 ? "danger" : d === 2 ? "important" : "info"; if (sev === "danger") kind = "pogoda3"; }
   return { sev, kind, cancel, attack };
 }
 
@@ -47,6 +54,8 @@ export function analyze(items, now = Date.now()) {
       const dur = a.type === "drogi" ? durationFromText(`${a.title} ${a.body || ""}`) : null;
       exp = pub + (dur != null ? dur : (DEFAULT_TTL_H[a.type] ?? DEFAULT_TTL_H.inne) * H);
     }
+    // Komunikaty tylko informacyjne starsze niż 7 dni trafiają do „Wcześniejszych”, nawet gdy źródło podaje „do odwołania”.
+    if (a.sev === "info" && !a.cancel && pub != null) exp = exp == null ? pub + 7 * 24 * H : Math.min(exp, pub + 7 * 24 * H);
     a.expiresAt = exp;
     a.supersededBy = null;
     if (a.sev === "danger" && a.published) {
