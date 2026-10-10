@@ -33,7 +33,7 @@ ok() {
 timeout 120 node poll.mjs || { echo "poll nieudany – nic nie publikuję"; fail; exit 1; }
 
 # Publikuj tylko gdy treść się zmieniła albo minęło ≥25 min (sygnał „żyję”, aby aplikacja nie uznała danych za stare).
-NEW="$(node -e 'const j=JSON.parse(require("fs").readFileSync(process.env.ALERTS_OUT,"utf8"));console.log(require("crypto").createHash("sha1").update(JSON.stringify(j.items)).digest("hex"))')"
+NEW="$(node -e 'const j=JSON.parse(require("fs").readFileSync(process.env.ALERTS_OUT,"utf8"));console.log(require("crypto").createHash("sha1").update(JSON.stringify([j.items,j.telegram||{}])).digest("hex"))')"
 OLD="$(cat "$BASE/last.hash" 2>/dev/null || true)"
 AGE=99999
 [ -f "$BASE/last.push" ] && AGE=$(( ( $(date +%s) - $(stat -c %Y "$BASE/last.push") ) / 60 ))
