@@ -255,3 +255,15 @@ input.sel{width:100%;font-weight:400}
 .lastmsg .ldot{flex:none;width:10px;height:10px;border-radius:50%;margin-top:7px}
 .lastmsg b{font-family:var(--font-h);font-weight:700;display:block}
 a.all{color:var(--brand);text-decoration:none;font-size:.875rem}
+
+/* Dobrze wiedzieć (komunikaty informacyjne) i przełącznik Aktywne/Wcześniejsze */
+.tri{display:inline-flex;color:#B7791F;flex:none}
+.tri svg{width:20px;height:20px}
+.goodtoknow{margin-top:12px}
+.goodtoknow h2{margin:0 0 6px;font-size:1rem}
+.goodtoknow ul{list-style:none;margin:0;padding:0}
+.goodtoknow li{display:flex;gap:10px;align-items:flex-start;padding:8px 0}
+.goodtoknow li+li{border-top:1px solid var(--line-in)}
+.goodtoknow a.small{display:inline-block;margin-top:6px;color:var(--brand-ink);font-weight:600}
+.seg{display:flex;gap:8px;margin:0 0 10px}
+.msg .meta .tri svg{width:18px;height:18px}

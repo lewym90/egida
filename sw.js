@@ -1,10 +1,10 @@
 // Service worker: offline dla treści (powłoka aplikacji z cache), komunikaty zawsze najpierw z sieci.
-const VERSION = "egida-v9";
+const VERSION = "egida-v10";
 const SHELL = [
   "./", "index.html", "manifest.webmanifest", "css/style.css",
   "js/app.js", "js/content.js", "js/config.js",
   "js/geo.js", "js/neptun.js", "js/neptun-feed.js", "js/shelters.js", "js/mapscreen.js",
-  "js/sheltersscreen.js", "js/poland-border.js", "js/demo.js",
+  "js/sheltersscreen.js", "js/classify.js", "js/poland-border.js", "js/demo.js",
   "js/vendor/leaflet/leaflet.js", "js/vendor/leaflet/leaflet.css",
   "icons/icon.svg", "icons/icon-192.png", "icons/icon-512.png", "icons/apple-touch-icon.png",
   "fonts/manrope-latin-500-normal.woff2", "fonts/manrope-latin-700-normal.woff2", "fonts/manrope-latin-800-normal.woff2",

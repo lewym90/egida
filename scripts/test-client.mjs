@@ -6,6 +6,7 @@ import { POLAND_RING } from "../js/poland-border.js";
 import { normalizeThreat, ThreatStore, applyEnvelope, applySnapshotJson, predict, assess, buildView, zoneOf, coneOutline, parseTime, ageText, LIMITS } from "../js/neptun.js";
 import { createFeed } from "../js/neptun-feed.js";
 import { coarseBbox, overpassQuery, parseOverpass, makeShelter, withDistance, walkMin, dirUrl, fetchOsmShelters, loadShelterDb, nearest, overpassQueryPoland, DB_CACHE, buildPspTiles, pspCellId, pspCellsAround, pspRowToShelter, loadPspAround, mergeSources, loadPspNearest, guaranteedKm } from "../js/shelters.js";
+import { analyze, statusOf, classifyOne, durationFromText } from "../js/classify.js";
 import { demoThreats, DEMO_USER } from "../js/demo.js";
 
 let n = 0;
@@ -61,7 +62,7 @@ ok("normalizeThreat: odrzuca śmieci, łagodzi braki", () => {
 });
 ok("parseTime: ISO, ms i sekundy", () => { assert.equal(parseTime("2026-10-10T12:00:00Z"), NOW); assert.equal(parseTime(NOW), NOW); assert.equal(parseTime(NOW / 1000), NOW); assert.equal(parseTime("nie data"), null); assert.equal(parseTime(null), null); });
 ok("koperty WebSocket i migawka REST", () => {
-  const s = new ThreatStore();
+  const s = new ThreatStore(); s.nowMs = () => NOW;
   assert.equal(applyEnvelope(s, { type: "snapshot", ts: new Date().toISOString(), data: { threats: [sample(), sample({ id: "x2" })] } }), "snapshot");
   assert.equal(s.items.size, 2);
   assert.equal(applyEnvelope(s, { type: "upsert", data: sample({ id: "x3" }) }), "upsert"); assert.equal(s.items.size, 3);
@@ -132,14 +133,14 @@ ok("assess: areaOnly i brak lokalizacji użytkownika", () => {
   assert.equal(assess(T({}), null, NOW, {}).kind, "nouser");
 });
 ok("buildView: strefa 200 km, areaOnly pomijane, sortowanie od granicy", () => {
-  const s = new ThreatStore();
+  const s = new ThreatStore(); s.nowMs = () => NOW;
   s.applySnapshot([
     sample({ id: "a", lat: 50.9, lon: 24.6 }),              // ok. 60 km od granicy
     sample({ id: "b", lat: 50.5, lon: 31.0 }),              // daleko (ok. 600 km)
     sample({ id: "c", lat: 51.1, lon: 23.5 }),              // nad Polską
     sample({ id: "d", areaOnly: true, lat: 50.0, lon: 25.0 }),
     sample({ id: "e", status: "resolved", lat: 50.9, lon: 24.6 }),
-    sample({ id: "f", lat: 50.9, lon: 24.6, updatedAt: new Date(Date.now() - 7200e3).toISOString(), confirmedAt: new Date(Date.now() - 7200e3).toISOString() }),
+    sample({ id: "f", lat: 50.9, lon: 24.6, updatedAt: new Date(NOW - 7200e3).toISOString(), confirmedAt: new Date(NOW - 7200e3).toISOString() }),
   ]);
   const v = buildView(s, USER, true);
   assert.deepEqual(v.rows.map((r) => r.t.id), ["c", "a"]); assert.equal(v.areaOnly, 1); assert.equal(v.rows[0].zone.inPoland, true);
@@ -297,6 +298,48 @@ ok("odległość, czas pieszo, linki do tras", () => {
   reqs.length = 0;
   r = await loadPspNearest("https://x.test/p/", lat, lon, { fetchImpl: async (u) => { reqs.push(u); throw new Error("offline"); }, memo: new Map() });
   assert.equal(reqs.length, 9); assert.equal(r.failed, 9); n++;
+}
+
+/* ---------- ocena komunikatów (waga, ważność, odwołania) ---------- */
+{
+  const NOW = new Date("2026-10-10T13:10:00Z").getTime(); // 15:10 czasu polskiego
+  const iso = (h, m) => new Date(Date.UTC(2026, 9, 10, h, m)).toISOString();
+  const rcbEnd = { id: "e", type: "rcb", voivodeship: "all", title: "ALERT RCB", body: "UWAGA! Zakończył się atak powietrzny na Ukrainę. Brak zagrożenia na terenie Polski.", published: iso(4, 55) };
+  const road = { id: "r", type: "drogi", voivodeship: "lubelskie", title: "Utrudnienie na DW 835", body: "Droga zablokowana. Przewidywany czas utrudnienia: 2 godz", published: iso(6, 44) };
+  const dry = { id: "w", type: "woda", voivodeship: "lubelskie", title: "Susza hydrologiczna", body: "niskie przepływy", published: "2026-09-04T13:13:00Z" };
+  const start = { id: "s", type: "rcb", voivodeship: "all", title: "ALERT RCB", body: "UWAGA! Trwa atak powietrzny na Ukrainę.", published: iso(2, 10) };
+  ok("durationFromText: godziny i minuty", () => { assert.equal(durationFromText("czas utrudnienia: 2 godz"), 2 * 36e5); assert.equal(durationFromText("potrwa 30 min"), 18e5); assert.equal(durationFromText("brak"), null); });
+  ok("odwołanie ataku na Ukrainę = info, nie zagrożenie", () => { const c = classifyOne(rcbEnd); assert.equal(c.cancel, true); assert.equal(c.sev, "info"); });
+  ok("atak na Ukrainę = zagrożenie (czerwone)", () => assert.equal(classifyOne(start).sev, "danger"));
+  ok("przykład z ekranu: spokojnie + utrudnienie tylko do wiadomości", () => {
+    const l = analyze([rcbEnd, road, dry], NOW), act = l.filter((a) => a.active);
+    assert.equal(statusOf(act), "calm");
+    assert.equal(l.find((a) => a.id === "r").active, false, "utrudnienie z 8:44 + 2 h wygasło o 10:44");
+    assert.equal(l.find((a) => a.id === "w").active, false, "susza sprzed miesiąca nieaktywna");
+    assert.equal(l.find((a) => a.id === "e").active, true);
+  });
+  ok("droga w trakcie trwania: aktywna, ale tylko info", () => {
+    const l = analyze([road], new Date(Date.UTC(2026, 9, 10, 7, 30)).getTime()); assert.equal(l[0].active, true); assert.equal(statusOf(l.filter((a) => a.active)), "calm");
+  });
+  ok("atak trwa do odwołania, potem czerwień znika", () => {
+    const t1 = new Date(Date.UTC(2026, 9, 10, 3, 0)).getTime();
+    assert.equal(statusOf(analyze([start], t1).filter((a) => a.active)), "alarm");
+    const l = analyze([start, rcbEnd], NOW); assert.equal(l.find((a) => a.id === "s").supersededBy !== null, true); assert.equal(statusOf(l.filter((a) => a.active)), "calm");
+  });
+  ok("odwołanie sprzed ataku nie kasuje nowego ataku", () => {
+    const newer = { ...start, id: "s2", published: iso(12, 0) };
+    assert.equal(statusOf(analyze([rcbEnd, newer], NOW).filter((a) => a.active)), "alarm");
+  });
+  ok("atak bez odwołania wygasa po 12 h (domyślny czas RCB)", () => assert.equal(analyze([start], new Date(Date.UTC(2026, 9, 10, 15, 0)).getTime())[0].active, false));
+  ok("inny alert RCB (np. ewakuacja) = ważne (bursztyn); pogoda wg stopnia", () => {
+    const e = { id: "x", type: "rcb", voivodeship: "lubelskie", title: "Alert RCB", body: "Ewakuacja osiedla", published: iso(12, 0) };
+    assert.equal(classifyOne(e).sev, "important");
+    assert.equal(classifyOne({ type: "pogoda", title: "Burze 2. stopnia" }).sev, "important");
+    assert.equal(classifyOne({ type: "pogoda", title: "Upał 1. stopnia" }).sev, "info");
+    assert.equal(classifyOne({ type: "pogoda", title: "Wichury 3. stopnia" }).sev, "danger");
+  });
+  ok("pole alarm z RSO = zagrożenie", () => assert.equal(classifyOne({ type: "inne", alarm: true, title: "Alarm" }).sev, "danger"));
+  ok("komunikat z validTo w przeszłości jest nieaktywny", () => assert.equal(analyze([{ id: "v", type: "pogoda", title: "Burze 2. stopnia", published: iso(1, 0), validTo: iso(5, 0) }], NOW)[0].active, false));
 }
 
 console.log(`OK: ${n} grup testów logiki klienta przeszło (limity: strefa ${LIMITS.zoneKm} km, uspokajanie ≤ ${LIMITS.reassureAgeSec} s)`);
