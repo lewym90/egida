@@ -294,3 +294,11 @@ a.all{color:var(--brand);text-decoration:none;font-size:.875rem}
 .msg .meta .tri svg{width:18px;height:18px}
 .slist .lbl{display:flex;align-items:center;gap:6px}
 .slist .lbl .tri svg{width:16px;height:16px}
+.status .slink{text-decoration:none;color:inherit}
+.slist .more{margin-top:2px}
+.slist .more summary{cursor:pointer;font-weight:700;font-size:.875rem;list-style:none;display:inline-flex;align-items:center;gap:4px;padding:4px 0}
+.slist .more summary::-webkit-details-marker{display:none}
+.slist .more summary::after{content:"▾";font-size:.75rem}
+.slist .more[open] summary::after{content:"▴"}
+.slist .more summary{color:inherit;text-decoration:underline;text-underline-offset:3px}
+.slist .more p{margin:4px 0 0;font-size:.9375rem;line-height:1.4}

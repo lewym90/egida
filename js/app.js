@@ -2,7 +2,7 @@ import { CONFIG } from "./config.js";
 import {
   VOIVODESHIPS, LEGAL_HTML, ALERT_FILTERS, PLECAK, FIRST_AID, WHAT_TO_DO, READINESS_QUESTIONS, SOURCES,
 } from "./content.js";
-import { analyze, statusOf, summarize } from "./classify.js";
+import { analyze, statusOf, summarize, compose } from "./classify.js";
 import { renderMapHtml, initMapScreen, destroyScreens } from "./mapscreen.js";
 import { renderSheltersHtml, initSheltersScreen } from "./sheltersscreen.js";
 
@@ -191,11 +191,11 @@ function ring(pct) {
 }
 const TYPE_LBL = { pogoda: "Pogoda", rcb: "Alert RCB", woda: "Woda", drogi: "Drogi" };
 const genericTitle = (a) => /^(alert rcb|komunikat)\b/i.test(String(a.title || "").trim()) && String(a.title).trim().length <= 12;
-/* Jeden komunikat jako czytelny wiersz: etykieta + czas, nagłówek, jedno zdanie. Bez urywania w środku skrótu. */
+/* Jeden komunikat jako czytelny wiersz: etykieta + czas, nagłówek, tekst. Krótkie komunikaty w całości;
+   dłuższe cięte tylko na granicy zdania, a reszta rozwija się w miejscu (bez przechodzenia na inny ekran). */
 function msgParts(a, count = 1, tri = false) {
-  const gen = genericTitle(a), sum = summarize(a.body, 140);
-  const head = gen ? sum || a.title : a.title, sub = gen ? "" : sum && sum.toLowerCase() !== String(a.title).toLowerCase() ? sum : "";
-  return `<span class="lbl">${tri && a.type === "drogi" ? `<span class="tri">${I.alert}</span>` : ""}${esc(TYPE_LBL[a.type] || "Komunikat")} · ${esc(fmtDate(a.published))}${count > 1 ? ` · ${count} ${plural(count)}` : ""}</span><b class="shead">${esc(head)}</b>${sub ? `<span class="ssub">${esc(sub)}</span>` : ""}`;
+  const c = compose(a);
+  return `<span class="lbl">${tri && a.type === "drogi" ? `<span class="tri">${I.alert}</span>` : ""}${esc(TYPE_LBL[a.type] || "Komunikat")} · ${esc(fmtDate(a.published))}${count > 1 ? ` · ${count} ${plural(count)}` : ""}</span><b class="shead">${esc(c.head)}</b>${c.text ? `<span class="ssub">${esc(c.text)}</span>` : ""}${c.rest ? `<details class="more"><summary>Czytaj dalej</summary><p>${esc(c.rest)}</p></details>` : ""}`;
 }
 function screenPulpit() {
   const r = readiness();
@@ -220,9 +220,9 @@ function screenPulpit() {
     const rows = (arr, n) => `<ul class="slist">${arr.slice(0, n).map((a) => `<li>${msgParts(a)}</li>`).join("")}</ul>${arr.length > n ? `<p class="smore">i jeszcze ${arr.length - n}</p>` : ""}`;
     if (lvl === "alarm") {
       const air = danger[0].kind === "atak";
-      status = `<a class="status alert" href="#/alerty"><span class="ico">${I.alert}</span><div class="sbody"><h2>${air ? "Zagrożenie z powietrza" : danger.length > 1 ? `Zagrożenia (${danger.length})` : "Zagrożenie"}</h2>${rows(danger, 2)}${air ? '<p class="slead">Obowiązuje do odwołania komunikatem o zakończeniu ataku.</p>' : ""}<p class="smeta">${meta}</p><span class="slink">Zobacz szczegóły ${I.chevr}</span></div></a>`;
+      status = `<div class="status alert"><span class="ico">${I.alert}</span><div class="sbody"><h2>${air ? "Zagrożenie z powietrza" : danger.length > 1 ? `Zagrożenia (${danger.length})` : "Zagrożenie"}</h2>${rows(danger, 2)}${air ? '<p class="slead">Obowiązuje do odwołania komunikatem o zakończeniu ataku.</p>' : ""}<p class="smeta">${meta}</p><a class="slink" href="#/alerty">Zobacz szczegóły ${I.chevr}</a></div></div>`;
     } else if (lvl === "warn") {
-      status = `<a class="status warn" href="#/alerty"><span class="ico">${I.alert}</span><div class="sbody"><h2>${important.length === 1 ? "Ostrzeżenie" : `Ostrzeżenia (${important.length})`}</h2>${rows(important, 2)}<p class="smeta">Śledź rozwój sytuacji. ${meta}</p><span class="slink">Zobacz szczegóły ${I.chevr}</span></div></a>`;
+      status = `<div class="status warn"><span class="ico">${I.alert}</span><div class="sbody"><h2>${important.length === 1 ? "Ostrzeżenie" : `Ostrzeżenia (${important.length})`}</h2>${rows(important, 2)}<p class="smeta">Śledź rozwój sytuacji. ${meta}</p><a class="slink" href="#/alerty">Zobacz szczegóły ${I.chevr}</a></div></div>`;
     } else {
       status = `<div class="status ok"><span class="ico">${I.check}</span><div class="sbody"><h2>W Twojej okolicy jest spokojnie</h2><p class="slead">Brak aktywnych ostrzeżeń w znanych nam źródłach.</p><p class="smeta">${meta}</p><p class="sfine">Aplikacja nie zastępuje syren ani Alertu RCB.</p></div></div>`;
     }

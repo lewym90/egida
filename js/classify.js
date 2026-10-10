@@ -115,3 +115,49 @@ export function linkRelated(list) {
   }
   return list;
 }
+
+/* ---------- skład komunikatu do wyświetlenia: pełne zdania, bez „urwanych” końcówek ---------- */
+const cleanText = (text) => {
+  let x = String(text || "").replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+  x = x.replace(/^(komunikat|alert rcb|alert)\s*:\s*/i, "").replace(/^[„"“]+\s*(komunikat|alert rcb|alert)\s*:\s*/i, "");
+  const open = (x.match(/[„“]/g) || []).length, close = (x.match(/[”]/g) || []).length;
+  if (open !== close || /^[„"“”]/.test(x)) x = x.replace(/[„“”]/g, "").replace(/^"+|"+$/g, ""); // niedomknięte cudzysłowy zdejmujemy
+  x = x.replace(/\s+([.,;:!?])/g, "$1").trim();
+  return x ? x[0].toUpperCase() + x.slice(1) : "";
+};
+/** Dzieli na zdania; nie dzieli na skrótach („pow.”, „r.”, „dot.”, „art.”). */
+export function sentences(text) {
+  const x = cleanText(text);
+  const out = []; let start = 0, m;
+  const re = /[.!?]["”“']?(?=\s+[\p{Lu}„"])/gu;
+  while ((m = re.exec(x))) {
+    const before = x.slice(start, m.index).split(/\s+/).pop();
+    if (/^\p{Ll}{1,4}$/u.test(before) || /^\p{Lu}$/u.test(before) || /^(nr|art|ust|pkt|poz)\d*$/i.test(before)) continue;
+    out.push(x.slice(start, m.index + m[0].length).trim()); start = m.index + m[0].length;
+  }
+  const tail = x.slice(start).trim(); if (tail) out.push(tail);
+  return out;
+}
+const wordCut = (t, n) => { if (t.length <= n) return t; let r = t.slice(0, n); r = r.slice(0, Math.max(r.lastIndexOf(" "), Math.floor(n / 2))); const o = r.lastIndexOf("("); if (o > 20 && r.indexOf(")", o) < 0) r = r.slice(0, o); return r.replace(/[\s,;:–-]+$/, "") + "…"; };
+const GENERIC = (t) => /^(alert rcb|komunikat)\b/i.test(String(t || "").trim()) && String(t).trim().length <= 12;
+
+/**
+ * Zwraca { head, text, rest }: nagłówek, tekst widoczny od razu i reszta (do rozwinięcia).
+ * Zasady: krótki komunikat (≤ 300 znaków) pokazujemy w całości; dłuższy tniemy tylko na granicy zdania;
+ * jeśli po cięciu zostałoby < 90 znaków, pokazujemy całość (żeby nie kazać klikać dla paru słów).
+ */
+export function compose(a, { soft = 200, hard = 300, tail = 90 } = {}) {
+  const ss = sentences(a.body);
+  let head = String(a.title || "").trim(), body = ss;
+  if (GENERIC(head) && ss.length) { if (ss[0].length <= 220) { head = ss[0]; body = ss.slice(1); } }
+  const full = body.join(" ");
+  if (full.length <= hard) return { head, text: full, rest: "" };
+  let shown = "", i = 0;
+  while (i < body.length && (i === 0 || (shown + " " + body[i]).length <= soft)) { shown = (shown ? shown + " " : "") + body[i]; i++; }
+  let rest = body.slice(i).join(" ");
+  if (!rest) { // jedno bardzo długie zdanie
+    shown = wordCut(full, soft); rest = full.slice(shown.replace(/…$/, "").length).trim();
+  }
+  if (rest.length < tail) return { head, text: full, rest: "" };
+  return { head, text: shown, rest };
+}

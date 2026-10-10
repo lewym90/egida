@@ -6,7 +6,7 @@ import { POLAND_RING } from "../js/poland-border.js";
 import { normalizeThreat, ThreatStore, applyEnvelope, applySnapshotJson, predict, assess, buildView, zoneOf, coneOutline, parseTime, ageText, LIMITS } from "../js/neptun.js";
 import { createFeed } from "../js/neptun-feed.js";
 import { coarseBbox, overpassQuery, parseOverpass, makeShelter, withDistance, walkMin, dirUrl, fetchOsmShelters, loadShelterDb, nearest, overpassQueryPoland, DB_CACHE, buildPspTiles, pspCellId, pspCellsAround, pspRowToShelter, loadPspAround, mergeSources, loadPspNearest, guaranteedKm } from "../js/shelters.js";
-import { analyze, statusOf, classifyOne, durationFromText, summarize } from "../js/classify.js";
+import { analyze, statusOf, classifyOne, durationFromText, summarize, compose, sentences } from "../js/classify.js";
 import { demoThreats, DEMO_USER } from "../js/demo.js";
 
 let n = 0;
@@ -369,6 +369,17 @@ ok("odległość, czas pieszo, linki do tras", () => {
   });
   ok("drogi: utrudnienie sprzed 4 dni nie jest aktywne mimo długiej ważności ze źródła", () => {
     assert.equal(analyze([{ id: "t", type: "drogi", title: "Zablokowana S3", published: "2026-10-06T16:09:00Z", validTo: "2026-12-01T00:00:00Z" }], Date.parse("2026-10-10T15:00:00Z"))[0].active, false);
+  });
+  ok("compose: krótki komunikat w całości, długi cięty na zdaniu, bez ucinania dla kilku słów", () => {
+    const lub = { title: "Informacje drogowe", body: "Z uwagi na prowadzone kontrole po stronie niemieckiej, na terenie województwa lubuskiego ruch kołowy w miejscach przekraczania granicy państwowej odbywa się na bieżąco." };
+    const c1 = compose(lub); assert.equal(c1.text, lub.body); assert.equal(c1.rest, "");
+    const maz = { title: "Ćwiczenia Syrena-26", body: "Od 12 do 16 października 2026 r. na terenie województwa mazowieckiego odbywać się będą ćwiczenia pod kryptonimem Syrena-26. W związku z tym mieszkańcy mogą usłyszeć sygnały syren alarmowych. Ćwiczenia nie stanowią zagrożenia." };
+    assert.equal(compose(maz).rest, ""); assert.ok(!compose(maz).text.endsWith("…"));
+    const long = { title: "Susza", body: Array.from({ length: 8 }, (_, i) => `To jest zdanie numer ${i + 1} opisujące sytuację hydrologiczną na rzece.`).join(" ") };
+    const c2 = compose(long); assert.ok(c2.rest.length >= 90 && /\.$/.test(c2.text) && !c2.text.includes("…")); assert.equal((c2.text + " " + c2.rest).replace(/\s+/g, " "), long.body);
+    const rcb = compose({ title: "Alert RCB", body: "„KOMUNIKAT: woda w gminie Kąty Wrocławskie (pow. wrocławski) nie nadaje się do spożycia. Śledź komunikaty”. Zakaz: Gądów." });
+    assert.equal(rcb.head, "Woda w gminie Kąty Wrocławskie (pow. wrocławski) nie nadaje się do spożycia."); assert.ok(!/[„”]/.test(rcb.text));
+    assert.equal(sentences("Od 12 do 16 października 2026 r. na terenie Mazowsza. Drugie zdanie.").length, 2);
   });
   ok("komunikaty informacyjne starsze niż 7 dni są wcześniejsze mimo „do odwołania”", () => {
     const old = { id: "o", type: "woda", title: "Susza hydrologiczna", published: iso(0, 0).replace("2026-10-10", "2026-10-01"), validTo: "2027-01-01T00:00:00Z" };
