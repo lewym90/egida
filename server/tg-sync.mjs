@@ -20,16 +20,26 @@ if (li > 0) {
   if (!REG[id] || !/^https:\/\/t\.me\/(\+|joinchat\/)[\w-]+$/.test(url || "")) { console.log("Użycie: --link <id_województwa> https://t.me/+…  (id np. opolskie, kujawsko-pomorskie)"); process.exit(1); }
   data[id] = { ...(data[id] || {}), link: url }; await save(); console.log(`Zapisano link dla: ${REG[id]}`); process.exit(0);
 }
+const me = await api("getMe");
+if (!me.ok) { console.log("Token odrzucony:", me.description); process.exit(1); }
+// 0) sprawdź zapisane kanały – jeśli bota już tam nie ma (stary/usunięty kanał), zapomnij numer i znajdź kanał od nowa
+for (const [id, v] of Object.entries(data)) {
+  if (!v.chat) continue;
+  const m = await api("getChatMember", { chat_id: v.chat, user_id: me.result.id });
+  if (!m.ok || !["administrator", "creator"].includes(m.result.status)) { console.log(`(${REG[id] || id}: zapisany kanał jest nieaktualny – szukam od nowa)`); delete data[id]; }
+}
 // 1) publiczne – po adresie @egida_<id>
 for (const id of Object.keys(REG)) {
   if (data[id]?.chat) continue;
   const c = await api("getChat", { chat_id: "@egida_" + id.replace(/-/g, "_") });
   if (c.ok && c.result.type === "channel") data[id] = { ...(data[id] || {}), chat: c.result.id, title: c.result.title };
 }
-// 2) prywatne – ze zdarzeń dodania bota
+// 2) prywatne – ze zdarzeń dodania bota (od najnowszych; tylko gdy bot jest tam administratorem)
 const up = await api("getUpdates", { allowed_updates: ["my_chat_member", "channel_post"], limit: 100 });
-if (up.ok) for (const u of up.result) {
-  const c = (u.my_chat_member || u.channel_post)?.chat;
+if (up.ok) for (const u of [...up.result].reverse()) {
+  const ev = u.my_chat_member || u.channel_post;
+  const c = ev?.chat;
+  if (u.my_chat_member && !["administrator", "creator"].includes(ev.new_chat_member?.status)) continue;
   const id = c && c.type === "channel" ? byTitle[norm(c.title)] : null;
   if (id && !data[id]?.chat) data[id] = { ...(data[id] || {}), chat: c.id, title: c.title };
 }
