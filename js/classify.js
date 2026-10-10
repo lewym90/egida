@@ -55,7 +55,7 @@ export function analyze(items, now = Date.now()) {
       exp = pub + (dur != null ? dur : (DEFAULT_TTL_H[a.type] ?? DEFAULT_TTL_H.inne) * H);
     }
     // Komunikaty tylko informacyjne starsze niż 7 dni trafiają do „Wcześniejszych”, nawet gdy źródło podaje „do odwołania”.
-    if (a.sev === "info" && !a.cancel && pub != null) exp = exp == null ? pub + 7 * 24 * H : Math.min(exp, pub + 7 * 24 * H);
+    if (a.sev === "info" && !a.cancel && pub != null) { const cap = pub + (a.type === "drogi" ? 24 : 7 * 24) * H; exp = exp == null ? cap : Math.min(exp, cap); }
     a.expiresAt = exp;
     a.supersededBy = null;
     if (a.sev === "danger" && a.published) {
@@ -64,7 +64,54 @@ export function analyze(items, now = Date.now()) {
     }
     a.active = !a.supersededBy && (exp == null || exp > now);
   }
-  return list;
+  return linkRelated(list);
 }
 
 export const statusOf = (active) => (active.some((a) => a.sev === "danger") ? "alarm" : active.some((a) => a.sev === "important") ? "warn" : "calm");
+
+/** Czyści treść komunikatu do jednego, czytelnego zdania (bez urywania w środku skrótu, np. „pow.”, i bez niedomkniętych nawiasów). */
+export function summarize(text, max = 150) {
+  let x = String(text || "").replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+  x = x.replace(/^[„"“”'\s]+/, "").replace(/^(komunikat|alert rcb|alert)\s*:\s*/i, "").replace(/^[„"“”'\s]+/, "");
+  if (!x) return "";
+  x = x[0].toUpperCase() + x.slice(1);
+  let cut = -1;
+  const re = /[.!?](?=\s+[\p{Lu}„"])/gu;
+  let m;
+  while ((m = re.exec(x))) {
+    const before = x.slice(0, m.index).split(/\s+/).pop();
+    if (/^\p{Ll}{1,4}$/u.test(before) || /^\p{Lu}$/u.test(before) || /\d$/.test(before)) continue; // skrót lub numer porządkowy
+    if (m.index < 30) continue;
+    cut = m.index + 1; break;
+  }
+  let r = cut > 0 ? x.slice(0, cut) : x;
+  if (r.length > max) {
+    r = r.slice(0, max);
+    r = r.slice(0, Math.max(r.lastIndexOf(" "), 40));
+    const open = r.lastIndexOf("(");
+    if (open > 30 && r.indexOf(")", open) < 0) r = r.slice(0, open).trimEnd();
+    r = r.replace(/[\s,;:–-]+$/, "") + "…";
+  }
+  return r;
+}
+
+const STOP = new Set(["komunikat", "alert", "woda", "dotyczy", "sledz", "zakaz", "uwaga", "gmina", "powiat", "wojewodztwo", "polska", "polski", "drogi", "droga", "kierunek", "samochody"]);
+const places = (a) => new Set((`${a.title || ""} ${a.body || ""}`.match(/\p{Lu}\p{Ll}{4,}/gu) || []).map(norm).filter((w) => !STOP.has(w)));
+const RANK = { danger: 2, important: 1, info: 0 };
+
+/** Wiąże ten sam wydarzenie opisane w kilku komunikatach (np. alert RCB i komunikat o wodzie z tymi samymi miejscowościami). Słabszy dostaje relatedTo = id silniejszego. */
+export function linkRelated(list) {
+  const P = list.map(places);
+  for (let i = 0; i < list.length; i++) for (let j = 0; j < list.length; j++) {
+    if (i === j) continue;
+    const a = list[i], b = list[j];
+    if (a.relatedTo || a.voivodeship !== b.voivodeship && a.voivodeship !== "all" && b.voivodeship !== "all") continue;
+    const stronger = RANK[b.sev] > RANK[a.sev] || (RANK[b.sev] === RANK[a.sev] && b.type === "rcb" && a.type !== "rcb");
+    if (!stronger || b.relatedTo) continue;
+    const ta = a.published ? new Date(a.published).getTime() : null, tb = b.published ? new Date(b.published).getTime() : null;
+    if (ta != null && tb != null && Math.abs(ta - tb) > 96 * H) continue;
+    let shared = 0; for (const w of P[i]) if (P[j].has(w)) shared++;
+    if (shared >= 3) a.relatedTo = b.id;
+  }
+  return list;
+}

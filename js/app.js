@@ -2,7 +2,7 @@ import { CONFIG } from "./config.js";
 import {
   VOIVODESHIPS, LEGAL_HTML, ALERT_FILTERS, PLECAK, FIRST_AID, WHAT_TO_DO, READINESS_QUESTIONS, SOURCES,
 } from "./content.js";
-import { analyze, statusOf } from "./classify.js";
+import { analyze, statusOf, summarize } from "./classify.js";
 import { renderMapHtml, initMapScreen, destroyScreens } from "./mapscreen.js";
 import { renderSheltersHtml, initSheltersScreen } from "./sheltersscreen.js";
 
@@ -189,6 +189,14 @@ function ring(pct) {
   const R = 30, C = 2 * Math.PI * R;
   return `<svg class="ring" viewBox="0 0 72 72" width="72" height="72" role="img" aria-label="Gotowość: ${pct}%"><circle cx="36" cy="36" r="${R}" fill="none" stroke="var(--line-in)" stroke-width="8"/><circle cx="36" cy="36" r="${R}" fill="none" stroke="var(--brand)" stroke-width="8" stroke-linecap="round" stroke-dasharray="${(C * pct / 100).toFixed(1)} ${C.toFixed(1)}" transform="rotate(-90 36 36)"/><text x="36" y="41" text-anchor="middle" font-family="var(--font-h)" font-weight="800" font-size="17" fill="var(--text)">${pct}%</text></svg>`;
 }
+const TYPE_LBL = { pogoda: "Pogoda", rcb: "Alert RCB", woda: "Woda", drogi: "Drogi" };
+const genericTitle = (a) => /^(alert rcb|komunikat)\b/i.test(String(a.title || "").trim()) && String(a.title).trim().length <= 12;
+/* Jeden komunikat jako czytelny wiersz: etykieta + czas, nagłówek, jedno zdanie. Bez urywania w środku skrótu. */
+function msgParts(a, count = 1, tri = false) {
+  const gen = genericTitle(a), sum = summarize(a.body, 140);
+  const head = gen ? sum || a.title : a.title, sub = gen ? "" : sum && sum.toLowerCase() !== String(a.title).toLowerCase() ? sum : "";
+  return `<span class="lbl">${tri && a.type === "drogi" ? `<span class="tri">${I.alert}</span>` : ""}${esc(TYPE_LBL[a.type] || "Komunikat")} · ${esc(fmtDate(a.published))}${count > 1 ? ` · ${count} ${plural(count)}` : ""}</span><b class="shead">${esc(head)}</b>${sub ? `<span class="ssub">${esc(sub)}</span>` : ""}`;
+}
 function screenPulpit() {
   const r = readiness();
   const fresh = alertsFresh();
@@ -206,21 +214,21 @@ function screenPulpit() {
     const when = alertsData.live && alertsData.checkedAt ? `Sprawdzono dziś o ${hhmm(alertsData.checkedAt)}.` : `Dane z ${esc(fmtDate(alertsData.updated))}.`;
     const chips = [...new Set(list.map((a) => String(a.source || "RSO").replace(/\s*\(.*\)/, "")).concat(["RSO"]))].slice(0, 4).map((c) => `<span class="srcchip">${esc(c)}</span>`).join("");
     const danger = list.filter((a) => a.sev === "danger"), important = list.filter((a) => a.sev === "important");
-    const info = list.filter((a) => a.sev === "info" && !a.cancel);
+    const shown = (a) => !(a.relatedTo && list.some((x) => x.id === a.relatedTo)); // to samo wydarzenie pokazujemy raz
+    const info = list.filter((a) => a.sev === "info" && !a.cancel && shown(a));
+    const meta = `Dla: ${name} · Źródło: RSO · ${when}`;
+    const rows = (arr, n) => `<ul class="slist">${arr.slice(0, n).map((a) => `<li>${msgParts(a)}</li>`).join("")}</ul>${arr.length > n ? `<p class="smore">i jeszcze ${arr.length - n}</p>` : ""}`;
     if (lvl === "alarm") {
-      const al = danger[0], air = al.kind === "atak";
-      status = `<a class="status alert" style="text-decoration:none" href="#/alerty"><span class="ico">${I.alert}</span><div><h2>${air ? "Zagrożenie z powietrza" : "Zagrożenie"}</h2><p>${esc(al.title)}${al.body ? " " + esc(al.body.slice(0, 160)) : ""}</p><p class="small" style="margin-top:6px">${air ? "Obowiązuje do odwołania komunikatem o zakończeniu ataku. " : ""}Dotknij, aby zobaczyć wszystkie komunikaty. ${when}</p></div></a>`;
+      const air = danger[0].kind === "atak";
+      status = `<a class="status alert" href="#/alerty"><span class="ico">${I.alert}</span><div class="sbody"><h2>${air ? "Zagrożenie z powietrza" : danger.length > 1 ? `Zagrożenia (${danger.length})` : "Zagrożenie"}</h2>${rows(danger, 2)}${air ? '<p class="slead">Obowiązuje do odwołania komunikatem o zakończeniu ataku.</p>' : ""}<p class="smeta">${meta}</p><span class="slink">Zobacz szczegóły ${I.chevr}</span></div></a>`;
     } else if (lvl === "warn") {
-      status = `<a class="status warn" style="text-decoration:none" href="#/alerty"><span class="ico">${I.alert}</span><div><h2>${important.length === 1 ? "Ostrzeżenie" : `Ostrzeżenia (${important.length})`}</h2><p>${esc(important[0].title)}${important[0].body ? ": " + esc(sentence(important[0].body)) : ""}</p><p class="small" style="margin-top:6px">Śledź rozwój sytuacji. Dla: ${name}. Dotknij, aby zobaczyć. ${when}</p><div class="chips">${chips}</div></div></a>`;
+      status = `<a class="status warn" href="#/alerty"><span class="ico">${I.alert}</span><div class="sbody"><h2>${important.length === 1 ? "Ostrzeżenie" : `Ostrzeżenia (${important.length})`}</h2>${rows(important, 2)}<p class="smeta">Śledź rozwój sytuacji. ${meta}</p><span class="slink">Zobacz szczegóły ${I.chevr}</span></div></a>`;
     } else {
-      status = `<div class="status ok"><span class="ico">${I.check}</span><div><h2>W Twojej okolicy jest spokojnie</h2><p>Brak aktywnych ostrzeżeń w znanych nam źródłach (województwo ${name}). ${when}</p><div class="chips">${chips}</div><p class="small" style="margin-top:8px;opacity:.85">Aplikacja nie zastępuje syren ani Alertu RCB.</p></div></div>`;
+      status = `<div class="status ok"><span class="ico">${I.check}</span><div class="sbody"><h2>W Twojej okolicy jest spokojnie</h2><p class="slead">Brak aktywnych ostrzeżeń w znanych nam źródłach.</p><p class="smeta">${meta}</p><p class="sfine">Aplikacja nie zastępuje syren ani Alertu RCB.</p></div></div>`;
     }
     if (info.length) {
-      const gs = groupAlerts(info), rows = gs.slice(0, 3).map((g) => {
-        const a = g.items[0];
-        return `<li><span class="tri">${I.alert}</span><div><b>${esc(a.title)}${g.items.length > 1 ? ` <span class="gcount">· ${g.items.length} ${plural(g.items.length)}</span>` : ""}</b>${a.body ? `<div class="gsum">${esc(sentence(a.body))}</div>` : ""}<div class="muted small">${esc(String(a.source || "RSO").replace(/\s*\(.*\)/, ""))} · ${esc(fmtDate(a.published))}${a.type === "drogi" && a.expiresAt ? ` · prognoza do ok. ${hhmm(a.expiresAt)}` : ""}</div></div></li>`;
-      }).join("");
-      status += `<div class="goodtoknow"><h2><span class="tri">${I.alert}</span>Dobrze wiedzieć</h2><ul>${rows}</ul>${gs.length > 3 ? `<a class="small" href="#/alerty">Zobacz wszystkie (${info.length})</a>` : ""}</div>`;
+      const gs = groupAlerts(info);
+      status += `<div class="goodtoknow"><h2><span class="tri">${I.alert}</span>Dobrze wiedzieć</h2><ul class="slist">${gs.slice(0, 3).map((g) => `<li>${msgParts(g.items[0], g.items.length, true)}</li>`).join("")}</ul>${gs.length > 3 || info.length > gs.length ? `<a class="gall" href="#/alerty">Zobacz wszystkie (${info.length}) ${I.chevr}</a>` : `<a class="gall" href="#/alerty">Wszystkie komunikaty ${I.chevr}</a>`}</div>`;
     }
   }
   const nm = nearestMinutes();
@@ -230,13 +238,12 @@ function screenPulpit() {
     const label = i === 1 ? `${st.t.replace("Przygotuj", "Spakuj")} <span class="muted small">· ${nPack} z ${tPack}</span>` : esc(st.t);
     return st.done ? `<li><a href="${st.h}"><span class="muted">${i === 1 ? label : esc(st.t)}</span><span class="stp">✓</span></a></li>` : `<li><a href="${st.h}"><span>${label}</span>${I.chevr}</a></li>`;
   }).join("");
-  const last = groupAlerts(list).slice(0, 3).map((g) => { const a = g.items[0]; const dot = a.alarm ? DOT.rcb : DOT[a.type] || DOT.drogi; return `<li class="lastmsg"><span class="ldot" style="background:${dot}"></span><div><b>${esc(a.title)}</b><div class="muted small">${esc(String(a.source || "RSO").replace(/\s*\(.*\)/, ""))} · ${esc(regionById(a.voivodeship)?.name?.toLowerCase() || "cała Polska")} · ${esc(fmtDate(a.published))}${g.items.length > 1 ? ` · ${g.items.length} ${plural(g.items.length)}` : ""}</div></div></li>`; }).join("");
   return `<div class="hero"><h1>Pulpit</h1></div>${status}
   <div class="card ready"><div class="row" style="gap:16px">${ring(r.pct)}<div style="flex:1"><h2 style="margin:0">Twoja gotowość</h2><p class="muted small" style="margin:2px 0 0">Trzy małe kroki, żeby poczuć się pewniej.</p></div></div>
   <ul class="steps stepsnav">${steps}</ul></div>
   <div class="grid2 grid-d grid4">${tile("#/schrony", "t-green", I.pin, "Schrony blisko", nm != null ? `Najbliżej: ${nm} min pieszo` : "Najbliższe punkty schronienia")}${tile("#/pierwsza-pomoc", "t-red", I.heart, "Pierwsza pomoc", "Krok po kroku, offline")}${tile("#/plecak", "t-blue", I.bag, "Plecak i zapasy", "Zestaw na 72 godziny")}${tile("#/plan-rodziny", "t-amber", I.users, "Plan rodziny", "Kontakty i miejsce spotkania", true)}</div>
   <div class="grid2 grid-d" style="margin-top:12px"><a class="tile" style="flex-direction:row;align-items:center" href="#/poradnik"><span class="ti t-green">${I.list}</span><b>Co robić, gdy…</b></a><a class="tile" style="flex-direction:row;align-items:center" href="#/telegram"><span class="ti t-blue">${I.send}</span><b>Powiadomienia Telegram dla Twojego województwa</b></a></div>
-  ${last ? `<div class="card" style="margin-top:16px"><div class="row"><h2 style="margin:0">Ostatnie komunikaty</h2><span class="spacer"></span><a href="#/alerty" class="all"><b>Wszystkie</b></a></div><ul class="lastlist">${last}</ul></div>` : ""}`;
+`;
 }
 
 /* Pilne na górze (alarm/RCB → pogoda → drogi → reszta), w obrębie grupy najnowsze pierwsze. Takie same tytuły zwijamy w jedną pozycję. */
@@ -246,7 +253,7 @@ const plural = (n) => (n === 1 ? "komunikat" : n % 10 >= 2 && n % 10 <= 4 && (n 
 function groupAlerts(list) {
   const map = new Map();
   for (const a of list) {
-    const k = `${a.type}|${String(a.title).trim().toLowerCase()}`;
+    const k = `${a.type}|${String(a.title).trim().toLowerCase()}|${genericTitle(a) ? summarize(a.body, 60) : ""}`;
     if (!map.has(k)) map.set(k, []);
     map.get(k).push(a);
   }
@@ -263,21 +270,25 @@ function groupItem(g) {
   const inner = g.items.map((x) => `<li style="margin:8px 0">${x.body ? esc(x.body) : esc(x.title)}<div class="muted small">${esc(fmtDate(x.published))}</div></li>`).join("");
   return `<li class="msg"><details><summary style="cursor:pointer"><div class="meta"><span class="badge ${g.prio === 0 ? "danger" : g.prio === 1 ? "unofficial" : "info"}">${esc(type)}</span><span>${esc(g.items.length)} ${plural(g.items.length)}</span></div>
   <h3 style="display:inline">${esc(a.title)}</h3> <span class="muted small">(pokaż szczegóły)</span></summary><ul style="padding-left:18px;margin:8px 0">${inner}</ul>
-  <p class="src" style="margin:6px 0 0">Źródło: ${esc(a.source || "RSO")}</p></details></li>`;
+  ${relHtml(g.items.map((x) => x.id))}<p class="src" style="margin:6px 0 0">Źródło: ${esc(a.source || "RSO")}</p></details></li>`;
 }
 
 function msgItem(a) {
   const type = { pogoda: "Pogoda", rcb: "Alert RCB", woda: "Woda", drogi: "Drogi" }[a.type] || "Komunikat";
   const url = safeUrl(a.url);
   return `<li class="msg"><div class="meta">${a.type === "drogi" ? `<span class="tri">${I.alert}</span>` : ""}<span class="badge ${a.sev === "danger" ? "danger" : a.sev === "important" ? "unofficial" : "info"}">${esc(type)}</span>${a.cancel ? '<span class="badge ok">Odwołanie</span>' : ""}${a.sev === "danger" ? '<span class="badge danger">Zagrożenie</span>' : ""}${a.supersededBy ? '<span class="badge info">Odwołano</span>' : ""}<span>${esc(fmtDate(a.published))}</span></div>
-  <h3>${esc(a.title)}</h3>${a.body ? `<p class="muted">${esc(a.body)}</p>` : ""}
+  <h3>${esc(a.title)}</h3>${a.body ? `<p class="muted">${esc(a.body)}</p>` : ""}${relHtml([a.id])}
   <p class="src" style="margin:6px 0 0">Źródło: ${esc(a.source || "RSO")}${url ? ` · <a href="${esc(url)}" target="_blank" rel="noopener noreferrer">Oryginał</a>` : ""}</p></li>`;
 }
-let alertFilter = "all", alertWhen = "active";
+let alertFilter = "all", alertWhen = "active", relMap = new Map();
+const relHtml = (ids) => ids.flatMap((id) => relMap.get(id) || []).map((r) => `<div class="related"><span class="lbl">Powiązany komunikat · ${esc(TYPE_LBL[r.type] || "Komunikat")} · ${esc(fmtDate(r.published))}</span><b>${esc(r.title)}</b>${r.body ? `<div class="muted small">${esc(summarize(r.body, 160))}</div>` : ""}</div>`).join("");
 function screenAlerty() {
   const all = regionAll();
   const nAct = all.filter((a) => a.active).length;
-  const list = all.filter((a) => (alertWhen === "active" ? a.active : !a.active) && (alertFilter === "all" || a.type === alertFilter));
+  const base = all.filter((a) => (alertWhen === "active" ? a.active : !a.active) && (alertFilter === "all" || a.type === alertFilter));
+  // To samo wydarzenie (np. alert RCB i komunikat o wodzie z tymi samymi miejscowościami) pokazujemy raz; powiązany wpis jest pod głównym.
+  relMap = new Map();
+  const list = base.filter((a) => { if (a.relatedTo && base.some((x) => x.id === a.relatedTo)) { relMap.set(a.relatedTo, [...(relMap.get(a.relatedTo) || []), a]); return false; } return true; });
   const chips = ALERT_FILTERS.map((f) => `<button class="chip" data-filter="${f.id}" aria-pressed="${alertFilter === f.id}">${f.label}</button>`).join("");
   let body;
   if (!state.region) body = `<div class="note warn">Wybierz województwo na górze ekranu, aby zobaczyć komunikaty.</div>`;

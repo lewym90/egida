@@ -6,7 +6,7 @@ import { POLAND_RING } from "../js/poland-border.js";
 import { normalizeThreat, ThreatStore, applyEnvelope, applySnapshotJson, predict, assess, buildView, zoneOf, coneOutline, parseTime, ageText, LIMITS } from "../js/neptun.js";
 import { createFeed } from "../js/neptun-feed.js";
 import { coarseBbox, overpassQuery, parseOverpass, makeShelter, withDistance, walkMin, dirUrl, fetchOsmShelters, loadShelterDb, nearest, overpassQueryPoland, DB_CACHE, buildPspTiles, pspCellId, pspCellsAround, pspRowToShelter, loadPspAround, mergeSources, loadPspNearest, guaranteedKm } from "../js/shelters.js";
-import { analyze, statusOf, classifyOne, durationFromText } from "../js/classify.js";
+import { analyze, statusOf, classifyOne, durationFromText, summarize } from "../js/classify.js";
 import { demoThreats, DEMO_USER } from "../js/demo.js";
 
 let n = 0;
@@ -352,6 +352,23 @@ ok("odległość, czas pieszo, linki do tras", () => {
   ok("RCB: nierozpoznany = ważne, wprost zagrożenie życia = zagrożenie", () => {
     assert.equal(classifyOne({ type: "rcb", title: "Alert RCB", body: "Zamknięty most, utrudnienia" }).sev, "important");
     assert.equal(classifyOne({ type: "rcb", title: "Alert RCB", body: "Zagrożenie życia! Natychmiast schroń się w budynku" }).sev, "danger");
+  });
+  ok("summarize: nie ucina na skrócie „pow.”, czyści prefiks i cudzysłowy", () => {
+    const body = "„KOMUNIKAT: woda w gminie Kąty Wrocławskie (pow. wrocławski) nie nadaje się do spożycia i celów higienicznych. Śledź komunikaty”. Zakaz korzystania z wody dot. m.in.: Gądów.";
+    assert.equal(summarize(body), "Woda w gminie Kąty Wrocławskie (pow. wrocławski) nie nadaje się do spożycia i celów higienicznych.");
+    const long = "Na odcinku drogi krajowej numer 19 w miejscowości Jabłonna Druga trwają prace remontowe oraz zmieniona jest organizacja ruchu z powodu bardzo długiego zdarzenia drogowego (kolizja";
+    const r = summarize(long, 100); assert.ok(r.endsWith("…") && !r.includes("(") && r.length <= 101, r);
+    assert.equal(summarize(""), "");
+  });
+  ok("ten sam alert RCB i komunikat o wodzie z tymi samymi miejscowościami = jedno wydarzenie", () => {
+    const rcb = { id: "a", type: "rcb", voivodeship: "dolnoslaskie", title: "Alert RCB", body: "„KOMUNIKAT: woda w gminie Kąty Wrocławskie nie nadaje się do spożycia. Zakaz: Gądów, Mokronos Dolny, Mokronos Górny, Zybiszów”", published: "2026-10-08T18:45:00Z" };
+    const rso = { id: "b", type: "woda", voivodeship: "dolnoslaskie", title: "Woda niezdatna do picia", body: "Gm. Kąty Wrocławskie. Dotyczy miejscowości: Gądów, Mokronos Dolny, Mokronos Górny, Zybiszów", published: "2026-10-08T16:01:00Z" };
+    const other = { id: "c", type: "drogi", voivodeship: "dolnoslaskie", title: "Zablokowana S3 Tunel", body: "tunel zamknięty", published: "2026-10-08T16:09:00Z" };
+    const l = analyze([rcb, rso, other], Date.parse("2026-10-09T10:00:00Z"));
+    assert.equal(l.find((x) => x.id === "b").relatedTo, "a"); assert.equal(l.find((x) => x.id === "c").relatedTo, undefined); assert.equal(l.find((x) => x.id === "a").relatedTo, undefined);
+  });
+  ok("drogi: utrudnienie sprzed 4 dni nie jest aktywne mimo długiej ważności ze źródła", () => {
+    assert.equal(analyze([{ id: "t", type: "drogi", title: "Zablokowana S3", published: "2026-10-06T16:09:00Z", validTo: "2026-12-01T00:00:00Z" }], Date.parse("2026-10-10T15:00:00Z"))[0].active, false);
   });
   ok("komunikaty informacyjne starsze niż 7 dni są wcześniejsze mimo „do odwołania”", () => {
     const old = { id: "o", type: "woda", title: "Susza hydrologiczna", published: iso(0, 0).replace("2026-10-10", "2026-10-01"), validTo: "2027-01-01T00:00:00Z" };
