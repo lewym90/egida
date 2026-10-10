@@ -20,6 +20,13 @@ if [ "$(date +%M)" -lt 5 ]; then
 fi
 
 cd "$SERVER_DIR"
+# Co ~6 h sprawdź, czy PSP opublikowała nową wersję Rejestru Punktów Schronienia (pobiera pakiet tylko przy zmianie).
+PSP_STAMP="$BASE/psp.checked"; PSP_NEW=0
+if [ ! -f "$PSP_STAMP" ] || [ "$(( $(date +%s) - $(stat -c %Y "$PSP_STAMP") ))" -gt 21600 ]; then
+  PSP_LOG="$(PSP_OUT="$DATA_DIR/psp" timeout 200 node psp-sync.mjs 2>&1)"; PSP_RC=$?; echo "$PSP_LOG" | tail -n 6
+  if [ "$PSP_RC" -eq 0 ]; then touch "$PSP_STAMP"; echo "$PSP_LOG" | grep -q '^Zapisano' && PSP_NEW=1
+  else echo "psp-sync nieudany – zostaje poprzednia baza, ponowię za ok. godzinę"; touch -d '-5 hours' "$PSP_STAMP"; fi
+fi
 # Raz na dobę odśwież bazę schronów z OpenStreetMap (błąd tu nie zatrzymuje komunikatów).
 SH_FILE="$DATA_DIR/shelters.json"; SH_NEW=0
 if [ ! -f "$SH_FILE" ] || [ "$(( $(date +%s) - $(stat -c %Y "$SH_FILE") ))" -gt 86400 ]; then
@@ -42,7 +49,7 @@ NEW="$(node -e 'const j=JSON.parse(require("fs").readFileSync(process.env.ALERTS
 OLD="$(cat "$BASE/last.hash" 2>/dev/null || true)"
 AGE=99999
 [ -f "$BASE/last.push" ] && AGE=$(( ( $(date +%s) - $(stat -c %Y "$BASE/last.push") ) / 60 ))
-if [ "$NEW" != "$OLD" ] || [ "$AGE" -ge 25 ] || [ "$SH_NEW" = 1 ]; then
+if [ "$NEW" != "$OLD" ] || [ "$AGE" -ge 25 ] || [ "$SH_NEW" = 1 ] || [ "$PSP_NEW" = 1 ]; then
   if bash "$SERVER_DIR/publish.sh"; then echo "$NEW" > "$BASE/last.hash"; touch "$BASE/last.push"; echo "opublikowano"; ok; else echo "publikacja nieudana"; fail; exit 1; fi
 else
   echo "bez zmian (ostatnia publikacja ${AGE} min temu)"; ok

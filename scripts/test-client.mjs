@@ -5,7 +5,7 @@ import { haversineKm, bearingDeg, destination, crossTrack, pointInRing, distToRi
 import { POLAND_RING } from "../js/poland-border.js";
 import { normalizeThreat, ThreatStore, applyEnvelope, applySnapshotJson, predict, assess, buildView, zoneOf, coneOutline, parseTime, ageText, LIMITS } from "../js/neptun.js";
 import { createFeed } from "../js/neptun-feed.js";
-import { coarseBbox, overpassQuery, parseOverpass, makeShelter, withDistance, walkMin, dirUrl, fetchOsmShelters, loadShelterDb, nearest, overpassQueryPoland, DB_CACHE } from "../js/shelters.js";
+import { coarseBbox, overpassQuery, parseOverpass, makeShelter, withDistance, walkMin, dirUrl, fetchOsmShelters, loadShelterDb, nearest, overpassQueryPoland, DB_CACHE, buildPspTiles, pspCellId, pspCellsAround, pspRowToShelter, loadPspAround, mergeSources } from "../js/shelters.js";
 import { demoThreats, DEMO_USER } from "../js/demo.js";
 
 let n = 0;
@@ -249,6 +249,31 @@ ok("odległość, czas pieszo, linki do tras", () => {
   const r = await fetchOsmShelters(["https://a.test", "https://b.test"], 51.1, 23.4, async (u) => { calls.push(u); return u.includes("a.test") ? { ok: false, status: 504 } : { ok: true, json: async () => ({ elements: [] }) }; });
   assert.deepEqual(calls, ["https://a.test", "https://b.test"]); assert.equal(r.items.length, 0); n++;
   await assert.rejects(fetchOsmShelters(["https://a.test", "https://b.test"], 51.1, 23.4, async () => ({ ok: false, status: 504 })), /504/); n++;
+}
+
+/* Rejestr Punktów Schronienia (PSP): kafelki, walidacja, ładowanie, scalanie */
+{
+  const ds = { format: "gsu-shelters-compact", schema: 1, rows: [["OZO-AAA", 51.250478, 22.56159, "ul. Niecała 7A, Lublin", "Lublin", "Ograniczona dostępność"], ["OZO-BBB", 51.2530, 22.5650, "ul. Niecała 9, Lublin", "Lublin", "Całodobowa"], ["OZO-AAA", 1, 1, "dubel", "", ""], ["OZO-CCC", 10, 10, "poza Polską", "", ""], ["OZO-DDD", "x", 22, "zły", "", ""], "śmieć", ["OZO-EEE", 49.2, 22.3, "<b>Cisna</b> 105", "Cisna", "Na żądanie"]] };
+  const { tiles, count, rejected } = buildPspTiles(ds);
+  assert.equal(count, 3); assert.equal(rejected, 4); assert.equal(tiles.get(pspCellId(51.250478, 22.56159)).length, 2); assert.equal(tiles.get(pspCellId(51.250478, 22.56159))[0][0], "AAA", "prefiks OZO- zdjęty"); n++;
+  assert.throws(() => buildPspTiles({ format: "inny", schema: 1, rows: [] }), /format/); assert.throws(() => buildPspTiles({ format: "gsu-shelters-compact", schema: 2, rows: [] }), /schema/); assert.throws(() => buildPspTiles(null)); n++;
+  assert.equal(pspCellsAround(51.25, 22.56).length, 9); assert.ok(pspCellsAround(51.25, 22.56).includes(pspCellId(51.25, 22.56))); n++;
+  const row = tiles.get(pspCellId(51.250478, 22.56159))[0]; const sh = pspRowToShelter(row);
+  assert.equal(sh.id, "OZO-AAA"); assert.equal(sh.name, "ul. Niecała 7A, Lublin"); assert.equal(sh.access, "Ograniczona dostępność"); assert.equal(sh.src, "psp"); n++;
+  // ładowanie: 404 = pusty obszar, błąd = kopia z cache, błąd bez kopii = failed
+  const cacheMem = new Map(); const cache = { get: async (k) => cacheMem.get(k) ?? null, set: async (k, v) => { cacheMem.set(k, v); } };
+  const here = pspCellId(51.250478, 22.56159);
+  const ok = async (u) => (u.endsWith(`c/${here}.json`) ? { ok: true, status: 200, json: async () => ({ rows: tiles.get(here) }) } : { ok: false, status: 404 });
+  let r1 = await loadPspAround("https://x.test/psp/", 51.2505, 22.5616, { fetchImpl: ok, cache, memo: new Map() });
+  assert.equal(r1.items.length, 2); assert.equal(r1.failed, 0); assert.equal(r1.total, 9); n++;
+  const down = async () => { throw new Error("offline"); };
+  let r2 = await loadPspAround("https://x.test/psp/", 51.2505, 22.5616, { fetchImpl: down, cache, memo: new Map() });
+  assert.equal(r2.items.length, 2, "offline: dane z cache"); assert.equal(r2.failed, 8, "pozostałe 8 kafelków bez kopii = nieudane"); n++;
+  let r3 = await loadPspAround("https://x.test/psp/", 51.2505, 22.5616, { fetchImpl: async () => ({ ok: false, status: 500 }), cache: null, memo: new Map() });
+  assert.equal(r3.failed, 9); assert.equal(r3.items.length, 0); n++;
+  // scalanie: wpis OSM (z opisem wejścia) wygrywa z punktem PSP w promieniu 30 m
+  const osm = [{ id: "node/1", lat: 51.250478, lon: 22.56159 + 0.0001, name: "Schron OSM", how: "Wejście od podwórka", src: "osm" }];
+  const merged = mergeSources(r1.items, osm); assert.equal(merged.length, 2); assert.ok(merged.some((x) => x.id === "node/1")); assert.ok(!merged.some((x) => x.id === "OZO-AAA")); assert.ok(merged.some((x) => x.id === "OZO-BBB")); n++;
 }
 
 console.log(`OK: ${n} grup testów logiki klienta przeszło (limity: strefa ${LIMITS.zoneKm} km, uspokajanie ≤ ${LIMITS.reassureAgeSec} s)`);

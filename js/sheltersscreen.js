@@ -4,7 +4,7 @@
 import { CONFIG } from "./config.js";
 import { fmtKmPl } from "./neptun.js";
 import { DEMO_USER } from "./demo.js";
-import { PSP_URL, withDistance, nearest, walkMin, dirUrl, makeShelter, loadShelterDb } from "./shelters.js";
+import { PSP_URL, nearest, walkMin, dirUrl, makeShelter, loadShelterDb, loadPspAround, makePspCache, mergeSources } from "./shelters.js";
 import { esc, loadLeaflet, baseLayer, shelterIcon, getUser, locate, setActive, destroyScreens, fmtDt } from "./mapscreen.js";
 
 /** Wymyślone obiekty do podglądu wyglądu ekranu (nie są to prawdziwe schrony). */
@@ -20,9 +20,9 @@ export function demoShelters(pos = DEMO_USER) {
 }
 
 const fmtDist = (km) => (km < 1 ? `${Math.max(10, Math.round((km * 1000) / 10) * 10)} m` : fmtKmPl(km));
-const FILTERS = [["all", "Wszystkie"], ["schron", "Schrony"], ["mine", "Moje miejsca"], ["10", "Do 10 min"]];
-const srcLabel = (s) => (s.mine ? "zgłoszenie użytkownika (Ty)" : s.src === "demo" ? "dane wymyślone (demo)" : "OpenStreetMap, wpis społeczności");
-const kindLabel = (s) => (s.mine ? "Twoje miejsce" : s.kind === "ukrycie" ? "Miejsce ukrycia" : "Schron");
+const FILTERS = [["all", "Wszystkie"], ["how", "Z opisem wejścia"], ["mine", "Moje miejsca"], ["10", "Do 10 min"]];
+const srcLabel = (s) => (s.mine ? "zgłoszenie użytkownika (Ty)" : s.src === "demo" ? "dane wymyślone (demo)" : s.src === "psp" ? "Rejestr Punktów Schronienia (PSP)" : "OpenStreetMap, wpis społeczności");
+const kindLabel = (s) => (s.mine ? "Twoje miejsce" : s.src === "psp" ? "Punkt schronienia" : s.kind === "ukrycie" ? "Miejsce ukrycia" : "Schron");
 
 export function renderSheltersHtml(ctx, { demo = false } = {}) {
   return `<div class="hero"><div class="row" style="align-items:flex-start"><div style="flex:1"><h1>Schrony i ukrycia</h1><p>Najbliższe miejsca od Twojej lokalizacji.</p></div>${demo ? `<span class="badge unofficial">Dane przykładowe</span>` : ""}</div></div>
@@ -43,7 +43,7 @@ export function renderSheltersHtml(ctx, { demo = false } = {}) {
       <p class="muted small" style="margin-top:10px"><b>Miejsce:</b> dotknij mapy u góry ekranu albo użyj swojej pozycji. <span id="pickInfo">Nie wskazano.</span></p>
       <div class="grid2" style="margin-top:10px"><button class="btn" id="shUseMe">Moja pozycja</button><button class="btn primary" id="shSave">Zapisz miejsce</button></div>
       <p id="shErr" class="small" style="color:var(--danger-ink)" role="alert"></p></div></details>
-  <p class="muted small" style="margin-top:12px">Dane o schronach pochodzą z OpenStreetMap (© współtwórcy OpenStreetMap, ODbL) i nie są oficjalnym wykazem: bywają niepełne lub nieaktualne. Oficjalna mapa Państwowej Straży Pożarnej: ${PSP_URL.replace("https://", "")}. Schron lub ukrycie nie daje prawa wstępu tam, gdzie obowiązują ograniczenia.</p>`;
+  <p class="muted small" style="margin-top:12px">Punkty schronienia pochodzą z publicznego Rejestru Punktów Schronienia (MSWiA / Państwowa Straż Pożarna, ${PSP_URL.replace("https://", "")}) i uzupełniająco z OpenStreetMap (© współtwórcy OpenStreetMap, ODbL). EGIDA nie jest aplikacją PSP; dane bywają niepełne lub nieaktualne. Punkt schronienia to istniejący obiekt, który zwiększa bezpieczeństwo, ale nie daje prawa wstępu tam, gdzie obowiązują ograniczenia: dostępność podajemy tak, jak w rejestrze.</p>`;
 }
 
 export function initSheltersScreen(ctx, { demo = false } = {}) {
@@ -55,16 +55,18 @@ export function initSheltersScreen(ctx, { demo = false } = {}) {
   const $ = (id) => document.getElementById(id);
   const st = () => ctx.state;
   let pos = demo ? DEMO_USER : getUser();
-  let db = demo ? { items: demoShelters(), source: "demo", at: "", count: 4, stale: false } : null;
-  let dbState = demo ? "ok" : "loading"; // loading | ok | none
+  let db = demo ? { items: demoShelters(), source: "demo", at: "", count: 4, stale: false } : null; // OSM (lub demo)
+  let pspItems = [], pspIdx = null, pspState = demo ? "ok" : "idle"; // idle | loading | ok | none
+  const pspMemo = new Map(), pspCache = demo ? null : makePspCache(CONFIG.pspUrl);
+  let pspSeq = 0;
   let filter = "all", openHow = new Set(), pick = null;
   let L = null, map = null, gMarks = null, gUser = null, pmarker = null, manualPos = false;
 
   const all = () => {
     const mine = (st().shelters || []).map((s) => ({ ...s, kind: "moje", mine: true, src: "mine" }));
-    return [...mine, ...(db?.items || [])];
+    return [...mine, ...mergeSources(pspItems, db?.items || [])];
   };
-  const filtered = (list) => list.filter((s) => filter === "all" || (filter === "schron" && !s.mine && s.kind === "schron") || (filter === "mine" && s.mine) || (filter === "10" && s.distKm != null && walkMin(s.distKm) <= 10));
+  const filtered = (list) => list.filter((s) => filter === "all" || (filter === "how" && !!s.how) || (filter === "mine" && s.mine) || (filter === "10" && s.distKm != null && walkMin(s.distKm) <= 10));
 
   const dist = (s) => `<b class="shdist">${esc(fmtDist(s.distKm))} · ${walkMin(s.distKm)} min pieszo</b>`;
   const howBox = (s) => s.how ? `<div class="howbox" id="how-${esc(s.id)}"><b>Jak wejść</b><p>${esc(s.how)}</p><p class="src">Źródło opisu: ${esc(srcLabel(s))}</p></div>` : "";
@@ -76,22 +78,25 @@ export function initSheltersScreen(ctx, { demo = false } = {}) {
   const draw = () => {
     if (dead) return;
     $("shGate").hidden = !!pos;
-    const list = pos ? nearest(all(), pos, { maxKm: 150, limit: 60 }) : [];
+    const list = pos ? nearest(all(), pos, { maxKm: demo ? 150 : 15, limit: 60 }) : [];
     const shown = filtered(list);
     const feat = shown[0], rest = shown.slice(1, 15);
     let status = "";
     if (!pos) status = "";
-    else if (dbState === "loading") status = `<p class="muted">Wczytuję bazę schronów…</p>`;
-    else if (dbState === "none" && !(st().shelters || []).length) status = `<div class="note warn"><b>Nie udało się wczytać bazy schronów</b> (brak internetu albo baza jeszcze nie została opublikowana). Brak danych nie oznacza, że schronów nie ma. Sprawdź oficjalną mapę PSP: <a href="${PSP_URL}" target="_blank" rel="noopener noreferrer">${PSP_URL.replace("https://", "")}</a>.</div>`;
-    else if (!shown.length) status = `<div class="note neutral">${filter === "all" ? "W promieniu 150 km nie ma wpisów w naszej bazie." : "Brak obiektów dla tego filtra."} <b>To nie znaczy, że nie ma schronów</b>: nasza baza pochodzi z OpenStreetMap i jest niepełna. Sprawdź oficjalną mapę PSP: <a href="${PSP_URL}" target="_blank" rel="noopener noreferrer">${PSP_URL.replace("https://", "")}</a> albo dodaj własne miejsce poniżej.</div>`;
-    else if (feat.distKm > 5 && !demo) status = `<div class="note neutral">Najbliższy wpis w naszej bazie jest ${esc(fmtKmPl(feat.distKm))} od Ciebie. Baza z OpenStreetMap jest niepełna: <b>bliżej mogą być schrony, których w niej nie ma</b>. Sprawdź oficjalną mapę PSP: <a href="${PSP_URL}" target="_blank" rel="noopener noreferrer">${PSP_URL.replace("https://", "")}</a>.</div>`;
+    else if (pspState === "loading" && !shown.length) status = `<p class="muted">Wczytuję punkty schronienia z Twojej okolicy…</p>`;
+    else if (pspState === "none" && !shown.length) status = `<div class="note warn"><b>Nie udało się wczytać punktów schronienia</b> (brak internetu albo dane jeszcze nie zostały opublikowane). Brak danych nie oznacza, że schronów nie ma. Oficjalna mapa PSP: <a href="${PSP_URL}" target="_blank" rel="noopener noreferrer">${PSP_URL.replace("https://", "")}</a>.</div>`;
+    else if (!shown.length) status = `<div class="note neutral">${filter === "all" ? "W promieniu ok. 15 km nie ma punktów w rejestrze." : "Brak obiektów dla tego filtra."} <b>To nie znaczy, że nie ma schronów</b>: rejestr może być niepełny. Sprawdź oficjalną mapę PSP: <a href="${PSP_URL}" target="_blank" rel="noopener noreferrer">${PSP_URL.replace("https://", "")}</a> albo dodaj własne miejsce poniżej.</div>`;
+    else if (pspState === "none") status = `<div class="note warn">Nie wszystkie dane z okolicy udało się wczytać (brak internetu?). Lista może być niepełna.</div>`;
+    else if (feat.distKm > 5 && !demo) status = `<div class="note neutral">Najbliższy punkt w rejestrze jest ${esc(fmtKmPl(feat.distKm))} od Ciebie. <b>Bliżej mogą być miejsca, których w rejestrze nie ma</b>. Oficjalna mapa PSP: <a href="${PSP_URL}" target="_blank" rel="noopener noreferrer">${PSP_URL.replace("https://", "")}</a>.</div>`;
     $("shStatus").innerHTML = status;
     $("shFeat").innerHTML = feat ? `<article class="shfeat" aria-label="Najbliższe miejsce"><div class="row"><span class="badge ok">Najbliższy</span><span class="spacer"></span>${dist(feat)}</div>
       <h2 style="margin:8px 0 2px">${esc(feat.name)}</h2><p class="muted small" style="margin:0 0 8px">${kindBadge(feat)} ${meta(feat)}</p>${howBox(feat)}${btns(feat, true)}</article>` : "";
     $("shList").innerHTML = rest.map((s) => `<li class="shitem"><div class="row"><b style="font-family:var(--font-h)">${esc(s.name)}</b><span class="spacer"></span>${dist(s)}</div>
       <p class="muted small" style="margin:2px 0 6px">${kindBadge(s)} ${meta(s)}</p><div id="hw-${esc(s.id)}" ${openHow.has(s.id) ? "" : "hidden"}>${howBox(s)}</div>${btns(s, false)}</li>`).join("");
-    const when = db?.at ? fmtDt(db.at) : "";
-    $("shMeta").innerHTML = demo ? "" : (db ? `Baza: OpenStreetMap${db.count ? `, ${db.count} wpisów w Polsce` : ""}${when ? `, stan z ${esc(when)}` : ""}${db.stale ? " (kopia z telefonu, brak połączenia)" : ""}. Niezweryfikowane.` : "");
+    const parts = [];
+    if (pspIdx) parts.push(`Rejestr Punktów Schronienia (MSWiA / PSP): ${esc(String(pspIdx.count))} punktów w Polsce${pspIdx.builtAt ? `, stan z ${esc(fmtDt(pspIdx.builtAt))}` : ""}`);
+    if (db?.count) parts.push(`OpenStreetMap: ${esc(String(db.count))} wpisów, niezweryfikowane${db.stale ? " (kopia z telefonu)" : ""}`);
+    $("shMeta").innerHTML = demo ? "" : parts.length ? "Źródła: " + parts.join("; ") + "." : "";
     drawMap(list, feat);
   };
 
@@ -113,7 +118,16 @@ export function initSheltersScreen(ctx, { demo = false } = {}) {
   };
   let fitted = false;
 
-  const setPos = (p, manual) => { pos = p; manualPos = !!manual; fitted = false; draw(); };
+  const loadPsp = () => {
+    if (demo || !pos) return;
+    const seq = ++pspSeq; pspState = "loading"; draw();
+    loadPspAround(CONFIG.pspUrl, pos.lat, pos.lon, { cache: pspCache, memo: pspMemo }).then((r) => {
+      if (dead || seq !== pspSeq) return;
+      pspItems = [...new Map([...pspItems, ...r.items].map((x) => [x.id, x])).values()];
+      pspState = r.failed === r.total ? "none" : r.failed ? "none" : "ok"; draw();
+    }).catch(() => { if (!dead && seq === pspSeq) { pspState = "none"; draw(); } });
+  };
+  const setPos = (p, manual) => { pos = p; manualPos = !!manual; fitted = false; loadPsp(); draw(); };
 
   loadLeaflet().then((Lf) => {
     if (dead) return;
@@ -123,7 +137,7 @@ export function initSheltersScreen(ctx, { demo = false } = {}) {
     const fail = (k) => { const n = $("shTileMsg"); if (n) { n.hidden = false; n.textContent = "Mapa podkładowa nie odpowiada. Lista poniżej działa bez niej."; } };
     baseLayer(L, "map", fail).addTo(map);
     gMarks = L.layerGroup().addTo(map); gUser = L.layerGroup().addTo(map);
-    setTimeout(() => map.invalidateSize(), 0);
+    setTimeout(() => { if (!dead) map.invalidateSize(); }, 0);
     map.on("click", (e) => {
       const p = { lat: e.latlng.lat, lon: e.latlng.lng };
       if ($("addBox").open) { setPick(p); return; }
@@ -150,7 +164,7 @@ export function initSheltersScreen(ctx, { demo = false } = {}) {
   /* ---- pozycja ---- */
   const doLocate = (silent) => {
     if (!silent) $("shLocMsg").textContent = "Ustalam pozycję…";
-    locate((p) => { if (dead) return; $("shLocMsg").textContent = ""; setPos(p, false); if (map) map.setView([p.lat, p.lon], 15); }, () => { if (!dead && !silent) $("shLocMsg").textContent = "Nie udało się ustalić pozycji. Dotknij mapy poniżej, aby wskazać miejsce ręcznie."; }, false);
+    locate((p) => { if (dead) return; $("shLocMsg").textContent = ""; setPos(p, false); if (map) map.setView([p.lat, p.lon], 15, { animate: false }); }, () => { if (!dead && !silent) $("shLocMsg").textContent = "Nie udało się ustalić pozycji. Dotknij mapy poniżej, aby wskazać miejsce ręcznie."; }, false);
   };
   $("shLocate").addEventListener("click", () => doLocate(false));
   if (!pos && st().consent?.gps) doLocate(true);
@@ -159,7 +173,7 @@ export function initSheltersScreen(ctx, { demo = false } = {}) {
   const setPick = (p) => { pick = p; $("pickInfo").textContent = `Wskazano: ${p.lat.toFixed(5)}, ${p.lon.toFixed(5)}`; if (map && L) { if (pmarker) pmarker.setLatLng([p.lat, p.lon]); else pmarker = L.marker([p.lat, p.lon]).addTo(map); } };
   $("shUseMe").addEventListener("click", () => {
     $("shErr").textContent = "";
-    locate((p) => { setPick({ lat: p.lat, lon: p.lon }); if (map) map.setView([p.lat, p.lon], 17); if (!pos) setPos(p, false); }, () => { $("shErr").textContent = "Nie udało się ustalić pozycji. Otwórz tę sekcję i dotknij mapy u góry, aby wskazać miejsce."; }, false);
+    locate((p) => { if (dead) return; setPick({ lat: p.lat, lon: p.lon }); if (map) map.setView([p.lat, p.lon], 17, { animate: false }); if (!pos) setPos(p, false); }, () => { if (!dead) $("shErr").textContent = "Nie udało się ustalić pozycji. Otwórz tę sekcję i dotknij mapy u góry, aby wskazać miejsce."; }, false);
   });
   $("shSave").addEventListener("click", () => {
     const r = makeShelter({ name: $("shName").value, how: $("shHow").value, lat: pick?.lat, lon: pick?.lon });
@@ -174,7 +188,9 @@ export function initSheltersScreen(ctx, { demo = false } = {}) {
 
   /* ---- baza ---- */
   if (!demo) {
-    loadShelterDb(CONFIG.sheltersUrl).then((d) => { if (dead) return; db = d; dbState = d ? "ok" : "none"; draw(); }).catch(() => { if (!dead) { dbState = "none"; draw(); } });
+    loadShelterDb(CONFIG.sheltersUrl).then((d) => { if (dead) return; db = d; draw(); }).catch(() => {});
+    fetch(CONFIG.pspUrl + "index.json", { signal: AbortSignal.timeout(15000) }).then((r) => (r.ok ? r.json() : null)).then((j) => { if (!dead && j && Number.isFinite(j.count)) { pspIdx = j; draw(); } }).catch(() => {});
+    if (pos) loadPsp();
   }
   draw();
 }

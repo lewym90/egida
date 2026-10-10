@@ -6,7 +6,7 @@ import { createFeed } from "./neptun-feed.js";
 import { ThreatStore, buildView, coneOutline, fmtKmPl, ageText, TYPES, LIMITS } from "./neptun.js";
 import { compassPl, destination } from "./geo.js";
 import { demoThreats, DEMO_USER } from "./demo.js";
-import { dirUrl, loadShelterDb } from "./shelters.js";
+import { dirUrl, loadShelterDb, loadPspAround, makePspCache, mergeSources } from "./shelters.js";
 
 export const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
@@ -121,7 +121,7 @@ export function renderMapHtml(ctx, { demo = false } = {}) {
   ${official}
   <div class="chips" role="group" aria-label="Podkład mapy">${chips}</div>
   <div class="card" style="padding:4px 16px">
-    <label class="switch"><input type="checkbox" id="lyShelters" ${lay.shelters !== false ? "checked" : ""}><span><b>Schrony i ukrycia</b><span class="muted small">Twoje zapisane miejsca oraz wyniki z OpenStreetMap, jeśli je pobrano (niezweryfikowane). Oficjalna mapa PSP jest w zakładce Schrony.</span></span></label>
+    <label class="switch"><input type="checkbox" id="lyShelters" ${lay.shelters !== false ? "checked" : ""}><span><b>Schrony i ukrycia</b><span class="muted small">Punkty schronienia z Rejestru PSP oraz Twoje zapisane miejsca. Widoczne po przybliżeniu mapy. Lista z czasem dojścia jest w zakładce Schrony.</span><span id="shHint" class="muted small" aria-live="polite"></span></span></label>
     ${nepEnabled() ? `<label class="switch"><input type="checkbox" id="lyNeptun" ${nepOn ? "checked" : ""} ${demo ? "disabled" : ""}><span><b>Obiekty znad Ukrainy <span class="badge unofficial">nieoficjalne · beta</span></b><span class="muted small">Drony i rakiety w pobliżu granicy wg NEPTUN. Domyślnie wyłączone. Po włączeniu przeglądarka łączy się bezpośrednio z neptun.in.ua.</span></span></label>` : ""}
   </div>
   <div id="nepConsent" class="card" hidden role="dialog" aria-label="Zgoda na połączenie z NEPTUN">
@@ -198,27 +198,53 @@ export function initMapScreen(ctx, { demo = false } = {}) {
       $("locMsg").textContent = "Ustalam pozycję…";
       stopLoc?.();
       stopLoc = locate((p) => {
+        if (dead) return;
         user = p; drawUser(); $("locMsg").textContent = "";
-        if (firstFix) { map.setView([p.lat, p.lon], Math.max(map.getZoom(), 8)); firstFix = false; }
+        if (firstFix) { map.setView([p.lat, p.lon], Math.max(map.getZoom(), 8), { animate: false }); firstFix = false; }
         scheduleRefresh();
       }, () => { $("locMsg").textContent = "Nie udało się ustalić pozycji. Sprawdź, czy lokalizacja jest włączona i dozwolona dla tej strony."; }, true);
     });
     $("btnBorder")?.addEventListener("click", () => map.fitBounds([[49.0, 21.6], [54.6, 24.6]]));
 
     /* schrony na mapie */
-    let dbItems = [];
+    let dbItems = [], pspItems = [];
+    const pspMemo = new Map(), pspCache = demo ? null : makePspCache(CONFIG.pspUrl);
+    const canvas = L.canvas({ padding: 0.3 });
     const drawShelters = () => {
+      if (dead) return;
       gShelters.clearLayers();
       if (ml().shelters === false) return;
       const mine = st().shelters || [];
-      const osm = dbItems;
       const pop = (s, kind, extra) => `<div class="pop"><b>${esc(s.name)}</b><br><span class="small muted">${kind}</span>${extra || ""}<p class="small" style="margin:6px 0"><a href="${esc(dirUrl(s, "walking"))}" target="_blank" rel="noopener noreferrer">Trasa pieszo</a> · <a href="${esc(dirUrl(s, "driving"))}" target="_blank" rel="noopener noreferrer">Autem</a></p></div>`;
-      for (const s of osm) L.marker([s.lat, s.lon], { icon: shelterIcon(L, false), keyboard: false }).bindPopup(pop(s, "OpenStreetMap · niezweryfikowane", s.access ? `<br><span class="small">Dostęp: ${esc(s.access)}</span>` : "")).addTo(gShelters);
+      const z = map.getZoom(), bounds = map.getBounds().pad(0.1);
+      const hint = $("shHint");
+      const list = mergeSources(pspItems, dbItems);
+      let n = 0;
+      if (z >= 12) {
+        for (const s of list) {
+          if (!bounds.contains([s.lat, s.lon]) || n++ > 1500) continue;
+          if (s.src === "osm") L.marker([s.lat, s.lon], { icon: shelterIcon(L, false), keyboard: false }).bindPopup(pop(s, "OpenStreetMap · niezweryfikowane", s.access ? `<br><span class="small">Dostęp: ${esc(s.access)}</span>` : "")).addTo(gShelters);
+          else L.circleMarker([s.lat, s.lon], { renderer: canvas, radius: 7, color: "#fff", weight: 2, fillColor: "#2A4DA0", fillOpacity: 1 }).bindPopup(pop(s, "Punkt schronienia · Rejestr PSP", s.access ? `<br><span class="small">Dostępność: ${esc(s.access)}</span>` : "")).addTo(gShelters);
+        }
+      }
+      if (hint) hint.textContent = z < 12 && ml().shelters !== false ? "Przybliż mapę (zoom 12 lub więcej), aby zobaczyć punkty schronienia." : "";
       for (const s of mine) L.marker([s.lat, s.lon], { icon: shelterIcon(L, true), keyboard: false }).bindPopup(pop(s, "Twoje miejsce", s.how ? `<br><span class="small">Jak wejść: ${esc(s.how)}</span>` : "")).addTo(gShelters);
     };
+    let pspTimer = null;
+    const loadView = () => {
+      if (dead || demo || map.getZoom() < 12 || ml().shelters === false) return;
+      const c = map.getCenter();
+      loadPspAround(CONFIG.pspUrl, c.lat, c.lng, { cache: pspCache, memo: pspMemo }).then((r) => {
+        if (dead) return;
+        pspItems = [...new Map([...pspItems, ...r.items].map((x) => [x.id, x])).values()]; drawShelters();
+      }).catch(() => {});
+    };
     drawShelters();
+    map.on("moveend", () => { drawShelters(); clearTimeout(pspTimer); pspTimer = setTimeout(loadView, 400); });
+    cleanups.push(() => clearTimeout(pspTimer));
     if (!demo) loadShelterDb(CONFIG.sheltersUrl).then((db) => { if (db && !dead) { dbItems = db.items; drawShelters(); } }).catch(() => {});
-    $("lyShelters")?.addEventListener("change", (e) => { ml().shelters = e.target.checked; ctx.save(); drawShelters(); });
+    loadView();
+    $("lyShelters")?.addEventListener("change", (e) => { ml().shelters = e.target.checked; ctx.save(); drawShelters(); loadView(); });
 
     /* NEPTUN */
     let feed = null, timer = null, pending = null, lastRows = [];

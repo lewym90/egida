@@ -11,7 +11,7 @@ import { ThreatStore, applySnapshotJson } from "../js/neptun.js";
 const URL_REST = process.env.NEPTUN_REST || "https://neptun.in.ua/api/v1/threats";
 const DIR = process.env.NEPTUN_LOG_DIR || "/opt/egida/neptun-log";
 const KEEP_DAYS = 60;
-const UA = "EGIDA/0.2 (nieoficjalna aplikacja PWA; log testowy co 1 min; kontakt: patrz repozytorium lewym90/egida)";
+const UA = "EGIDA/0.2 (unofficial PWA; test log once per minute; repo lewym90/egida)";
 const dump = process.argv.includes("--dump");
 
 const day = new Date().toISOString().slice(0, 10);

@@ -37,5 +37,7 @@ export const CONFIG = {
   // Serwer Overpass (OpenStreetMap) do wyszukiwania schronów w pobliżu. Można zmienić na inny publiczny serwer.
   overpassUrl: ["https://overpass-api.de/api/interpreter", "https://overpass.private.coffee/api/interpreter", "https://overpass.kumi.systems/api/interpreter"],
   // Baza schronów z OpenStreetMap, odświeżana raz na dobę przez serwer EGIDA (gałąź data). Telefon nie pyta wtedy OSM o nic.
+  // Rejestr Punktów Schronienia (MSWiA / PSP), podzielony na kafelki przez serwer EGIDA (server/psp-sync.mjs).
+  pspUrl: "https://raw.githubusercontent.com/lewym90/egida/data/psp/",
   sheltersUrl: "https://raw.githubusercontent.com/lewym90/egida/data/shelters.json",
 };

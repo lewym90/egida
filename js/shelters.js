@@ -6,6 +6,70 @@ import { haversineKm } from "./geo.js";
 
 export const PSP_URL = "https://gdziesieukryc.pl";
 
+/* ---------- Rejestr Punktów Schronienia (MSWiA / PSP): pakiet „gsu-shelters-compact”, dzielony na kafelki ---------- */
+// Kafelek 0,2° szerokości × 0,3° długości geograficznej (ok. 22 × 19 km). Ta sama funkcja działa na serwerze i w telefonie.
+export const CELL_LAT = 0.2, CELL_LON = 0.3;
+export const pspCellId = (lat, lon) => `${Math.floor(lat / CELL_LAT + 1e-9)}_${Math.floor(lon / CELL_LON + 1e-9)}`;
+/** Kafelki 3×3 wokół pozycji (pozycja w środkowym). */
+export function pspCellsAround(lat, lon) {
+  const a = Math.floor(lat / CELL_LAT + 1e-9), b = Math.floor(lon / CELL_LON + 1e-9), out = [];
+  for (let i = a - 1; i <= a + 1; i++) for (let j = b - 1; j <= b + 1; j++) out.push(`${i}_${j}`);
+  return out;
+}
+const inPolandBox = (lat, lon) => lat >= 48.9 && lat <= 55.0 && lon >= 14.0 && lon <= 24.3;
+/** Walidacja i podział pakietu PSP na kafelki. Zwraca { tiles: Map(id → rows), count, rejected }. Rzuca błąd przy obcym formacie. */
+export function buildPspTiles(ds) {
+  if (!ds || ds.format !== "gsu-shelters-compact" || ds.schema !== 1 || !Array.isArray(ds.rows)) throw new Error("Nieoczekiwany format pakietu PSP (format/schema)");
+  const tiles = new Map(), seen = new Set(); let rejected = 0;
+  for (const r of ds.rows) {
+    if (!Array.isArray(r)) { rejected++; continue; }
+    const [id, lat, lon, addr, city, avail] = r;
+    if (typeof id !== "string" || !Number.isFinite(lat) || !Number.isFinite(lon) || !inPolandBox(lat, lon) || seen.has(id)) { rejected++; continue; }
+    seen.add(id);
+    const k = pspCellId(lat, lon);
+    if (!tiles.has(k)) tiles.set(k, []);
+    tiles.get(k).push([id.replace(/^OZO-/, ""), Math.round(lat * 1e5) / 1e5, Math.round(lon * 1e5) / 1e5, clean(addr, 120), clean(city, 60), clean(avail, 60)]);
+  }
+  return { tiles, count: seen.size, rejected };
+}
+/** Wiersz kafelka → obiekt do listy. */
+export function pspRowToShelter([id, lat, lon, addr, city, avail]) {
+  return { id: "OZO-" + id, lat, lon, name: clean(addr, 120) || (city ? `Punkt schronienia, ${city}` : "Punkt schronienia"), kind: "ukrycie", addr: "", city: clean(city, 60), access: clean(avail, 60), hours: "", capacity: "", level: "", how: "", osmUrl: "", src: "psp" };
+}
+/** Pobiera kafelki wokół pozycji (równolegle); cache: { get(key) → Promise<obj|null>, set(key, obj) }. Brak kafelka (404) = pusty obszar. */
+export async function loadPspAround(baseUrl, lat, lon, { fetchImpl = (...a) => fetch(...a), cache = null, memo = new Map() } = {}) {
+  const ids = pspCellsAround(lat, lon);
+  let failed = 0;
+  const res = await Promise.all(ids.map(async (id) => {
+    if (memo.has(id)) return memo.get(id);
+    let rows = null;
+    try {
+      const r = await fetchImpl(`${baseUrl}c/${id}.json`, { signal: AbortSignal.timeout(20000) });
+      if (r.status === 404) rows = [];
+      else if (!r.ok) throw new Error("HTTP " + r.status);
+      else { const j = await r.json(); if (!Array.isArray(j?.rows)) throw new Error("format"); rows = j.rows; cache?.set(id, rows); }
+    } catch { try { rows = (await cache?.get(id)) ?? null; } catch { rows = null; } if (rows == null) failed++; }
+    if (rows != null) memo.set(id, rows);
+    return rows || [];
+  }));
+  return { items: res.flat().map(pspRowToShelter), failed, total: ids.length };
+}
+/** Pamięć podręczna kafelków w telefonie (Cache API) – działa offline po pierwszym pobraniu okolicy. */
+export function makePspCache(baseUrl) {
+  if (!globalThis.caches) return null;
+  const key = (id) => `${baseUrl}c/${id}.json`;
+  return {
+    async get(id) { const c = await caches.open("egida-psp"); const r = await c.match(key(id)); return r ? (await r.json()).rows : null; },
+    async set(id, rows) { const c = await caches.open("egida-psp"); await c.put(key(id), new Response(JSON.stringify({ rows }))); },
+  };
+}
+/** Łączy PSP z OSM: wpis OSM (często z opisem wejścia) wygrywa z punktem PSP położonym w promieniu 30 m. */
+export function mergeSources(psp, osm) {
+  const out = [...osm];
+  for (const p of psp) if (!osm.some((o) => Math.abs(o.lat - p.lat) < 0.0005 && Math.abs(o.lon - p.lon) < 0.0008 && haversineKm(o, p) < 0.03)) out.push(p);
+  return out;
+}
+
 const clean = (v, max = 160) => (typeof v === "string" ? v.replace(/[\u0000-\u001f\u007f]+/g, " ").trim().slice(0, max) : "");
 const r2 = (x) => Math.round(x * 100) / 100;
 

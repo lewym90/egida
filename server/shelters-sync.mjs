@@ -10,7 +10,7 @@ import { overpassQueryPoland, parseOverpass } from "../js/shelters.js";
 
 const MIRRORS = (process.env.OVERPASS_URLS || "https://overpass-api.de/api/interpreter,https://overpass.private.coffee/api/interpreter,https://overpass.kumi.systems/api/interpreter").split(",");
 const OUT = process.env.SHELTERS_OUT || join(process.env.DATA_DIR || ".", "shelters.json");
-const UA = "EGIDA/0.2 (nieoficjalna aplikacja PWA; synchronizacja raz na dobę; kontakt: repozytorium lewym90/egida)";
+const UA = "EGIDA/0.2 (unofficial PWA; daily OSM shelter sync; repo lewym90/egida)";
 const dump = process.argv.includes("--dump");
 
 let json = null, used = "";
