@@ -1,10 +1,11 @@
 // Service worker: offline dla treści (powłoka aplikacji z cache), komunikaty zawsze najpierw z sieci.
-const VERSION = "egida-v13";
+const VERSION = "egida-v14";
 const SHELL = [
   "./", "index.html", "manifest.webmanifest", "css/style.css",
   "js/app.js", "js/content.js", "js/config.js",
   "js/geo.js", "js/neptun.js", "js/neptun-feed.js", "js/shelters.js", "js/mapscreen.js",
   "js/sheltersscreen.js", "js/classify.js", "js/poland-border.js", "js/demo.js",
+  "js/version.js", "js/regions.js", "js/regions-data.js", "js/personal.js", "js/screens2.js",
   "js/vendor/leaflet/leaflet.js", "js/vendor/leaflet/leaflet.css",
   "icons/icon.svg", "icons/icon-192.png", "icons/icon-512.png", "icons/apple-touch-icon.png",
   "fonts/manrope-latin-500-normal.woff2", "fonts/manrope-latin-700-normal.woff2", "fonts/manrope-latin-800-normal.woff2",
@@ -19,6 +20,7 @@ self.addEventListener("install", (e) => {
 self.addEventListener("activate", (e) => {
   e.waitUntil(caches.keys().then((ks) => Promise.all(ks.filter((k) => k !== VERSION).map((k) => caches.delete(k)))).then(() => self.clients.claim()));
 });
+self.addEventListener("message", (e) => { if (e.data === "version" && e.source) e.source.postMessage({ version: VERSION }); });
 self.addEventListener("fetch", (e) => {
   const req = e.request;
   if (req.method !== "GET") return;

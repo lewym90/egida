@@ -3,6 +3,9 @@ import {
   VOIVODESHIPS, LEGAL_HTML, ALERT_FILTERS, PLECAK, FIRST_AID, WHAT_TO_DO, READINESS_QUESTIONS, SOURCES,
 } from "./content.js";
 import { analyze, statusOf, summarize, compose } from "./classify.js";
+import { APP_VERSION, APP_BUILD } from "./version.js";
+import { emptyPlan, normalizePlan, normalizePlaces, importState } from "./personal.js";
+import { renderEmergency, initEmergency, renderPlan, initPlan, renderPlaces, initPlaces, renderPrivacy, shareText, shareNote, printSheet, planPrintHtml, packPrintHtml, guidePrintHtml } from "./screens2.js";
 import { renderMapHtml, initMapScreen, destroyScreens } from "./mapscreen.js";
 import { renderSheltersHtml, initSheltersScreen } from "./sheltersscreen.js";
 
@@ -42,7 +45,9 @@ const KEY = "egida.v1";
 const defaults = () => ({
   onboarded: false,
   consent: { gps: false, counter: false, ack: false, neptun: false },
-  region: null, regionSource: null, // "manual" | "gps"
+  region: null, regionSource: null, regionNear: null, // regionSource: "manual" | "gps" | "gps-edge" | "place"; regionNear: { km, id } gdy GPS wskazał miejsce blisko granicy województw
+  plan: emptyPlan(), // plan rodziny i karty ICE (tylko w urządzeniu)
+  places: [], // ważne miejsca: dom, praca, rodzina (tylko w urządzeniu)
   shelters: [], // „Moje miejsca schronienia” (tylko w urządzeniu)
   map: { base: "map", layers: { shelters: true, neptun: false } },
   checked: {},
@@ -51,6 +56,7 @@ const defaults = () => ({
 });
 let state = defaults();
 try { state = { ...defaults(), ...JSON.parse(localStorage.getItem(KEY) || "{}") }; } catch { /* brak/uszkodzone dane */ }
+state.plan = normalizePlan(state.plan); state.places = normalizePlaces(state.places);
 const save = () => { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch { /* tryb prywatny */ } };
 const applyPrefs = () => {
   document.documentElement.dataset.fs = state.fs === "normal" ? "" : state.fs;
@@ -97,6 +103,9 @@ const geoCtx = {
   regionById: (id) => regionById(id),
   regionAlerts: () => regionAlerts(),
   alertsFresh: () => alertsFresh(),
+  alertsFor: (rid) => analyze(alertsData.items).filter((a) => a.active && (a.voivodeship === rid || a.voivodeship === "all")),
+  back: (h, t) => back(h, t),
+  rerender: () => render(),
 };
 
 /* ---------- wspólne fragmenty ---------- */
@@ -130,11 +139,13 @@ const SIDE = [
   { h: "#/pierwsza-pomoc", k: "pierwsza-pomoc", t: "Pierwsza pomoc", i: I.heart },
   { h: "#/plecak", k: "plecak", t: "Plecak i zapasy", i: I.bag },
   { h: "#/test", k: "test", t: "Test gotowości", i: I.test },
-  { h: "#/plan-rodziny", k: "plan-rodziny", t: "Plan rodziny", i: I.home, soon: 1 },
+  { h: "#/zagrozenie", k: "zagrozenie", t: "Tryb zagrożenia", i: I.alert },
+  { h: "#/plan-rodziny", k: "plan-rodziny", t: "Plan rodziny", i: I.users },
+  { h: "#/miejsca", k: "miejsca", t: "Ważne miejsca", i: I.pin },
   { h: "#/ustawienia", k: "ustawienia", t: "Ustawienia", i: I.gear },
   { h: "#/zrodla", k: "zrodla", t: "Źródła i licencje", i: I.book },
 ];
-const GROUP = { telegram: "alerty", "co-robic": "poradnik", "pierwsza-pomoc": "poradnik", test: "poradnik", schrony: "mapa", zrodla: "ustawienia", "plan-rodziny": "pulpit" };
+const GROUP = { telegram: "alerty", "co-robic": "poradnik", "pierwsza-pomoc": "poradnik", test: "poradnik", schrony: "mapa", zrodla: "ustawienia", prywatnosc: "ustawienia", "plan-rodziny": "pulpit", zagrozenie: "pulpit", miejsca: "pulpit" };
 
 function shell(route, inner) {
   const cur = GROUP[route] || route;
@@ -220,7 +231,7 @@ function screenPulpit() {
     const rows = (arr, n) => `<ul class="slist">${arr.slice(0, n).map((a) => `<li>${msgParts(a)}</li>`).join("")}</ul>${arr.length > n ? `<p class="smore">i jeszcze ${arr.length - n}</p>` : ""}`;
     if (lvl === "alarm") {
       const air = danger[0].kind === "atak";
-      status = `<div class="status alert"><span class="ico">${I.alert}</span><div class="sbody"><h2>${air ? "Zagrożenie z powietrza" : danger.length > 1 ? `Zagrożenia (${danger.length})` : "Zagrożenie"}</h2>${rows(danger, 2)}${air ? '<p class="slead">Obowiązuje do odwołania komunikatem o zakończeniu ataku.</p>' : ""}<p class="smeta">${meta}</p><a class="slink" href="#/alerty">Zobacz szczegóły ${I.chevr}</a></div></div>`;
+      status = `<div class="status alert"><span class="ico">${I.alert}</span><div class="sbody"><h2>${air ? "Zagrożenie z powietrza" : danger.length > 1 ? `Zagrożenia (${danger.length})` : "Zagrożenie"}</h2>${rows(danger, 2)}${air ? '<p class="slead">Obowiązuje do odwołania komunikatem o zakończeniu ataku.</p>' : ""}<p class="smeta">${meta}</p><a class="slink" href="#/alerty">Zobacz szczegóły ${I.chevr}</a> <a class="slink" style="margin-left:14px" href="#/zagrozenie">Tryb zagrożenia ${I.chevr}</a></div></div>`;
     } else if (lvl === "warn") {
       status = `<div class="status warn"><span class="ico">${I.alert}</span><div class="sbody"><h2>${important.length === 1 ? "Ostrzeżenie" : `Ostrzeżenia (${important.length})`}</h2>${rows(important, 2)}<p class="smeta">Śledź rozwój sytuacji. ${meta}</p><a class="slink" href="#/alerty">Zobacz szczegóły ${I.chevr}</a></div></div>`;
     } else {
@@ -241,7 +252,7 @@ function screenPulpit() {
   return `<div class="hero"><h1>Pulpit</h1></div>${status}
   <div class="card ready"><div class="row" style="gap:16px">${ring(r.pct)}<div style="flex:1"><h2 style="margin:0">Twoja gotowość</h2><p class="muted small" style="margin:2px 0 0">Trzy małe kroki, żeby poczuć się pewniej.</p></div></div>
   <ul class="steps stepsnav">${steps}</ul></div>
-  <div class="grid2 grid-d grid4">${tile("#/schrony", "t-green", I.pin, "Schrony blisko", nm != null ? `Najbliżej: ${nm} min pieszo` : "Najbliższe punkty schronienia")}${tile("#/pierwsza-pomoc", "t-red", I.heart, "Pierwsza pomoc", "Krok po kroku, offline")}${tile("#/plecak", "t-blue", I.bag, "Plecak i zapasy", "Zestaw na 72 godziny")}${tile("#/plan-rodziny", "t-amber", I.users, "Plan rodziny", "Kontakty i miejsce spotkania", true)}</div>
+  <div class="grid2 grid-d grid4">${tile("#/schrony", "t-green", I.pin, "Schrony blisko", nm != null ? `Najbliżej: ${nm} min pieszo` : "Najbliższe punkty schronienia")}${tile("#/pierwsza-pomoc", "t-red", I.heart, "Pierwsza pomoc", "Krok po kroku, offline")}${tile("#/plecak", "t-blue", I.bag, "Plecak i zapasy", "Zestaw na 72 godziny")}${tile("#/plan-rodziny", "t-amber", I.users, "Plan rodziny", "Kontakty i miejsce spotkania")}</div>
   <div class="grid2 grid-d" style="margin-top:12px"><a class="tile" style="flex-direction:row;align-items:center" href="#/poradnik"><span class="ti t-green">${I.list}</span><b>Co robić, gdy…</b></a><a class="tile" style="flex-direction:row;align-items:center" href="#/telegram"><span class="ti t-blue">${I.send}</span><b>Powiadomienia Telegram dla Twojego województwa</b></a></div>
 `;
 }
@@ -267,7 +278,7 @@ function groupItem(g) {
   if (g.items.length === 1) return msgItem(g.items[0]);
   const a = g.items[0];
   const type = { pogoda: "Pogoda", rcb: "Alert RCB", woda: "Woda", drogi: "Drogi" }[a.type] || "Komunikat";
-  const inner = g.items.map((x) => `<li style="margin:8px 0">${x.body ? esc(x.body) : esc(x.title)}<div class="muted small">${esc(fmtDate(x.published))}</div></li>`).join("");
+  const inner = g.items.map((x) => `<li style="margin:8px 0">${x.body ? esc(x.body) : esc(x.title)}<div class="muted small">${esc(fmtDate(x.published))}</div>${shareBtn(x.id)}</li>`).join("");
   return `<li class="msg"><details><summary style="cursor:pointer"><div class="meta"><span class="badge ${g.prio === 0 ? "danger" : g.prio === 1 ? "unofficial" : "info"}">${esc(type)}</span><span>${esc(g.items.length)} ${plural(g.items.length)}</span></div>
   <h3 style="display:inline">${esc(a.title)}</h3> <span class="muted small">(pokaż szczegóły)</span></summary><ul style="padding-left:18px;margin:8px 0">${inner}</ul>
   ${relHtml(g.items.map((x) => x.id))}<p class="src" style="margin:6px 0 0">Źródło: ${esc(a.source || "RSO")}</p></details></li>`;
@@ -278,28 +289,42 @@ function msgItem(a) {
   const url = safeUrl(a.url);
   return `<li class="msg"><div class="meta">${a.type === "drogi" ? `<span class="tri">${I.alert}</span>` : ""}<span class="badge ${a.sev === "danger" ? "danger" : a.sev === "important" ? "unofficial" : "info"}">${esc(type)}</span>${a.cancel ? '<span class="badge ok">Odwołanie</span>' : ""}${a.sev === "danger" ? '<span class="badge danger">Zagrożenie</span>' : ""}${a.supersededBy ? '<span class="badge info">Odwołano</span>' : ""}<span>${esc(fmtDate(a.published))}</span></div>
   <h3>${esc(a.title)}</h3>${a.body ? `<p class="muted">${esc(a.body)}</p>` : ""}${relHtml([a.id])}
-  <p class="src" style="margin:6px 0 0">Źródło: ${esc(a.source || "RSO")}${url ? ` · <a href="${esc(url)}" target="_blank" rel="noopener noreferrer">Oryginał</a>` : ""}</p></li>`;
+  <p class="src" style="margin:6px 0 0">Źródło: ${esc(a.source || "RSO")}${url ? ` · <a href="${esc(url)}" target="_blank" rel="noopener noreferrer">Oryginał</a>` : ""}</p>${shareBtn(a.id)}</li>`;
 }
-let alertFilter = "all", alertWhen = "active", relMap = new Map();
+let alertFilter = "all", alertWhen = "active", alertQuery = "", relMap = new Map();
 const relHtml = (ids) => ids.flatMap((id) => relMap.get(id) || []).map((r) => `<div class="related"><span class="lbl">Powiązany komunikat · ${esc(TYPE_LBL[r.type] || "Komunikat")} · ${esc(fmtDate(r.published))}</span><b>${esc(r.title)}</b>${r.body ? `<div class="muted small">${esc(summarize(r.body, 160))}</div>` : ""}</div>`).join("");
-function screenAlerty() {
+const normQ = (t) => String(t ?? "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/ł/g, "l");
+/** Wyszukiwanie: wszystkie wpisane słowa muszą wystąpić w tytule lub treści (bez względu na polskie znaki i wielkość liter). */
+const queryMatch = (a, q) => { const toks = normQ(q).split(/\s+/).filter(Boolean); if (!toks.length) return true; const hay = normQ(`${a.title} ${a.body} ${TYPE_LBL[a.type] || ""}`); return toks.every((t) => hay.includes(t)); };
+const shareBtn = (id) => `<button class="linkbtn" data-share="${esc(id)}" aria-label="Udostępnij ten komunikat">${I.send}<span>Udostępnij</span></button>`;
+const borderNote = () => {
+  const n = state.regionNear;
+  if ((state.regionSource !== "gps" && state.regionSource !== "gps-edge") || !n) return "";
+  const nb = regionById(n.id)?.name;
+  return `<div class="note neutral" style="margin:0 0 10px">${n.edge ? "Twoja pozycja jest tuż przy granicy województwa (lub wybrzeża)." : `Twoja pozycja jest ok. ${esc(String(n.km))} km od granicy z województwem ${esc(nb || "sąsiednim")}.`} Komunikaty sąsiedniego województwa mogą dotyczyć też Twojej okolicy. Granice w aplikacji są uproszczone, więc sprawdź także tamte komunikaty.</div>`;
+};
+function alertListHtml() {
   const all = regionAll();
-  const nAct = all.filter((a) => a.active).length;
-  const base = all.filter((a) => (alertWhen === "active" ? a.active : !a.active) && (alertFilter === "all" || a.type === alertFilter));
+  const base = all.filter((a) => (alertWhen === "active" ? a.active : !a.active) && (alertFilter === "all" || a.type === alertFilter) && queryMatch(a, alertQuery));
   // To samo wydarzenie (np. alert RCB i komunikat o wodzie z tymi samymi miejscowościami) pokazujemy raz; powiązany wpis jest pod głównym.
   relMap = new Map();
   const list = base.filter((a) => { if (a.relatedTo && base.some((x) => x.id === a.relatedTo)) { relMap.set(a.relatedTo, [...(relMap.get(a.relatedTo) || []), a]); return false; } return true; });
+  if (!state.region) return `<div class="note warn">Wybierz województwo na górze ekranu, aby zobaczyć komunikaty.</div>`;
+  if (!alertsData.ok) return `<div class="note warn">Nie udało się pobrać komunikatów. Sprawdź połączenie lub oficjalne źródła: <a href="https://komunikaty.tvp.pl" target="_blank" rel="noopener noreferrer">komunikaty.tvp.pl</a>.</div>`;
+  if (!list.length) return `<div class="note neutral">${alertQuery.trim() ? `Nic nie znaleziono dla „${esc(alertQuery.trim())}” w tej zakładce i kategorii.` : `${alertWhen === "active" ? "Brak aktywnych komunikatów" : "Brak wcześniejszych komunikatów"} tej kategorii dla województwa: ${esc(regionById(state.region)?.name)}.`}</div>`;
+  return `${alertQuery.trim() ? `<p class="muted small" style="margin:0 0 6px" role="status">Znaleziono: ${base.length}</p>` : ""}<div class="card flat"><ul class="list">${groupAlerts(list).map(groupItem).join("")}</ul></div>`;
+}
+function screenAlerty() {
+  const all = regionAll();
+  const nAct = all.filter((a) => a.active).length;
   const chips = ALERT_FILTERS.map((f) => `<button class="chip" data-filter="${f.id}" aria-pressed="${alertFilter === f.id}">${f.label}</button>`).join("");
-  let body;
-  if (!state.region) body = `<div class="note warn">Wybierz województwo na górze ekranu, aby zobaczyć komunikaty.</div>`;
-  else if (!alertsData.ok) body = `<div class="note warn">Nie udało się pobrać komunikatów. Sprawdź połączenie lub oficjalne źródła: <a href="https://komunikaty.tvp.pl" target="_blank" rel="noopener noreferrer">komunikaty.tvp.pl</a>.</div>`;
-  else if (!list.length) body = `<div class="note neutral">${alertWhen === "active" ? "Brak aktywnych komunikatów" : "Brak wcześniejszych komunikatów"} tej kategorii dla województwa: ${esc(regionById(state.region)?.name)}.</div>`;
-  else body = `<div class="card flat"><ul class="list">${groupAlerts(list).map(groupItem).join("")}</ul></div>`;
   const stale = alertsData.ok && !alertsFresh() ? `<div class="banner-offline">Dane mogą być nieaktualne (ostatnia aktualizacja: ${esc(fmtDate(alertsData.updated) || "brak")}).</div>` : "";
   return `<div class="hero"><h1>Alerty</h1><p>Oficjalne komunikaty (RSO: Alert RCB, IMGW, woda, drogi) dla Twojego województwa.</p></div>
   <a class="tile" style="flex-direction:row;align-items:center;margin-bottom:12px" href="#/telegram"><span class="ti">${I.send}</span><b>Chcesz dostawać ważne komunikaty na telefon? Powiadomienia Telegram</b></a>
+  ${borderNote()}
   <div class="seg" role="group" aria-label="Aktywne lub wcześniejsze"><button class="chip" data-when="active" aria-pressed="${alertWhen === "active"}">Aktywne (${nAct})</button><button class="chip" data-when="past" aria-pressed="${alertWhen === "past"}">Wcześniejsze (${all.length - nAct})</button></div>
-  <div class="chips" role="group" aria-label="Filtry">${chips}</div>${stale}${alertWhen === "past" ? '<p class="muted small">Komunikaty, które wygasły albo zostały odwołane. Nie wpływają na kolor karty na Pulpicie.</p>' : ""}${body}`;
+  <div class="field" style="margin:0 0 8px"><label class="sr" for="alertQ">Szukaj w komunikatach</label><input class="sel" id="alertQ" type="search" placeholder="Szukaj: miejscowość, ulica, słowo" value="${esc(alertQuery)}" autocomplete="off" enterkeyhint="search"></div>
+  <div class="chips" role="group" aria-label="Filtry">${chips}</div>${stale}${alertWhen === "past" ? '<p class="muted small">Komunikaty, które wygasły albo zostały odwołane. Nie wpływają na kolor karty na Pulpicie.</p>' : ""}<div id="alertList">${alertListHtml()}</div>`;
 }
 
 /* ---------- powiadomienia Telegram ---------- */
@@ -332,7 +357,7 @@ function screenTelegram() {
   <div class="card flat"><h2 style="padding:16px 16px 4px">Wybierz województwo</h2><ul class="list tglist">${rows}</ul></div>`;
 }
 
-function screenMapa(arg) { return renderMapHtml(geoCtx, { demo: arg === "demo" }); }
+function screenMapa(arg) { return renderMapHtml(geoCtx, { demo: arg === "demo", diag: arg === "diag" }); }
 function screenSoon(t, d) {
   return `<div class="hero"><h1>${t}</h1></div><div class="card"><span class="badge soon">Wkrótce</span><p>${d}</p><a class="btn" href="#/pulpit">Wróć na pulpit</a></div>`;
 }
@@ -340,9 +365,11 @@ function screenSoon(t, d) {
 function screenPoradnik() {
   const items = WHAT_TO_DO.items.map((x) => `<a class="check" style="text-decoration:none;color:inherit;cursor:pointer" href="#/co-robic/${x.id}"><span><b>${esc(x.t)}</b><br><span class="muted small">${esc(x.d)}</span></span></a>`).join("");
   return `<div class="hero"><h1>Poradnik</h1><p>Krótkie instrukcje, które działają także bez internetu.</p></div>
+  <a class="tile" style="flex-direction:row;align-items:center;margin-bottom:12px" href="#/zagrozenie"><span class="ti t-red">${I.alert}</span><b>Tryb zagrożenia: 112, schron, 3 kroki</b></a>
   <a class="tile" style="flex-direction:row;align-items:center" href="#/pierwsza-pomoc"><span class="ti">${I.heart}</span><b>Pierwsza pomoc, w tym resuscytacja (RKO)</b></a>
   <h2 style="margin-top:20px">Co robić, gdy…</h2><div class="card flat">${items}</div>
-  <a class="tile" style="flex-direction:row;align-items:center;margin-top:12px" href="#/test"><span class="ti">${I.test}</span><b>Test gotowości (2 minuty)</b></a>`;
+  <a class="tile" style="flex-direction:row;align-items:center;margin-top:12px" href="#/test"><span class="ti">${I.test}</span><b>Test gotowości (2 minuty)</b></a>
+  <button class="btn" id="printGuide" style="margin-top:12px">Drukuj instrukcje (pierwsza pomoc i „Co robić”)</button>`;
 }
 function screenCoRobic(id) {
   const x = WHAT_TO_DO.items.find((i) => i.id === id);
@@ -401,6 +428,7 @@ function screenPlecak() {
   <div class="card"><div class="row"><b style="font-family:var(--font-h)">Na start: ${n} z ${total}</b><span class="spacer"></span><b>${pct}%</b></div><div class="progress" style="margin-top:8px"><i style="width:${pct}%"></i></div></div>
   <div class="chips" role="group" aria-label="Sekcje">${tabs}</div>${body}
   <div class="note" style="margin-top:12px">${esc(PLECAK.note)}</div>
+  <button class="btn" id="printPack" style="margin-top:12px">Drukuj listę plecaka i zapasów</button>
   <p class="src">Źródło: ${esc(PLECAK.source)}. Każdy domownik, także dziecko, ma własny plecak. Zaznaczenia zapisują się tylko w tym urządzeniu. Ostatni przegląd: ${PLECAK.reviewed ? esc(PLECAK.reviewed) : "<b>oczekuje na zatwierdzenie</b>"}.</p>`;
 }
 
@@ -426,25 +454,34 @@ function screenUstawienia() {
   const c = state.consent;
   const tg = state.region ? safeUrl(tgLinks()[state.region] || "") : "";
   const opt = (v, cur, t) => `<option value="${v}" ${cur === v ? "selected" : ""}>${t}</option>`;
+  const src = state.regionSource;
+  const gpsTag = src === "gps" ? ' <span class="tag-gps">wg GPS</span>' : src === "gps-edge" ? ' <span class="tag-gps">wg GPS (przy granicy – sprawdź)</span>' : src === "place" ? ' <span class="tag-gps">z ważnego miejsca</span>' : "";
   return `<div class="hero"><h1>Ustawienia</h1></div>
-  <div class="card"><h2>Region i lokalizacja</h2><div class="field" style="margin-top:8px"><label for="setRegion" class="muted small">Województwo${state.regionSource === "gps" ? ' <span class="tag-gps">wg GPS (przybliżone – sprawdź)</span>' : ""}</label>
+  <div class="card"><h2>Region i lokalizacja</h2><div class="field" style="margin-top:8px"><label for="setRegion" class="muted small">Województwo${gpsTag}</label>
   <select class="sel" id="setRegion"><option value="">— wybierz —</option>${VOIVODESHIPS.map((v) => `<option value="${v.id}" ${state.region === v.id ? "selected" : ""}>${esc(v.name)}</option>`).join("")}</select></div>
-  <button class="btn" id="useGps" style="margin-top:10px">${I.pin}Użyj lokalizacji GPS</button><p class="muted small">Pozycja jest używana tylko w Twoim telefonie, do wskazania najbliższego województwa. Nie jest wysyłana na serwer.</p></div>
+  ${borderNote()}
+  <button class="btn" id="useGps" style="margin-top:10px">${I.pin}Użyj lokalizacji GPS</button><p class="muted small">Pozycja jest używana tylko w Twoim telefonie, do wskazania województwa na podstawie uproszczonych granic. Nie jest wysyłana na serwer.</p>
+  <label class="switch"><input type="checkbox" id="setGps" ${c.gps ? "checked" : ""}><span><b>Pozwalam używać lokalizacji na ekranie Schrony</b><span class="muted small">Gdy włączone, lista najbliższych schronów ustala Twoją pozycję od razu po wejściu na ekran (przeglądarka nadal może zapytać o zgodę).</span></span></label></div>
+  <div class="card"><h2>Twoje przygotowania</h2><div class="col" style="margin-top:8px"><a class="btn" href="#/plan-rodziny">${I.users}Plan rodziny i karty ICE</a><a class="btn" href="#/miejsca">${I.pin}Ważne miejsca: dom, praca, rodzina</a></div></div>
   <div class="card"><h2>Powiadomienia</h2>${tg ? `<p>Kanał Telegram dla Twojego województwa:</p><a class="btn primary" href="${esc(tg)}" target="_blank" rel="noopener noreferrer">Otwórz kanał Telegram ${I.ext}</a>` : `<p class="muted">Kanał Telegram dla Twojego województwa jest w przygotowaniu. Powiadomienia nie przebijają trybu „Nie przeszkadzać” i nie zastępują syren ani Alertu RCB.</p>`}<p style="margin-top:10px"><a href="#/telegram">Jak działają powiadomienia Telegram i lista kanałów</a></p></div>
   <div class="card"><h2>Prywatność</h2>
   <label class="switch"><input type="checkbox" id="setCounter" ${c.counter ? "checked" : ""}><span><b>Anonimowy licznik odwiedzin</b><span class="muted small">Bez cookies i identyfikatorów. ${CONFIG.goatcounter ? "" : "(Licznik nie jest jeszcze skonfigurowany, więc nic nie jest zliczane.)"}</span></span></label>
-  ${CONFIG.neptun?.enabled === false ? "" : `<label class="switch"><input type="checkbox" id="setNeptun" ${c.neptun ? "checked" : ""}><span><b>Obiekty znad Ukrainy na mapie (NEPTUN) <span class="badge unofficial">nieoficjalne · beta</span></b><span class="muted small">Zgoda na bezpośrednie połączenie z neptun.in.ua, gdy włączysz tę warstwę na mapie. Serwis zobaczy Twój adres IP. Dane mogą być spóźnione lub błędne.</span></span></label>`}</div>
+  ${CONFIG.neptun?.enabled === false ? "" : `<label class="switch"><input type="checkbox" id="setNeptun" ${c.neptun ? "checked" : ""}><span><b>Obiekty znad Ukrainy na mapie (NEPTUN) <span class="badge unofficial">nieoficjalne · beta</span></b><span class="muted small">Zgoda na bezpośrednie połączenie z neptun.in.ua, gdy włączysz tę warstwę na mapie. Serwis zobaczy Twój adres IP. Dane mogą być spóźnione lub błędne.</span></span></label>`}
+  <p style="margin-top:6px"><a href="#/prywatnosc">Polityka prywatności</a></p></div>
   <div class="card"><h2>Wygląd</h2><div class="grid2" style="margin-top:8px"><div class="field"><label for="setFs" class="muted small">Rozmiar tekstu</label><select class="sel" id="setFs">${opt("normal", state.fs, "Normalny")}${opt("large", state.fs, "Duży")}${opt("xlarge", state.fs, "Bardzo duży")}</select></div>
   <div class="field"><label for="setContrast" class="muted small">Kontrast</label><select class="sel" id="setContrast">${opt("normal", state.contrast, "Normalny")}${opt("high", state.contrast, "Wysoki")}</select></div></div></div>
-  <div class="card"><h2>Twoje dane</h2><p class="muted">Wszystko, co ustawisz, jest tylko w tym urządzeniu.</p><div class="grid2"><button class="btn" id="exportData">Pobierz dane</button><button class="btn" id="wipeData">Usuń dane</button></div></div>
+  <div class="card"><h2>Twoje dane</h2><p class="muted">Wszystko, co ustawisz, jest tylko w tym urządzeniu: województwo, plecak, plan rodziny, karty ICE, ważne miejsca.</p><div class="grid2"><button class="btn" id="exportData">Pobierz dane</button><button class="btn" id="wipeData">Usuń dane</button></div>
+  <button class="btn" id="importBtn" style="margin-top:12px">Wczytaj dane z pliku</button><input type="file" id="importFile" accept="application/json,.json" hidden><p id="importMsg" class="small" role="status" aria-live="polite"></p></div>
+  <div class="card"><h2>Aplikacja</h2><p class="muted small">Jeśli widzisz starą wersję albo coś się nie odświeża, dotknij poniższego przycisku. Wyczyści pamięć podręczną aplikacji i wczyta najnowszą wersję (Twoje dane zostają).</p><button class="btn" id="refreshApp">Odśwież aplikację</button></div>
   <a class="btn" href="#/zrodla">Źródła i licencje</a>
-  ${CONFIG.contactUrl ? `<a class="btn" style="margin-top:10px" href="${esc(safeUrl(CONFIG.contactUrl))}" target="_blank" rel="noopener noreferrer">Zgłoś błąd</a>` : ""}`;
+  ${CONFIG.contactUrl ? `<a class="btn" style="margin-top:10px" href="${esc(safeUrl(CONFIG.contactUrl))}" target="_blank" rel="noopener noreferrer">Zgłoś błąd</a>` : ""}
+  <p class="vers" id="appVer">EGIDA ${esc(APP_VERSION)} · ${esc(APP_BUILD)}<span id="swVer"></span></p>`;
 }
 function screenZrodla() {
   const rows = SOURCES.map((s) => `<tr><td><a href="${esc(s.u)}" target="_blank" rel="noopener noreferrer">${esc(s.n)}</a><br><span class="muted">${esc(s.w)}</span></td><td>${esc(s.l)}</td></tr>`).join("");
   return `${back("#/ustawienia", "Ustawienia")}<div class="hero"><h1>Źródła i licencje</h1><p>EGIDA jest nieoficjalna i niezależna. Pokazujemy, skąd pochodzą dane.</p></div>
   <div class="card"><table class="t"><thead><tr><th>Źródło</th><th>Licencja / warunki</th></tr></thead><tbody>${rows}</tbody></table></div>
-  <p class="src">Dane pochodzą od stron trzecich „tak jak są” i mogą być spóźnione lub błędne. Grafik i logo RCB nie używamy.</p>`;
+  <p class="src">Dane pochodzą od stron trzecich „tak jak są” i mogą być spóźnione lub błędne. Grafik i logo RCB nie używamy. <a href="#/prywatnosc">Polityka prywatności</a>.</p>`;
 }
 
 /* ---------- router ---------- */
@@ -460,7 +497,10 @@ function render() {
     case "alerty": inner = screenAlerty(); break;
     case "mapa": inner = screenMapa(arg); break;
     case "schrony": inner = renderSheltersHtml(geoCtx, { demo: arg === "demo" }); break;
-    case "plan-rodziny": inner = screenSoon("Plan rodziny", "Miejsce spotkania, kontakty i karta ICE do wydruku są w przygotowaniu."); break;
+    case "plan-rodziny": inner = renderPlan(geoCtx); break;
+    case "zagrozenie": inner = renderEmergency(geoCtx); break;
+    case "miejsca": inner = renderPlaces(geoCtx); break;
+    case "prywatnosc": inner = renderPrivacy(geoCtx); break;
     case "poradnik": inner = screenPoradnik(); break;
     case "co-robic": inner = screenCoRobic(arg); break;
     case "pierwsza-pomoc": inner = screenPierwszaPomoc(); break;
@@ -472,23 +512,65 @@ function render() {
     default: inner = screenPulpit();
   }
   app.innerHTML = shell(route, inner);
-  if (route === "mapa") initMapScreen(geoCtx, { demo: arg === "demo" });
+  if (route === "mapa") initMapScreen(geoCtx, { demo: arg === "demo", diag: arg === "diag" });
   else if (route === "schrony") initSheltersScreen(geoCtx, { demo: arg === "demo" });
-  const titles = { pulpit: "Pulpit", alerty: "Alerty", mapa: "Mapa", poradnik: "Poradnik", plecak: "Plecak", "pierwsza-pomoc": "Pierwsza pomoc", test: "Test gotowości", ustawienia: "Ustawienia", zrodla: "Źródła", telegram: "Powiadomienia Telegram", schrony: "Schrony" };
+  else if (route === "plan-rodziny") initPlan(geoCtx);
+  else if (route === "zagrozenie") initEmergency(geoCtx);
+  else if (route === "miejsca") initPlaces(geoCtx);
+  else if (route === "ustawienia") showSwVersion();
+  const titles = { pulpit: "Pulpit", alerty: "Alerty", mapa: "Mapa", poradnik: "Poradnik", plecak: "Plecak", "pierwsza-pomoc": "Pierwsza pomoc", test: "Test gotowości", ustawienia: "Ustawienia", zrodla: "Źródła", telegram: "Powiadomienia Telegram", schrony: "Schrony", "plan-rodziny": "Plan rodziny", zagrozenie: "Tryb zagrożenia", miejsca: "Ważne miejsca", prywatnosc: "Polityka prywatności" };
   document.title = `EGIDA – ${titles[route] || "Pulpit"}`;
   window.scrollTo(0, 0);
 }
 
-/* ---------- GPS -> najbliższe województwo (przybliżenie, bez wysyłania pozycji) ---------- */
+/* ---------- GPS -> województwo (uproszczone granice PRG/GUGiK, bez wysyłania pozycji) ---------- */
 function useGps(after) {
   if (!navigator.geolocation) { alert("Ta przeglądarka nie obsługuje lokalizacji. Wybierz województwo ręcznie."); return; }
-  navigator.geolocation.getCurrentPosition((p) => {
+  navigator.geolocation.getCurrentPosition(async (p) => {
     const { latitude: la, longitude: lo } = p.coords;
-    const k = Math.cos((la * Math.PI) / 180);
-    let best = null, bd = 1e9;
-    for (const v of VOIVODESHIPS) { const d = (v.lat - la) ** 2 + ((v.lon - lo) * k) ** 2; if (d < bd) { bd = d; best = v; } }
-    state.region = best.id; state.regionSource = "gps"; save(); after?.();
-  }, () => { alert("Nie udało się ustalić lokalizacji. Wybierz województwo ręcznie."); }, { enableHighAccuracy: false, timeout: 10000, maximumAge: 600000 });
+    let r = null, loaded = true;
+    try { const { regionFromGps } = await import("./regions.js"); r = await regionFromGps(la, lo); } catch { loaded = false; /* brak danych granic: spróbujemy przybliżenia */ }
+    if (!r) {
+      // Dane granic niedostępne albo pozycja daleko od Polski: przybliżenie „najbliższy środek województwa” tylko w granicach kraju.
+      const inPl = !loaded && la >= 48.9 && la <= 55 && lo >= 14 && lo <= 24.3;
+      if (!inPl) { alert("Wygląda na to, że jesteś poza Polską albo nie udało się ustalić województwa. Wybierz województwo ręcznie."); return; }
+      const k = Math.cos((la * Math.PI) / 180);
+      let best = null, bd = 1e9;
+      for (const v of VOIVODESHIPS) { const d = (v.lat - la) ** 2 + ((v.lon - lo) * k) ** 2; if (d < bd) { bd = d; best = v; } }
+      state.region = best.id; state.regionSource = "gps-edge"; state.regionNear = { edge: true, km: null, id: null };
+    } else {
+      state.region = r.id;
+      if (r.outside) { state.regionSource = "gps-edge"; state.regionNear = { edge: true, km: 0, id: null }; }
+      else { state.regionSource = "gps"; state.regionNear = r.neighbor && r.borderKm < 10 ? { edge: false, km: r.borderKm, id: r.neighbor } : null; }
+    }
+    save(); after?.();
+  }, () => { alert("Nie udało się ustalić lokalizacji. Wybierz województwo ręcznie."); }, { enableHighAccuracy: false, timeout: 10000, maximumAge: 30000 }); // świeża pozycja: po podróży województwo może być inne niż 10 min temu
+}
+
+/* ---------- wersja i odświeżanie aplikacji ---------- */
+function showSwVersion() {
+  const el = document.getElementById("swVer"); if (!el || !("serviceWorker" in navigator) || !navigator.serviceWorker.controller) return;
+  const onMsg = (e) => {
+    if (!e.data?.version) return;
+    navigator.serviceWorker.removeEventListener("message", onMsg);
+    const cur = document.getElementById("swVer"); if (!cur) return;
+    const same = e.data.version === `egida-${APP_VERSION}`;
+    cur.textContent = same ? ` · pamięć offline ${e.data.version}` : ` · UWAGA: pamięć offline ma wersję ${e.data.version}. Dotknij „Odśwież aplikację”.`;
+  };
+  navigator.serviceWorker.addEventListener("message", onMsg);
+  navigator.serviceWorker.controller.postMessage("version");
+}
+async function refreshApp() {
+  try { const regs = await navigator.serviceWorker?.getRegistrations?.(); for (const r of regs || []) await r.unregister(); } catch { /* */ }
+  try { for (const k of await caches.keys()) if (/^egida-v/.test(k)) await caches.delete(k); } catch { /* */ }
+  location.reload();
+}
+/** Tekst komunikatu do udostępnienia (kopia z oznaczeniem, że to nieoficjalna aplikacja). */
+function alertShareText(a) {
+  const body = String(a.body || "").replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+  const cut = body.length > 800 ? body.slice(0, 800).replace(/\s+\S*$/, "") + "…" : body;
+  const url = safeUrl(a.url);
+  return `${TYPE_LBL[a.type] || "Komunikat"} · ${regionById(a.voivodeship)?.name || "cała Polska"} · ${fmtDate(a.published)}\n${a.title}${cut ? "\n" + cut : ""}\nŹródło: ${a.source || "RSO"}${url ? " · " + url : ""}\nKopia z aplikacji EGIDA (nieoficjalna). Kieruj się syrenami, Alertem RCB i poleceniami służb. W zagrożeniu życia dzwoń 112.`;
 }
 
 /* ---------- licznik ---------- */
@@ -504,12 +586,14 @@ document.addEventListener("change", (e) => {
   const t = e.target;
   if (t.id === "regionSel") {
     if (t.value === "__gps") { useGps(render); t.value = state.region || ""; return; }
-    state.region = t.value; state.regionSource = "manual"; save(); render();
-  } else if (t.id === "startRegion") { state.region = t.value || null; state.regionSource = "manual"; save(); }
+    state.region = t.value; state.regionSource = "manual"; state.regionNear = null; save(); render();
+  } else if (t.id === "startRegion") { state.region = t.value || null; state.regionSource = "manual"; state.regionNear = null; save(); }
   else if (t.id === "cGps") state.consent.gps = t.checked;
   else if (t.id === "cCounter") { state.consent.counter = t.checked; save(); }
   else if (t.id === "cAck") { state.consent.ack = t.checked; save(); $("#goStart").disabled = !t.checked; }
-  else if (t.id === "setRegion") { state.region = t.value || null; state.regionSource = "manual"; save(); render(); }
+  else if (t.id === "setRegion") { state.region = t.value || null; state.regionSource = "manual"; state.regionNear = null; save(); render(); }
+  else if (t.id === "setGps") { state.consent.gps = t.checked; save(); }
+  else if (t.id === "importFile") importFromFile(t);
   else if (t.id === "setCounter") { state.consent.counter = t.checked; save(); applyCounter(); }
   else if (t.id === "setNeptun") { state.consent.neptun = t.checked; if (!t.checked && state.map?.layers) state.map.layers.neptun = false; save(); }
   else if (t.id === "setFs") { state.fs = t.value; save(); applyPrefs(); }
@@ -517,13 +601,41 @@ document.addEventListener("change", (e) => {
   else if (t.dataset.check) { state.checked[t.dataset.check] = t.checked; save(); render(); const el = document.querySelector(`[data-check="${t.dataset.check}"]`); el?.focus(); }
   else if (t.dataset.q) testAnswers[t.dataset.q] = t.checked;
 });
+document.addEventListener("input", (e) => {
+  if (e.target.id === "alertQ") { alertQuery = e.target.value; const l = $("#alertList"); if (l) l.innerHTML = alertListHtml(); }
+});
+const DRAFT = "Wersja robocza: treść oczekuje na zatwierdzenie merytoryczne.";
+async function importFromFile(input) {
+  const msg = $("#importMsg"), f = input.files?.[0]; input.value = "";
+  if (!f || !msg) return;
+  try {
+    if (f.size > 2e6) throw new Error("Plik jest za duży jak na kopię danych EGIDY.");
+    const res = importState(JSON.parse(await f.text()), { validRegions: VOIVODESHIPS.map((v) => v.id) });
+    if (!res.ok) { msg.style.color = "var(--danger-ink)"; msg.textContent = res.error; return; }
+    if (!confirm("Wczytać dane z pliku? Zastąpią one odpowiadające im dane w tej aplikacji (ustawienia, plan rodziny, miejsca).")) return;
+    Object.assign(state, res.state); state.plan = normalizePlan(state.plan); state.places = normalizePlaces(state.places);
+    save(); applyPrefs(); render();
+    const m2 = $("#importMsg"); if (m2) { m2.style.color = ""; m2.textContent = "Dane wczytane."; }
+  } catch (err) { msg.style.color = "var(--danger-ink)"; msg.textContent = err?.message && !/JSON/i.test(err.message) ? err.message : "Nie udało się odczytać pliku. Wybierz plik pobrany wcześniej przyciskiem „Pobierz dane”."; }
+}
 document.addEventListener("click", (e) => {
   const b = e.target.closest("button"); if (!b) return;
   if (b.id === "goStart") {
     state.onboarded = true; save(); applyCounter();
     if (state.consent.gps && !state.region) useGps(render); else render();
     if (!location.hash) location.hash = "#/pulpit";
-  } else if (b.dataset.filter) { alertFilter = b.dataset.filter; render(); }
+  } else if (b.dataset.share) {
+    const a = alertsData.items.find((x) => x.id === b.dataset.share);
+    if (a) shareText(alertShareText(a)).then((r) => {
+      const lab = b.querySelector("span");
+      if (r === "copied" && lab) { lab.textContent = "Skopiowano"; setTimeout(() => { lab.textContent = "Udostępnij"; }, 2500); }
+      else if (r === "failed") alert(shareNote(r));
+    });
+  } else if (b.id === "printGuide") printSheet("Instrukcje: pierwsza pomoc i co robić", guidePrintHtml(esc), FIRST_AID.reviewed && WHAT_TO_DO.reviewed ? "" : DRAFT);
+  else if (b.id === "printPack") printSheet("Plecak i zapasy", packPrintHtml(state, esc), PLECAK.reviewed ? "" : DRAFT);
+  else if (b.id === "importBtn") $("#importFile")?.click();
+  else if (b.id === "refreshApp") { b.disabled = true; b.textContent = "Odświeżam…"; refreshApp(); }
+  else if (b.dataset.filter) { alertFilter = b.dataset.filter; render(); }
   else if (b.dataset.when) { alertWhen = b.dataset.when; render(); }
   else if (b.dataset.ptab) { plecakTab = b.dataset.ptab; render(); }
   else if (b.id === "useGps") useGps(render);
@@ -545,6 +657,6 @@ window.addEventListener("hashchange", () => { if (parse().route === "test" && !p
 applyPrefs(); applyCounter();
 testAnswers = { ...(state.test?.answers || {}) };
 render();
-loadAlerts().then(() => { if (state.onboarded && ["pulpit", "alerty", "ustawienia", "telegram", ""].includes(parse().route) && !document.activeElement?.closest?.("select")) render(); });
-setInterval(() => loadAlerts().then(() => { if (["pulpit", "alerty", "ustawienia", "telegram"].includes(parse().route) && !document.activeElement?.closest?.("select")) render(); }), 5 * 60 * 1000);
+loadAlerts().then(() => { if (state.onboarded && ["pulpit", "alerty", "ustawienia", "telegram", ""].includes(parse().route) && !document.activeElement?.closest?.("select,input,textarea")) render(); });
+setInterval(() => loadAlerts().then(() => { if (["pulpit", "alerty", "ustawienia", "telegram"].includes(parse().route) && !document.activeElement?.closest?.("select,input,textarea")) render(); }), 5 * 60 * 1000);
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});

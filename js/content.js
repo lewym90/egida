@@ -108,6 +108,9 @@ export const WHAT_TO_DO = {
     { id: "pozar", t: "Pożar", d: "W domu lub budynku", steps: ["Alarmuj domowników i opuść budynek najkrótszą drogą, zamykając za sobą drzwi.", "Zadzwoń pod 112 już z zewnątrz.", "W dymie poruszaj się nisko przy podłodze. Nie wracaj po rzeczy.", "Windą nie uciekaj."] },
     { id: "brak-pradu", t: "Brak prądu", d: "Dłuższa przerwa w dostawie", steps: ["Użyj latarki, nie świeczek. Sprawdź radio na baterie.", "Ogranicz otwieranie lodówki. Oszczędzaj baterię telefonu.", "Do gotowania i ogrzewania nie używaj grilla ani kuchenki gazowej w zamkniętym pomieszczeniu – grozi zatruciem czadem.", "Sprawdź, jak się mają sąsiedzi, zwłaszcza starsi."] },
     { id: "burza", t: "Burza i silny wiatr", d: "Ostrzeżenie IMGW", steps: ["Zostań w budynku, z dala od okien. Zabezpiecz lub schowaj przedmioty na balkonie i w ogrodzie.", "Nie chowaj się pod pojedynczymi drzewami. W samochodzie zatrzymaj się z dala od drzew i linii.", "Po burzy omijaj zerwane linie energetyczne i połamane drzewa. Zgłoś je pod 112."] },
+    { id: "syreny", t: "Usłyszałem syreny", d: "Alarm lub ogłoszenie zagrożenia", steps: ["Włącz radio lub telewizję albo otwórz Alerty w aplikacji. Sam dźwięk syreny nie mówi, co się stało.", "Wejdź do budynku. Przy zagrożeniu z powietrza zejdź do schronu lub piwnicy, a gdy ich nie ma, do pomieszczenia w głębi budynku, z dala od okien.", "Zostań w środku do ogłoszenia odwołania. Odwołanie alarmu to ciągły dźwięk syren (ok. 3 minuty), alarm to dźwięk modulowany.", "Daj znać bliskim, że jesteś bezpieczny, krótką wiadomością. Nie blokuj linii."] },
+    { id: "chemia", t: "Wyciek substancji niebezpiecznych", d: "Chmura, zapach, komunikat o skażeniu", steps: ["Wejdź do budynku, zamknij okna i drzwi, wyłącz wentylację i klimatyzację.", "Jeśli jesteś na zewnątrz, opuść zagrożony teren prostopadle do kierunku wiatru. Osłoń usta i nos wilgotną tkaniną.", "Nie pij wody z kranu, jeśli komunikat tak mówi. Nie używaj otwartego ognia.", "Słuchaj komunikatów służb. Na polecenie ewakuuj się, zabierając plecak. W zagrożeniu życia dzwoń 112."] },
+    { id: "terror", t: "Atak terrorystyczny lub strzelanina", d: "Napastnik w pobliżu", steps: ["Jeśli możesz bezpiecznie uciec, uciekaj i zabierz innych. Nie zbieraj rzeczy.", "Jeśli nie możesz uciec, ukryj się: zamknij i zablokuj drzwi, wycisz telefon (także wibracje), nie pokazuj się w oknach.", "Gdy możesz zrobić to bezpiecznie, zadzwoń pod 112: podaj, gdzie jesteś, ilu jest napastników i jak wyglądają.", "Gdy przyjadą służby, trzymaj ręce na widoku, nie biegnij w ich stronę i wykonuj polecenia."] },
   ],
 };
 
@@ -127,11 +130,46 @@ export const SOURCES = [
   { n: "Rządowe Centrum Bezpieczeństwa (gov.pl/rcb)", l: "Teksty: CC BY-SA 4.0", u: "https://www.gov.pl/web/rcb", w: "Poradnik bezpieczeństwa, komunikaty" },
   { n: "Polska Rada Resuscytacji / ERC", l: "Wytyczne 2025", u: "https://www.prc.krakow.pl", w: "Pierwsza pomoc (opracowanie własne zgodne z wytycznymi)" },
   { n: "NEPTUN (neptun.in.ua)", l: "Otwarte API, warunki: neptun.in.ua/api-terms. Nieoficjalny agregator, nie system ostrzegania", u: "https://neptun.in.ua", w: "Obserwacje dronów i rakiet nad Ukrainą (mapa, beta, nieoficjalne). Dane: Karta powitryanykh tryvoh — NEPTUN" },
-  { n: "Mapa PSP „Gdzie się ukryć”", l: "Oficjalna mapa Państwowej Straży Pożarnej. Jej danych nie kopiujemy", u: "https://gdziesieukryc.pl", w: "Punkty schronienia (tylko odsyłacz)" },
+  { n: "Rejestr Punktów Schronienia (MSWiA / Państwowa Straż Pożarna)", l: "Dane publiczne udostępniane przez PSP w pakiecie offline aplikacji „Gdzie się ukryć”. Licencja nie jest określona w repozytorium PSP; do zgody KG PSP: patrz uwagi wydawcy", u: "https://gdziesieukryc.pl", w: "Punkty schronienia (adres, dostępność). EGIDA nie jest aplikacją PSP; dane bywają niepełne lub nieaktualne" },
   { n: "OpenStreetMap", l: "ODbL, © współtwórcy OpenStreetMap", u: "https://www.openstreetmap.org/copyright", w: "Podkład „Mapa” oraz schrony (znaczniki shelter_type i bunker_type = bomb_shelter, dane niezweryfikowane)" },
   { n: "OpenTopoMap", l: "CC-BY-SA 3.0", u: "https://opentopomap.org", w: "Podkład „Teren”" },
   { n: "EOxCloudless (EOX IT Services GmbH)", l: "CC BY-NC-SA 4.0, tylko użytek niekomercyjny. Zawiera zmodyfikowane dane Copernicus Sentinel 2025", u: "https://cloudless.eox.at", w: "Podkład „Satelita”" },
   { n: "Natural Earth", l: "Domena publiczna", u: "https://www.naturalearthdata.com", w: "Uproszczony obrys Polski do szacowania odległości obiektów od granicy (to nie jest granica prawna)" },
+  { n: "Państwowy Rejestr Granic (GUGiK)", l: "Dane publiczne GUGiK (dane bez opłat). Używamy wersji uproszczonej (konwersja: ppatrzyk/polska-geojson)", u: "https://www.gov.pl/web/gugik", w: "Granice województw do wskazania województwa z GPS (dokładność ok. 1–2 km, to nie jest granica prawna)" },
+  { n: "Telegram", l: "Warunki i polityka prywatności Telegram", u: "https://telegram.org/tos", w: "Prywatne kanały powiadomień „tylko do czytania” (dołączasz z własnego konta Telegram)" },
   { n: "Leaflet", l: "BSD-2-Clause", u: "https://leafletjs.com", w: "Biblioteka mapy (hostowana lokalnie)" },
   { n: "Czcionki: Manrope, Source Sans 3", l: "SIL Open Font License", u: "https://openfontlicense.org", w: "Hostowane lokalnie, bez połączeń z Google" },
 ];
+
+// --- Tryb zagrożenia (treść robocza – do zatwierdzenia; docelowo na podstawie Poradnika bezpieczeństwa RCB) ---
+export const EMERGENCY = {
+  source: "Poradnik bezpieczeństwa RCB (rcb.gov.pl)",
+  published: "2026-10-10",
+  reviewed: null,
+  steps: [
+    { t: "Schroń się", d: "Wejdź do najbliższego budynku lub schronu. Zostań w środku, najlepiej w głębi budynku, z dala od okien. Nie zostawaj na otwartej przestrzeni." },
+    { t: "Sprawdź komunikaty", d: "Włącz radio lub telewizję albo otwórz Alerty w aplikacji. Stosuj się do poleceń służb. Nie wychodź, dopóki nie ogłoszono odwołania zagrożenia." },
+    { t: "Daj znać bliskim", d: "Wyślij krótką wiadomość, że jesteś bezpieczny. Nie blokuj linii długimi rozmowami. Numer 112 jest tylko dla zagrożenia życia." },
+  ],
+};
+
+// --- Polityka prywatności (treść robocza – wymaga przeglądu prawnego; wydawca jest anonimowy) ---
+export const PRIVACY = {
+  updated: "2026-10-10",
+  reviewed: null,
+  sections: [
+    { h: "Kim jesteśmy", p: ["EGIDA to nieoficjalna, bezpłatna aplikacja informacyjna prowadzona przez osobę prywatną. Nie jest aplikacją żadnego urzędu ani służby i nie zastępuje syren, Alertu RCB ani poleceń służb."] },
+    { h: "Co zostaje w Twoim telefonie", p: ["Wybrane województwo, zgody, odhaczone pozycje listy plecaka, wynik testu gotowości, zapisane miejsca (schrony i ważne miejsca), plan rodziny i karty ICE, ostatnio pobrane komunikaty (kopia na wypadek braku internetu) oraz ustawienia wyglądu.", "Te dane są zapisane tylko w pamięci przeglądarki na tym urządzeniu. W Ustawieniach możesz je pobrać do pliku albo usunąć."] },
+    { h: "Czego nie robimy", p: ["Nie ma kont, reklam, profilowania ani sprzedaży danych. EGIDA nie prowadzi bazy użytkowników. Twoja pozycja GPS, plan rodziny i karty ICE nie są wysyłane na żaden serwer EGIDY."] },
+    { h: "Z kim łączy się Twoja przeglądarka", p: [
+      "GitHub (strona aplikacji oraz pliki z komunikatami i punktami schronienia): widzi Twój adres IP i zwykłe dane przeglądarki. Punkty schronienia pobieramy jako kafelki danych obejmujące okolicę ok. 20 km. Nie wysyłamy dokładnej pozycji, ale nazwa kafelka wskazuje przybliżony obszar.",
+      "Dostawcy map (OpenStreetMap, OpenTopoMap, EOX): widzą adres IP i obszary, które oglądasz. Łączymy się z nimi dopiero na ekranach z mapą.",
+      "NEPTUN (neptun.in.ua): tylko po Twojej zgodzie na warstwę „Obiekty znad Ukrainy”. Serwis widzi Twój adres IP.",
+      "Telegram: jeśli dołączysz do kanału, Twoje dane przetwarza Telegram według własnych zasad. Kanały są prywatne i tylko do czytania.",
+      "Przyciski „Pieszo” i „Autem” otwierają zewnętrzną aplikację map (domyślnie Mapy Google) z celem trasy.",
+      "Anonimowy licznik odwiedzin jest domyślnie wyłączony. Jeśli włączysz go w Ustawieniach (i gdy zostanie skonfigurowany), zlicza wejścia bez cookies i bez identyfikatorów."] },
+    { h: "Lokalizacja", p: ["Pozycję GPS ustalamy wyłącznie po Twojej zgodzie (przeglądarka zapyta o pozwolenie). Służy do wskazania województwa i najbliższych schronów, jest używana w telefonie i nie jest wysyłana. W pamięci zostają tylko miejsca, które sam zapiszesz."] },
+    { h: "Dane o zdrowiu (karty ICE)", p: ["Karty ICE wypełniasz dobrowolnie. Zostają wyłącznie w tym urządzeniu. Nie wpisuj numeru PESEL, haseł ani numerów kart. Wydruk jest Twoją kopią: chroń go jak dokument.", "Wiadomość „Jestem bezpieczny” wysyłasz sam, swoim komunikatorem lub SMS-em. EGIDA jej nie widzi."] },
+    { h: "Twoja kontrola", p: ["Wszystko, co zapisano w aplikacji, możesz pobrać lub usunąć w Ustawieniach („Pobierz dane”, „Usuń dane”). Przycisk „Odśwież aplikację” czyści pamięć podręczną offline i ładuje najnowszą wersję."] },
+  ],
+};

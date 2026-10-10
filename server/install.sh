@@ -6,6 +6,7 @@
 #          bash install.sh --cron   (włączenie automatycznego uruchamiania co 5 min)
 #          bash install.sh --uncron (wyłączenie)
 #          bash install.sh --neptun-cron  (dziennik NEPTUN co minutę, tryb cichy) / --neptun-uncron
+#          bash install.sh --watchdog-cron  (strażnik komunikatów co 10 min; pisze do Ciebie na Telegram, gdy dane nie docierają) / --watchdog-uncron
 set -euo pipefail
 BASE=/opt/egida
 REPO="${EGIDA_REPO:-lewym90/egida}"
@@ -26,6 +27,15 @@ if [ "${1:-}" = "--neptun-cron" ]; then
 fi
 if [ "${1:-}" = "--neptun-uncron" ]; then
   ( crontab -u "$US" -l 2>/dev/null | grep -v '# egida_neptun' || true ) | crontab -u "$US" - ; echo "Wyłączono dziennik NEPTUN."; exit 0
+fi
+if [ "${1:-}" = "--watchdog-cron" ]; then
+  [ -f "$BASE/env" ] || die "Najpierw zrób zwykłą instalację: bash install.sh"
+  grep -q '^ADMIN_CHAT_ID=' "$BASE/env" || echo "UWAGA: w $BASE/env nie ma ADMIN_CHAT_ID, więc strażnik nie będzie miał komu wysłać alarmu. Ustal numer: runuser -u egida -- bash -c 'set -a; . $BASE/env; $BASE/node/bin/node $BASE/repo/server/tg-admin-id.mjs'"
+  ( crontab -u "$US" -l 2>/dev/null | grep -v '# egida_watchdog' || true; echo "*/10 * * * * bash $BASE/repo/server/run-watchdog.sh # egida_watchdog" ) | crontab -u "$US" -
+  echo "Włączono strażnika (co 10 min). Podgląd: tail -n 5 $BASE/watchdog-log.txt"; exit 0
+fi
+if [ "${1:-}" = "--watchdog-uncron" ]; then
+  ( crontab -u "$US" -l 2>/dev/null | grep -v '# egida_watchdog' || true ) | crontab -u "$US" - ; echo "Wyłączono strażnika."; exit 0
 fi
 if [ "${1:-}" = "--uncron" ]; then
   ( crontab -u "$US" -l 2>/dev/null | grep -v '# egida_poll' || true ) | crontab -u "$US" - ; echo "Wyłączono."; exit 0

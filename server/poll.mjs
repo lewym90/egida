@@ -6,6 +6,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { fetchRso, parseRso, findItems } from "./rso.mjs";
 import { XMLParser } from "fast-xml-parser";
+import { selectForTelegram, tgText } from "./tg-policy.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const OUT = process.env.ALERTS_OUT || path.join(here, "..", "data", "alerts.json");
@@ -38,9 +39,8 @@ try {
 } catch { /* brak pliku – OK */ }
 const APP_URL = process.env.APP_URL || "";
 
-const NAMES = { dolnoslaskie: "Dolnośląskie", "kujawsko-pomorskie": "Kujawsko-pomorskie", lubelskie: "Lubelskie", lubuskie: "Lubuskie", lodzkie: "Łódzkie", malopolskie: "Małopolskie", mazowieckie: "Mazowieckie", opolskie: "Opolskie", podkarpackie: "Podkarpackie", podlaskie: "Podlaskie", pomorskie: "Pomorskie", slaskie: "Śląskie", swietokrzyskie: "Świętokrzyskie", "warminsko-mazurskie": "Warmińsko-mazurskie", wielkopolskie: "Wielkopolskie", zachodniopomorskie: "Zachodniopomorskie" };
-const TYPE_NAMES = { rcb: "Alert RCB", pogoda: "Pogoda", woda: "Woda", drogi: "Drogi", inne: "Komunikat" };
-// Na Telegram wysyłamy tylko to, co ważne dla bezpieczeństwa. Drogi i „inne” zostają w aplikacji.
+// Reguły wysyłki (co jest „ważne”) są w tg-policy.mjs i opierają się na tej samej ocenie wagi, co aplikacja.
+// TELEGRAM_POLICY=legacy przywraca starą regułę: typy z TELEGRAM_TYPES (domyślnie rcb,pogoda,woda) lub komunikat z flagą alarmu.
 const TG_TYPES = new Set((process.env.TELEGRAM_TYPES || "rcb,pogoda,woda").split(","));
 
 const readJson = async (f, d) => { try { return JSON.parse(await readFile(f, "utf8")); } catch { return d; } };
@@ -54,20 +54,6 @@ async function sendTelegram(channel, html) {
   });
   if (!r.ok) throw new Error(`Telegram ${r.status}: ${(await r.text()).slice(0, 200)}`);
 }
-const TYPE_ICON = { rcb: "🚨", pogoda: "⛈", woda: "🌊", drogi: "🚧", inne: "ℹ️" };
-const when = (iso) => { if (!iso) return ""; const d = new Date(iso); return isNaN(d) ? "" : d.toLocaleString("pl-PL", { timeZone: "Europe/Warsaw", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }); };
-const tgText = (a) => {
-  const region = a.voivodeship === "all" ? "cała Polska" : NAMES[a.voivodeship] || a.voivodeship;
-  const head = `${a.alarm ? "🚨 " : (TYPE_ICON[a.type] || "ℹ️") + " "}<b>${escHtml(TYPE_NAMES[a.type] || "Komunikat")}</b> · ${escHtml(region)}`;
-  const t = when(a.published);
-  const body = a.body ? `\n${escHtml(a.body.slice(0, 500))}` : "";
-  const time = t ? `\n🕒 ${escHtml(t)}` : "";
-  const src = `\n\nŹródło: ${escHtml(a.source)}${a.url ? ` · ${escHtml(a.url)}` : ""}`;
-  const follow = `\n\n📲 <b>Śledź rozwój sytuacji w aplikacji EGIDA</b>${APP_URL ? `: ${escHtml(APP_URL)}` : ""}\n🛡 Stosuj się do zaleceń służb, kieruj się syrenami i Alertem RCB. W zagrożeniu życia dzwoń <b>112</b>.`;
-  const foot = `\n<i>EGIDA to nieoficjalna aplikacja informacyjna. Dane mogą być opóźnione lub niepełne.</i>`;
-  return `${head}\n<b>${escHtml(a.title)}</b>${body}${time}${src}${follow}${foot}`;
-};
-
 async function main() {
   if (process.argv.includes("--dump")) {
     const xml = await fetchRso();
@@ -78,8 +64,19 @@ async function main() {
     console.log("Pierwszy węzeł:\n" + JSON.stringify(items[0] ?? root, null, 2).slice(0, 3000));
     return;
   }
+  if (process.argv.includes("--preview-tg")) {
+    // Podgląd bez wysyłania i bez zapisu stanu: co reguły wysłałyby na Telegram w ostatnich N godzinach (domyślnie 24).
+    const i = process.argv.indexOf("--preview-tg"), hrs = Number(process.argv[i + 1]) || 24;
+    const all = parseRso(await fetchRso());
+    const sel = selectForTelegram(all, { sent: {}, danger: { all: Date.now() } }, { recentH: hrs });
+    console.log(`Komunikatów w RSO: ${all.length}. Wg reguł wagi na Telegram trafiłoby z ostatnich ${hrs} h: ${sel.length}.`);
+    for (const { a, level } of sel) console.log(` [${level}] ${a.voivodeship} · ${a.type} · ${String(a.title).slice(0, 90)}`);
+    if (sel[0]) console.log("\nPrzykładowa wiadomość:\n" + tgText(sel[0].a, sel[0].level, { appUrl: APP_URL }).replace(/<[^>]+>/g, ""));
+    return;
+  }
   const previous = await readJson(OUT, { items: [] });
   const state = await readJson(STATE, { sent: {} });
+  state.danger ||= {}; // zasięg → czas ostatniego wysłanego zagrożenia (odwołanie wysyłamy tylko po zagrożeniu)
 
   let fresh;
   try {
@@ -101,17 +98,22 @@ async function main() {
   await writeFile(OUT, JSON.stringify({ updated: new Date().toISOString(), source: "RSO (komunikaty.tvp.pl)", telegram: { ...Object.fromEntries(Object.entries(TG_CHANNELS).filter(([, c]) => /^@[A-Za-z0-9_]{5,32}$/.test(c)).map(([id, c]) => [id, "https://t.me/" + c.slice(1)])), ...PRIVATE_LINKS }, items }, null, 1));
   console.log(`Zapisano ${items.length} komunikatów (nowych w pobraniu: ${fresh.filter((a) => !(previous.items || []).some((p) => p.id === a.id)).length}).`);
 
-  // Telegram: tylko nowe, tylko ważne typy, tylko z ostatnich 6 godzin (żeby po pierwszym uruchomieniu nie zalać kanałów).
+  // Telegram: tylko nowe, tylko ważne wg wagi (czerwone i żółte + odwołania zagrożeń), tylko z ostatnich 6 godzin
+  // (żeby po pierwszym uruchomieniu nie zalać kanałów).
   const isFirstRun = !Object.keys(state.sent).length;
   const recent = Date.now() - 6 * 36e5;
-  const toSend = fresh.filter((a) => !state.sent[a.id] && (TG_TYPES.has(a.type) || a.alarm) && (!a.published || new Date(a.published).getTime() >= recent));
+  const toSend = process.env.TELEGRAM_POLICY === "legacy"
+    ? fresh.filter((a) => !state.sent[a.id] && (TG_TYPES.has(a.type) || a.alarm) && (!a.published || new Date(a.published).getTime() >= recent)).map((a) => ({ a, level: a.alarm ? "danger" : "important" }))
+    : selectForTelegram(fresh, state);
   for (const a of fresh) if (!state.sent[a.id]) state.sent[a.id] = Date.now();
   if (!TG_TOKEN) { if (toSend.length) console.log(`Telegram wyłączony (brak TELEGRAM_BOT_TOKEN). Do wysłania byłoby: ${toSend.length}.`); }
   else if (isFirstRun && !process.env.TELEGRAM_SEND_ON_FIRST_RUN) console.log("Pierwsze uruchomienie: zapamiętuję komunikaty bez wysyłania (ustaw TELEGRAM_SEND_ON_FIRST_RUN=1, aby wysłać).");
-  else for (const a of toSend) {
+  else for (const { a, level } of toSend) {
     const ch = a.voivodeship === "all" ? Object.values(TG_CHANNELS) : [TG_CHANNELS[a.voivodeship]].filter(Boolean);
-    for (const c of ch) { try { await sendTelegram(c, tgText(a)); await new Promise((r) => setTimeout(r, 1100)); } catch (e) { console.error("Telegram:", e.message); } }
+    if (level === "danger") state.danger[a.voivodeship] = Date.now();
+    for (const c of ch) { try { await sendTelegram(c, tgText(a, level, { appUrl: APP_URL })); await new Promise((r) => setTimeout(r, 1100)); } catch (e) { console.error("Telegram:", e.message); } }
   }
+  for (const [k, t] of Object.entries(state.danger)) if (Date.now() - t > 48 * 36e5) delete state.danger[k];
   const keep = Date.now() - 14 * 864e5;
   for (const [k, t] of Object.entries(state.sent)) if (t < keep) delete state.sent[k];
   await writeFile(STATE, JSON.stringify(state));

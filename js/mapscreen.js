@@ -49,17 +49,23 @@ export function destroyScreens() { if (active) { try { active.destroy(); } catch
 export function baseLayer(L, key, onFail) {
   const c = CONFIG.tiles[key] || CONFIG.tiles.map;
   const urls = [c.url, ...(c.fallbackUrls || [])];
-  let i = 0, ok = 0, bad = 0;
-  const layer = L.tileLayer(urls[0], { attribution: c.attribution, maxZoom: c.maxZoom ?? 18, maxNativeZoom: c.maxNativeZoom, subdomains: c.subdomains || "abc" });
+  let i = 0, ok = 0, bad = 0, badTotal = 0, lastBad = "";
+  const opts = { attribution: c.attribution, maxZoom: c.maxZoom ?? 18, maxNativeZoom: c.maxNativeZoom, subdomains: c.subdomains || "abc" };
+  // Satelita (EOX): adres wklejony w pasek przeglądarki działa (nie wysyła nagłówka Referer), więc tu też go nie wysyłamy.
+  // Dla OSM zostaje domyślnie: polityka OSM wymaga prawidłowego nagłówka Referer.
+  if (c.referrerPolicy) opts.referrerPolicy = c.referrerPolicy;
+  const layer = L.tileLayer(urls[0], opts);
   // Gdy żaden kafelek się nie wczytuje (np. zły adres lub awaria dostawcy), próbujemy kolejnego adresu, a na końcu zgłaszamy błąd.
   layer.on("tileload", () => { ok++; });
-  layer.on("tileerror", () => {
-    bad++;
+  layer.on("tileerror", (e) => {
+    bad++; badTotal++; lastBad = String(e?.tile?.src || "");
     if (ok === 0 && bad >= 4) {
       bad = 0;
       if (i + 1 < urls.length) { i++; layer.setUrl(urls[i]); } else if (onFail) { const f = onFail; onFail = null; f(key); }
     }
   });
+  // Dane do podglądu diagnostycznego (#/mapa/diag): ile kafelków się wczytało, ile nie, jaki adres jest aktualnie używany.
+  layer.diag = () => ({ key, loaded: ok, errors: badTotal, url: urls[i], variant: i + 1, variants: urls.length, lastBad, referrerPolicy: c.referrerPolicy || "domyślna" });
   return layer;
 }
 export const fmtDt = (iso) => { const d = new Date(iso); return isNaN(d) ? "" : d.toLocaleString("pl-PL", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }); };
@@ -106,7 +112,7 @@ const NEPTUN_NOTICE = "NEPTUN to nieoficjalny agregator informacji z otwartych �
    ========================================================= */
 const nepEnabled = () => CONFIG.neptun?.enabled !== false;
 
-export function renderMapHtml(ctx, { demo = false } = {}) {
+export function renderMapHtml(ctx, { demo = false, diag = false } = {}) {
   demo = demo && nepEnabled();
   const st = ctx.state, m = st.map || {}, lay = m.layers || {};
   const base = m.base || "map";
@@ -133,6 +139,7 @@ export function renderMapHtml(ctx, { demo = false } = {}) {
     <div class="grid2" style="margin-top:10px"><button class="btn primary" id="nepYes">Włączam</button><button class="btn" id="nepNo">Nie teraz</button></div>
   </div>
   <p id="tileMsg" class="note warn" hidden role="status"></p>
+  ${diag ? '<pre id="tileDiag" class="note neutral" style="white-space:pre-wrap;word-break:break-all;font-size:.75rem" aria-live="off">Diagnostyka podkładu: czekam na kafelki…</pre>' : ""}
   <div class="mapwrap"><div id="map" class="map" role="region" aria-label="Mapa. Obiekty i schrony są też wypisane w listach poniżej."><p class="muted" style="padding:16px">Ładuję mapę…</p></div></div>
   <div class="maptools"><button class="btn sm" id="btnLocate">${ctx.I.pin}Pokaż mnie</button><button class="btn sm" id="btnBorder">Granica wschodnia</button><button class="btn sm" id="btnObjects" hidden>Pokaż obiekty</button></div>
   <p id="locMsg" class="muted small" aria-live="polite"></p>
@@ -146,7 +153,7 @@ export function renderMapHtml(ctx, { demo = false } = {}) {
   <p class="src">Pozycja „Ty” jest tylko w pamięci przeglądarki i nigdzie nie jest wysyłana. Kafelki mapy pobiera Twoja przeglądarka od dostawcy mapy (zobacz Źródła i licencje).</p>`;
 }
 
-export function initMapScreen(ctx, { demo = false } = {}) {
+export function initMapScreen(ctx, { demo = false, diag = false } = {}) {
   demo = demo && nepEnabled();
   destroyScreens();
   const root = document.getElementById("map");
@@ -169,6 +176,10 @@ export function initMapScreen(ctx, { demo = false } = {}) {
     cleanups.push(() => map.remove());
     const failNote = (k) => { const n = $("tileMsg"); if (n) { n.hidden = false; n.textContent = `Podkład „${(CONFIG.tiles[k] || {}).name || k}” nie odpowiada. Wybierz inny albo spróbuj później.`; } };
     let baseL = baseLayer(L, st().map.base || "map", failNote).addTo(map);
+    if (diag) {
+      const dt = setInterval(() => { const el = $("tileDiag"); if (!el || !baseL?.diag) return; const d = baseL.diag(); el.textContent = `Diagnostyka podkładu „${d.key}” (wariant ${d.variant}/${d.variants}, Referer: ${d.referrerPolicy})\nWczytane kafelki: ${d.loaded} · błędy: ${d.errors} · online: ${navigator.onLine}\nAdres: ${d.url}${d.lastBad ? `\nOstatni błędny kafelek: ${d.lastBad}` : ""}\nPrzybliżenie: ${map.getZoom()}`; }, 1000);
+      cleanups.push(() => clearInterval(dt));
+    }
     const gShelters = L.layerGroup().addTo(map), gThreats = L.layerGroup().addTo(map), gUser = L.layerGroup().addTo(map);
     setTimeout(() => { if (!dead) map.invalidateSize(); }, 0);
 

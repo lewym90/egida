@@ -1,10 +1,10 @@
 // Kontrola treści przed publikacją (CI).
 // Zasady z projektu: każda instrukcja ma źródło i datę przeglądu; przegląd starszy niż 12 miesięcy blokuje publikację.
 // Tryb --strict: błąd (exit 1), gdy cokolwiek nie ma daty przeglądu. Bez --strict: tylko ostrzeżenia.
-import { FIRST_AID, WHAT_TO_DO, PLECAK } from "../js/content.js";
+import { FIRST_AID, WHAT_TO_DO, PLECAK, EMERGENCY, PRIVACY } from "../js/content.js";
 
 const strict = process.argv.includes("--strict");
-const sets = { "Pierwsza pomoc": FIRST_AID, "Co robić": WHAT_TO_DO, "Plecak i zapasy": PLECAK };
+const sets = { "Pierwsza pomoc": FIRST_AID, "Co robić": WHAT_TO_DO, "Plecak i zapasy": PLECAK, "Tryb zagrożenia": EMERGENCY, "Polityka prywatności": { source: "własne opracowanie", reviewed: PRIVACY.reviewed } };
 const problems = [];
 for (const [name, m] of Object.entries(sets)) {
   if (!m.source) problems.push(`${name}: brak źródła`);

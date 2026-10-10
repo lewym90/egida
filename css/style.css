@@ -302,3 +302,42 @@ a.all{color:var(--brand);text-decoration:none;font-size:.875rem}
 .slist .more[open] summary::after{content:"▴"}
 .slist .more summary{color:inherit;text-decoration:underline;text-underline-offset:3px}
 .slist .more p{margin:4px 0 0;font-size:.9375rem;line-height:1.4}
+
+/* ---- v14: tryb zagrożenia, plan rodziny, ważne miejsca, wydruki ---- */
+.call112{display:flex;align-items:center;justify-content:center;gap:14px;min-height:92px;margin:6px 0 14px;padding:14px 18px;border-radius:var(--r-card);background:var(--danger);color:#fff;text-decoration:none;box-shadow:0 6px 18px rgba(179,38,30,.3)}
+.call112 svg{width:40px;height:40px;flex:none}
+.call112 b{display:block;font-family:var(--font-h);font-weight:800;font-size:2rem;line-height:1.1}
+.call112 small{display:block;font-size:.875rem;font-weight:600;opacity:.95}
+.estep{list-style:none;margin:10px 0 0;padding:0}
+.estep li{display:flex;gap:12px;align-items:flex-start;margin:.8rem 0}
+.estep .dot{flex:none}
+.lightov{position:fixed;inset:0;z-index:200;background:#fff;color:#8892a0;display:flex;align-items:flex-end;justify-content:center;padding:0 16px calc(28px + env(safe-area-inset-bottom));font-size:.875rem;cursor:pointer}
+.linkbtn{display:inline-flex;align-items:center;gap:6px;min-height:40px;margin:2px 0 0;padding:0 2px;border:0;background:none;color:var(--info);font-family:var(--font-h);font-weight:700;font-size:.875rem;cursor:pointer}
+.linkbtn svg{width:16px;height:16px}
+.vers{margin:18px 0 4px;text-align:center;font-size:.75rem;color:var(--muted);opacity:.8}
+.ctlist>li{padding:12px 0}
+.ctlist .row{flex-wrap:wrap}
+.plcard .badge{flex:none}
+details.acc.person summary{gap:8px;justify-content:flex-start}
+details.acc.person[open] summary{border-bottom:1px solid var(--line-in)}
+input[type="search"].sel{-webkit-appearance:none;appearance:none;width:100%;font-weight:400}
+
+/* Wydruk: osobny arkusz (#printSheet), reszta aplikacji znika tylko podczas drukowania z naszych przycisków */
+#printSheet{display:none}
+@media print{
+  body.print-sheet #app{display:none!important}
+  body.print-sheet #printSheet{display:block!important;color:#000;background:#fff;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:11.5pt;line-height:1.4}
+  #printSheet h1{font-size:20pt;margin:0 0 4pt;color:#000}
+  #printSheet h2{font-size:14pt;margin:14pt 0 4pt;padding-bottom:2pt;border-bottom:1.5pt solid #000;color:#000}
+  #printSheet h3{font-size:12pt;margin:8pt 0 3pt;color:#000}
+  #printSheet table{width:100%;border-collapse:collapse}
+  #printSheet th,#printSheet td{border:.75pt solid #555;padding:4pt 6pt;text-align:left;vertical-align:top}
+  #printSheet th{width:32%;background:#eee;font-weight:700}
+  #printSheet .plist th{width:auto}
+  #printSheet .ice,#printSheet .g{break-inside:avoid;margin:8pt 0;padding:6pt 8pt;border:1pt solid #000;border-radius:4pt}
+  #printSheet .chk{list-style:none;margin:0;padding:0}
+  #printSheet .chk li{margin:3pt 0;break-inside:avoid}
+  #printSheet ol{margin:3pt 0;padding-left:18pt}
+  #printSheet .pmuted{color:#444;font-size:10pt}
+  #printSheet .pfoot{margin-top:16pt;padding-top:6pt;border-top:.75pt solid #777;font-size:9pt;color:#333}
+}

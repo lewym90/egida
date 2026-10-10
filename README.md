@@ -43,5 +43,14 @@ Bez tokenu skrypt działa „na sucho”: zapisuje dane, niczego nie wysyła. Pr
 - **Testy**: `npm test` (logika) oraz scenariusze przeglądarkowe Playwright (poza repozytorium).
 - **Dziennik NEPTUN na serwerze (tryb cichy)**: `node server/neptun-log.mjs --dump` pokazuje prawdziwy format; `bash server/install.sh --neptun-cron` włącza zapis co minutę do `/opt/egida/neptun-log/`, `--neptun-uncron` wyłącza.
 
+## Wersja 14: tryb zagrożenia, plan rodziny, granice województw, strażnik
+- **Wersja aplikacji**: `js/version.js` (`APP_VERSION`) + `VERSION` w `sw.js` – zawsze podnoś razem. Widać ją w Ustawieniach („EGIDA v14 · pamięć offline egida-v14”). Paczki nazywamy `egida-vNN.zip`.
+- **Ekrany**: Tryb zagrożenia (`#/zagrozenie`), Plan rodziny + karty ICE + „Jestem bezpieczny” (`#/plan-rodziny`), Ważne miejsca (`#/miejsca`), Polityka prywatności (`#/prywatnosc`), wydruki (plan, plecak, instrukcje), wyszukiwanie i udostępnianie w Alertach, import kopii danych i „Odśwież aplikację” w Ustawieniach. Dane osobiste zostają tylko w telefonie (`js/personal.js`, `js/screens2.js`).
+- **Granice województw (GPS)**: uproszczone PRG/GUGiK (`js/regions-data.js`, generowane `node scripts/build-regions.mjs`). Przy granicy (<10 km) aplikacja ostrzega, że województwo trzeba sprawdzić.
+- **Satelita**: EOX z `referrerPolicy: "no-referrer"`; diagnostyka kafelków: `#/mapa/diag`.
+- **Telegram wg wagi** (`server/tg-policy.mjs`): wysyła zagrożenia, ostrzeżenia i odwołania; podgląd bez wysyłki: `node server/poll.mjs --preview-tg 24`; stary tryb: `TELEGRAM_POLICY=legacy`.
+- **Strażnik** (`server/watchdog.mjs`): alarm na Telegram przy awarii pobierania komunikatów. `node server/tg-admin-id.mjs` pokazuje `ADMIN_CHAT_ID` (po wpisaniu w `.env`), `bash server/install.sh --watchdog-cron` włącza (co 10 min), `--watchdog-uncron` wyłącza, `node server/watchdog.mjs --status` pokazuje stan. Nie wykryje awarii całego VPS (potrzebny monitoring zewnętrzny).
+- Nowe treści (tryb zagrożenia, polityka prywatności, instrukcje) mają `reviewed: null` – wymagają zatwierdzenia; polityka prywatności – przeglądu prawnego.
+
 ## Dalej
-Granice województw dla GPS (dziś: najbliższy środek województwa – przybliżenie), alerty poziomu 2 z torem po weryfikacji formatu NEPTUN, zatwierdzenie treści (`reviewed`).
+Alerty poziomu 2 z torem po weryfikacji formatu NEPTUN, zatwierdzenie treści (`reviewed`), zewnętrzny monitoring VPS.
