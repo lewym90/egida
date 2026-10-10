@@ -110,7 +110,6 @@ const popupHtml = (row, demo) => `<div class="pop">${demo ? '<b>DANE WYMYŚLONE 
 const hhmm = (ms) => (ms ? new Date(ms).toLocaleTimeString("pl-PL", { hour: "2-digit", minute: "2-digit" }) : "?");
 const areaItemHtml = (r) => `<li class="obj"><div class="meta"><span class="badge unofficial">Nieoficjalne</span><span class="badge info">${esc(TYPES[r.t.type].label)}${r.t.count > 1 ? ` ×${esc(r.t.count)}` : ""}</span>${r.t.advisory ? '<span class="badge soon">bez alarmu</span>' : ""}</div>
   <p class="muted small" style="margin:6px 0 0">${esc(r.t.region || r.t.district || r.t.title || "obwód nieznany")}${r.t.locality ? ` · ${esc(r.t.locality)}` : ""} · ${esc(ageText(r.ageSec))}</p></li>`;
-const msgHtml = (m) => `<li class="obj"><p class="small" style="margin:0">${esc(m.text.length > 220 ? m.text.slice(0, 217).replace(/\s+\S*$/, "") + "…" : m.text)}</p><p class="muted small" style="margin:4px 0 0">${esc(hhmm(m.at))}${m.channel ? ` · ${esc(m.channel)}` : ""}</p></li>`;
 const NEPTUN_ATTR = `Dane o obiektach: <a href="https://neptun.in.ua/" target="_blank" rel="noopener noreferrer">Karta powitryanykh tryvoh — NEPTUN (neptun.in.ua)</a>.`;
 const NEPTUN_NOTICE = "NEPTUN to nieoficjalny agregator informacji z otwartych źródeł, a nie system ostrzegania. Dane mogą być spóźnione, niepełne lub błędne. Zawsze kieruj się syrenami, Alertami RCB i poleceniami służb. W zagrożeniu życia dzwoń 112.";
 
@@ -167,9 +166,6 @@ export function renderMapHtml(ctx, { demo = false, diag = false } = {}) {
     <div id="nepAlertsWrap" hidden><h2 style="margin-top:16px">Alarmy powietrzne w Ukrainie</h2>
       <p class="muted small" style="margin:0 0 6px">Obwody z aktywnym alarmem wg NEPTUN. To informacja o Ukrainie, nie o Polsce.</p>
       <div class="card flat"><p id="nepAlerts" class="small" style="margin:0;padding:12px 16px"></p></div></div>
-    <div id="nepMsgWrap" hidden><details class="card flat" style="margin-top:16px"><summary style="cursor:pointer;padding:12px 16px;font-weight:700">Wiadomości źródłowe NEPTUN (po ukraińsku lub rosyjsku)</summary>
-      <p class="muted small" style="margin:0;padding:0 16px 8px">Surowe wpisy z kanałów, które obserwuje NEPTUN. Nie tłumaczymy ich i nie weryfikujemy, mogą być błędne.</p>
-      <ul class="list" id="nepMsgs"></ul></details></div>
     <details class="card flat" style="margin-top:12px"><summary style="cursor:pointer;padding:12px 16px;font-weight:600">Szczegóły połączenia</summary><div id="nepDiag" class="small muted" style="padding:0 16px 12px"></div></details>
     <p class="src">${NEPTUN_ATTR}</p>
     <div class="note warn" style="margin-top:8px">${NEPTUN_NOTICE}</div>
@@ -332,16 +328,12 @@ export function initMapScreen(ctx, { demo = false, diag = false } = {}) {
         for (const a of view.alerts) { const g = by.get(a.region) || { whole: false, raions: [], reasons: new Set() }; if (a.scope === "oblast") g.whole = true; else g.raions.push(a.name); a.reasons.forEach((r) => g.reasons.add(r)); by.set(a.region, g); }
         $("nepAlerts").innerHTML = [...by].map(([reg, g]) => `<b>${esc(reg)}</b>${g.whole ? " (cały obwód)" : g.raions.length ? ` (${g.raions.length} ${g.raions.length === 1 ? "rejon" : g.raions.length < 5 ? "rejony" : "rejonów"})` : ""}${g.reasons.size ? ` · ${esc([...g.reasons].join(", "))}` : ""}`).join("<br>");
       }
-      const mw = dataOk && view.messages.length;
-      $("nepMsgWrap").hidden = !mw;
-      if (mw) $("nepMsgs").innerHTML = view.messages.slice(0, 8).map(msgHtml).join("");
       const ex = s.extras || {};
       $("nepDiag").innerHTML = demo ? "Tryb demonstracyjny." : [
         `Połączenie: ${esc({ live: "na żywo (WebSocket)", polling: "odpytywanie REST", connecting: "łączenie", offline: "brak", off: "wyłączone" }[fs.state] || fs.state)}`,
         `Ostatnia odpowiedź: ${esc(hhmm(fs.lastOkAt))}${fs.error ? ` · błąd: ${esc(fs.error)}` : ""}`,
         `Rekordy w ostatniej migawce: ${s.stats.seen}, odrzucone: ${s.stats.bad}`,
         `Alarmy w Ukrainie: ${ex.alertsAt ? "odebrane " + esc(hhmm(ex.alertsAt)) : "brak"}${ex.alertsErr ? ` · ${esc(ex.alertsErr)}` : ""}`,
-        `Wiadomości: ${ex.messagesAt ? "odebrane " + esc(hhmm(ex.messagesAt)) : "brak"}${ex.messagesErr ? ` · ${esc(ex.messagesErr)}` : ""}`,
         `Ukryte (włączone „Tylko okolice granicy”): ${view.farHidden}`,
       ].join("<br>");
       if (!dataOk) { redrawing = false; openId = null; return; } // bez świeżych danych nie rysujemy nic, co mogłoby sugerować obraz sytuacji
@@ -377,7 +369,7 @@ export function initMapScreen(ctx, { demo = false, diag = false } = {}) {
 
     function startFeed() {
       if (demo || feed) return;
-      feed = createFeed({ alertsUrl: CONFIG.neptun.alertsUrl, messagesUrl: CONFIG.neptun.messagesUrl, extrasMs: CONFIG.neptun.extrasMs, restUrl: CONFIG.neptun.restUrl, wsUrl: CONFIG.neptun.wsUrl, pollMs: CONFIG.neptun.pollMs, onChange: scheduleRefresh, onStatus: scheduleRefresh });
+      feed = createFeed({ alertsUrl: CONFIG.neptun.alertsUrl, extrasMs: CONFIG.neptun.extrasMs, restUrl: CONFIG.neptun.restUrl, wsUrl: CONFIG.neptun.wsUrl, pollMs: CONFIG.neptun.pollMs, onChange: scheduleRefresh, onStatus: scheduleRefresh });
       cleanups.push(() => { feed?.stop(); feed = null; });
       feed.start();
     }

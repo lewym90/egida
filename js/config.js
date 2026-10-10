@@ -33,7 +33,7 @@ export const CONFIG = {
   },
   // NEPTUN (neptun.in.ua): otwarte API, tylko odczyt. REST nie częściej niż co 5 s (my: co pollMs).
   // Ustaw enabled: false, aby wyłączyć całą funkcję (np. gdyby operator zmienił warunki lub API).
-  neptun: { enabled: true, restUrl: "https://neptun.in.ua/api/v1/threats", alertsUrl: "https://neptun.in.ua/api/v1/alerts", messagesUrl: "https://neptun.in.ua/api/v1/messages", wsUrl: "wss://neptun.in.ua/api/v1/stream", pollMs: 15000, extrasMs: 60000 },
+  neptun: { enabled: true, restUrl: "https://neptun.in.ua/api/v1/threats", alertsUrl: "https://neptun.in.ua/api/v1/alerts", wsUrl: "wss://neptun.in.ua/api/v1/stream", pollMs: 10000, extrasMs: 60000 },
   // Serwer Overpass (OpenStreetMap) do wyszukiwania schronów w pobliżu. Można zmienić na inny publiczny serwer.
   overpassUrl: ["https://overpass-api.de/api/interpreter", "https://overpass.private.coffee/api/interpreter", "https://overpass.kumi.systems/api/interpreter"],
   // Baza schronów z OpenStreetMap, odświeżana raz na dobę przez serwer EGIDA (gałąź data). Telefon nie pyta wtedy OSM o nic.
