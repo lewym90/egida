@@ -146,8 +146,14 @@ export function toItem(raw, src, nowMs) {
   // Wyjątek: poważne zagrożenie bezpieczeństwa w Polsce (zamach, planowany atak) – pokazujemy je w województwie, które wymieniono w tekście, a gdy miejsca nie ma, w całym kraju.
   let region = raw.region || src.region;
   if (src.kind === "media") {
-    const txt = `${raw.title} ${raw.cats || ""}`;
-    if (!mentionsRegion(txt, src.region)) {
+    const txt = `${raw.title} ${raw.cats || ""}`, regs = regionsMentioned(raw.title), regsAll = regionsMentioned(txt);
+    if (src.national) { // portal ogólnopolski: województwo z nazwy miejscowości/regionu w tytule; zagrożenie krajowe bez miejsca → cały kraj; inaczej odrzucamy
+      if (regs.length) region = regs[0]; else if (nationalThreat(raw.title)) region = "all"; else return null;
+    } else if (src.local) { // regionalny portal prywatny (np. Lublin112): domyślnie jego województwo, ale nie wiadomości „z kraju”
+      if (nationalThreat(raw.title) && !regs.includes(src.region)) region = regs[0] || "all";
+      else if (regs.length && !regs.includes(src.region)) region = regs[0];
+      else if (!regs.includes(src.region) && /(^|[\s,])(kraj|świat|swiat|polityka)([\s,]|$)/i.test(raw.cats || "") && !regsAll.includes(src.region)) return null;
+    } else if (!mentionsRegion(txt, src.region)) {
       if (!nationalThreat(txt)) return null;
       region = regionsMentioned(txt)[0] || "all";
     }

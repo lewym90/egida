@@ -93,3 +93,11 @@ Alerty poziomu 2 z torem po weryfikacji formatu NEPTUN, zatwierdzenie treści (`
 - Komunikaty RSO: podobne komunikaty z tego samego województwa (do 10 dni różnicy) są jedną pozycją „N komunikatów” (np. „Ćwiczenie Syrena” i „Ćwiczenia Syrena-26”).
 - Wiadomości: ta sama sprawa z kilku źródeł pokazuje się raz, wygrywa źródło oficjalne; to samo robi serwer w `news.json`.
 - RKO: ocena oddechu do 10 s (2–3 spokojne oddechy u dorosłego, co najmniej 2 u dziecka, oddech agonalny = brak oddechu), pełne puszczenie klatki między uciśnięciami. Metronom 100/min z precyzyjnym odmierzaniem czasu; dioda świeci przy ucisku i gaśnie przy puszczaniu; sygnał jako plik audio (działa przy włączonym trybie cichym iPhone'a).
+
+## Wersja 23: więcej bieżących wiadomości (3 warstwy) i naprawa ucinania listy
+- **Naprawa:** w v21/v22 końcowy zapis `news.json` ucinał całość do 15 wpisów (policja, urzędy, MEN i RCB znikały). Teraz listy źródeł scalane są jednym przebiegiem; test pilnuje tego.
+- **Warstwa 1 – uznane media ogólnopolskie (RSS):** Polsat News, TVN24, RMF24, Radio ZET, Interia, TVP Info, Polskie Radio 24, Info112. Pokazujemy wyłącznie nagłówek, nazwę źródła i link („doniesienie medialne”). Województwo wynika z nazwy miejscowości/regionu w tytule; zagrożenie krajowe bez miejsca (np. zamach) trafia do wszystkich. Adresy kanałów to kandydaci (pierwszy działający wygrywa); robots.txt jest respektowany, a o działaniu decyduje `news-report.json`.
+- **Lublin112** (Lubelskie): jak radio, ale wiadomości „z kraju” odpadają, chyba że to zagrożenie w Polsce.
+- **Warstwa 2 – szybszy obieg:** doniesienia medialne odświeżane co ~5 min (`node news-sync.mjs --fast`), pozostałe źródła co ~14 min.
+- **Warstwa 3 – Straż Pożarna:** 16 komend wojewódzkich PSP (gov.pl/web/kwpsp-<miasto>/aktualnosci).
+- Poprawka lokalizacji: „walczą” nie jest już Wałczem, a „z łodzi” (mała litera) nie jest Łodzią.

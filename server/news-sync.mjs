@@ -7,13 +7,15 @@ import { writeFileSync, readFileSync, renameSync } from "node:fs";
 import { robotsAllows } from "./news-lib.mjs";
 import { VOIVODESHIPS } from "../js/content.js";
 import { parseGddkia, parseRss, parseHtmlList, parseMediaHtml, discoverFeeds, discoverRssPages, toItem, mergeItems } from "./news-lib.mjs";
-import { SOURCES } from "./news-sources.mjs";
+import { SOURCES as ALL_SOURCES } from "./news-sources.mjs";
 
 const OUT = process.env.NEWS_OUT || "news.json";
 const REPORT = process.env.NEWS_REPORT_OUT || "news-report.json";
-const UA = "EGIDA/0.3 (unofficial PWA; reads public news pages of Polish public institutions every ~15 min; repo lewym90/egida)";
+const UA = "EGIDA/0.3 (unofficial PWA; reads public news feeds/pages of Polish public institutions and established media, headline+link only, every 5-15 min; repo lewym90/egida)";
 const CACHE = process.env.NEWS_CACHE_FILE || "news-feeds.json"; // znalezione adresy kanałów RSS (żeby nie szukać ich co 15 min)
 const DUMP = process.argv.includes("--dump");
+const FAST = process.argv.includes("--fast"); // szybki przebieg (co ~5 min): tylko doniesienia medialne; resztę bierzemy z poprzedniego news.json
+const SOURCES = FAST ? ALL_SOURCES.filter((x) => x.kind === "media") : ALL_SOURCES;
 const now = Date.now();
 
 const robotsCache = new Map();
@@ -120,7 +122,12 @@ const save = (file, obj) => { const tmp = `${file}.${process.pid}.tmp`; writeFil
 // Wpisy ze źródeł, które chwilowo zawiodły, zachowujemy z poprzedniego pliku (do limitu wieku), aby wiadomość nie znikała przez jeden błąd sieci.
 let prev = []; try { prev = JSON.parse(readFileSync(OUT, "utf8")).items || []; } catch { /* pierwszy przebieg */ }
 const failedLabels = new Set(results.filter((r) => !r.rep.ok).map((r) => r.rep.label));
-const keep = prev.filter((p) => failedLabels.has(p.source));
+const ranLabels = new Set(results.map((r) => r.rep.label));
+const keep = prev.filter((p) => failedLabels.has(p.source) || (FAST && !ranLabels.has(p.source)));
 keep.noCap = true; // uwaga: scalamy listy źródeł jeszcze raz razem z zachowanymi – NIE wolno traktować już scalonego wyniku jako jednego źródła (limit na źródło ucinał go do 15)
 save(OUT, { generatedAt: report.generatedAt, items: mergeItems([...results.map((r) => r.items), keep], now) });
+if (FAST) { // raport: podmień tylko wpisy mediów, resztę zostaw z ostatniego pełnego przebiegu
+  let old = null; try { old = JSON.parse(readFileSync(REPORT, "utf8")); } catch { /* brak */ }
+  if (old?.details) { const ids = new Set(report.details.map((d) => d.id)); report.details = [...old.details.filter((d) => !ids.has(d.id)), ...report.details].sort((a, b) => a.id.localeCompare(b.id)); report.sources = report.details.length; report.ok = report.details.filter((d) => d.ok).length; }
+}
 save(REPORT, report);

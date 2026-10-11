@@ -41,10 +41,15 @@ fi
 # Co ~15 min „Ważne w regionie”: aktualności z oficjalnych źródeł (Policja, MEN, RCB, urzędy, kuratoria) → news.json + news-report.json.
 # Błąd tu nigdy nie blokuje komunikatów: przy porażce zostaje poprzedni plik (aplikacja sama pokaże „Brak aktualnych danych” po 3 h).
 NEWS_FILE="$DATA_DIR/news.json"; NEWS_NEW=0
-if [ ! -f "$BASE/news.checked" ] || [ "$(( $(date +%s) - $(stat -c %Y "$BASE/news.checked") ))" -gt 840 ]; then
-  touch "$BASE/news.checked"
+# Pełny przebieg (wszystkie źródła) co ~14 min; w międzyczasie, przy każdym uruchomieniu (co ~5 min), szybki przebieg samych doniesień medialnych (--fast).
+NEWS_MODE=""
+if [ ! -f "$BASE/news.checked" ] || [ "$(( $(date +%s) - $(stat -c %Y "$BASE/news.checked") ))" -gt 840 ]; then NEWS_MODE="full"
+elif [ ! -f "$BASE/news.fast" ] || [ "$(( $(date +%s) - $(stat -c %Y "$BASE/news.fast") ))" -gt 240 ]; then NEWS_MODE="fast"; fi
+if [ -n "$NEWS_MODE" ]; then
+  [ "$NEWS_MODE" = full ] && touch "$BASE/news.checked"; touch "$BASE/news.fast"
+  NEWS_ARG=""; [ "$NEWS_MODE" = fast ] && NEWS_ARG="--fast"
   NEWS_OLD="$(node -e 'try{const j=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));console.log(require("crypto").createHash("sha1").update(JSON.stringify(j.items)).digest("hex"))}catch{console.log("")}' "$NEWS_FILE")"
-  if NEWS_CACHE_FILE="$BASE/news-feeds.json" NEWS_SEEN_FILE="$BASE/news-seen.json" NEWS_OUT="$NEWS_FILE" NEWS_REPORT_OUT="$DATA_DIR/news-report.json" timeout 170 node news-sync.mjs | tail -n 30; then
+  if NEWS_CACHE_FILE="$BASE/news-feeds.json" NEWS_SEEN_FILE="$BASE/news-seen.json" NEWS_OUT="$NEWS_FILE" NEWS_REPORT_OUT="$DATA_DIR/news-report.json" timeout 170 node news-sync.mjs $NEWS_ARG | tail -n 40; then
     NEWS_CUR="$(node -e 'try{const j=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));console.log(require("crypto").createHash("sha1").update(JSON.stringify(j.items)).digest("hex"))}catch{console.log("")}' "$NEWS_FILE")"
     [ "$NEWS_CUR" != "$NEWS_OLD" ] && NEWS_NEW=1
   fi

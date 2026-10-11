@@ -16,7 +16,7 @@ export const PLACES = {
   swietokrzyskie: ["kielcach", "ostrowcu", "starachowicach", "swietokrzys", "kielc", "ostrowiec", "starachowic", "skarzysk", "sandomierz", "busk", "jedrzejow", "pinczow", "staszow", "opatow", "konsk", "ostrowiec", "wloszczow", "kazimierz wielk", "sedziszow malop", "chmielnik", "ilz", "checin", "bodzentyn"],
   "warminsko-mazurskie": ["olsztynie", "elblagu", "ilawie", "gizycku", "ketrzynie", "warminsk", "mazur", "olsztyn", "elblag", "elblaskie", "elblaska", "elk", "gizyck", "ketrzyn", "ostrod", "ilaw", "mragow", "szczytn", "nidzic", "braniew", "lidzbark", "bartoszyc", "gołdap", "goldap", "olecko", "orzysz", "dzialdow", "mikolajk", "biskupiec", "reszel", "frombork", "zalew wislan"],
   wielkopolskie: ["poznaniu", "kaliszu", "koninie", "lesznie", "gnieznie", "wielkopols", "poznan", "kalisz", "konin", "leszn", "gniezn", "ostrow wielk", "krotoszyn", "sroda wielk", "swarzedz", "luboń", "lubon", "kostrzyn wielk", "wrzesni", "sloska", "slupc", "chodziez", "czarnkow", "wagrowiec", "obornik", "nowy tomysl", "szamotul", "rawicz", "gostyn", "koscian", "jarocin", "pleszew", "kepn", "zlotow", "zlotowsk"],
-  zachodniopomorskie: ["szczecinie", "koszalinie", "kolobrzegu", "swinoujsciu", "stargardzie", "zachodniopomors", "zachodniopomorz", "szczecin", "koszalin", "stargard", "kolobrzeg", "swinoujsc", "szczecinek", "swidwin", "gryfic", "gryfin", "pyrzyc", "goleniow", "wałcz", "walcz", "drawsko", "bialogard", "darlowo", "kamien pomor", "wolin", "dziwnow", "miedzyzdroj", "choszczn", "mysliborz", "barlinek", "sianow", "resko", "dabie szczecin"],
+  zachodniopomorskie: ["szczecinie", "koszalinie", "kolobrzegu", "swinoujsciu", "stargardzie", "zachodniopomors", "zachodniopomorz", "szczecin", "koszalin", "stargard", "kolobrzeg", "swinoujsc", "szczecinek", "swidwin", "gryfic", "gryfin", "pyrzyc", "goleniow", "walczu", "walczem", "drawsko", "bialogard", "darlowo", "kamien pomor", "wolin", "dziwnow", "miedzyzdroj", "choszczn", "mysliborz", "barlinek", "sianow", "resko", "dabie szczecin"],
 };
 // Wyrażenia, które wyglądają jak miejscowość tego województwa, a oznaczają inne miejsce (np. Radomsko leży w łódzkim, nie koło Radomia).
 const EXCLUDE = { mazowieckie: ["radomsk"], lubelskie: ["chelmno","chelmza"], zachodniopomorskie: [] };
@@ -25,7 +25,7 @@ const REGEX = Object.fromEntries(Object.entries(PLACES).map(([id, list]) => [id,
 
 /** Czy tekst (tytuł, kategorie) wskazuje na dane województwo? */
 export function mentionsRegion(text, regionId) {
-  const r = REGEX[regionId], t = fold(text);
+  const r = REGEX[regionId], t = fold(String(text).replace(/łodz/g, "lodka")); // „z łodzi” (mała litera) to łódź wodna, a nie miasto Łódź
   return !!r && r.test(t) && !(EXCLUDE[regionId] || []).some((x) => t.includes(x));
 }
 
