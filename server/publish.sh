@@ -7,6 +7,9 @@ cd "$DATA_DIR"
 git add alerts.json
 [ -f shelters.json ] && git add shelters.json
 [ -f neptun-schema.json ] && git add neptun-schema.json
+[ -f neptun-seen.json ] && git add neptun-seen.json
+[ -f news.json ] && git add news.json
+[ -f news-report.json ] && git add news-report.json
 [ -d psp ] && git add -A psp
 if git rev-parse -q --verify HEAD >/dev/null; then
   git -c user.name="egida-bot" -c user.email="egida-bot@users.noreply.github.com" commit --amend --reset-author -q -m "Dane komunikatów"

@@ -9,7 +9,7 @@
 //  - Uspokajającą ocenę toru („przechodzi daleko od Ciebie”) pokazujemy TYLKO dla dronów, przy świeżych,
 //    pewnych danych. Dla rakiet i bomb kierowanych nie oceniamy toru (lecą minuty, zmieniają kurs).
 //  - Brak świeżych danych ⇒ brak oceny.
-import { destination, crossTrack, haversineKm, pointInRing, distToRingKm, normDeg, rad } from "./geo.js";
+import { destination, crossTrack, haversineKm, bearingDeg, angleDiff, pointInRing, distToRingKm, normDeg, rad } from "./geo.js";
 import { POLAND_RING } from "./poland-border.js";
 import { polishPlace, hasCyrillic } from "./polish.js";
 
@@ -61,6 +61,35 @@ function typeFromTitle(title) {
   if (/розвід|развед|орлан|supercam|zala/.test(t)) return "recon";
   if (/бпла|шахед|герань|geran|дрон|безпілот|беспилот/.test(t)) return "uav";
   return null;
+}
+
+/* ---------- szacowanie ruchu z kolejnych pozycji ----------
+ * NEPTUN nie podaje prędkości (stan z 10.10.2026), więc wyliczamy ją z przesunięcia pozycji między kolejnymi odczytami.
+ * Bierzemy tylko pozycje potwierdzone i dokładne, a wynik uznajemy za wiarygodny dopiero wtedy, gdy przesunięcie jest wyraźnie
+ * większe od niepewności pozycji. Szacunek służy WYŁĄCZNIE do wyświetlania toru i czasu dotarcia (nigdy do wszczynania alarmu). */
+export const TRACK = {
+  keepSec: 900,       // pamiętamy pozycje z ostatnich 15 min
+  maxPoints: 12,
+  minSpanSec: 45,     // minimalny odstęp czasu między skrajnymi pozycjami
+  minMoveKm: 3,       // minimalne przesunięcie
+  maxUncKm: 6,        // pozycje mniej dokładne niż ±6 km nie nadają się do liczenia prędkości
+  minKmh: 30, maxKmh: 1200,
+  headingTolDeg: 50,  // kierunek ruchu musi zgadzać się z kursem podanym przez źródło (±50°)
+};
+/** points: [{ at (ms), lat, lon, unc (km) }] od najstarszego. Zwraca { kmh, bearing, spanSec, distKm } albo null. */
+export function estimateMotion(points, headingDeg = null, over = {}) {
+  const K = { ...TRACK, ...over };
+  if (!Array.isArray(points) || points.length < 2) return null;
+  const a = points[0], b = points[points.length - 1];
+  const spanSec = (b.at - a.at) / 1000;
+  if (!(spanSec >= K.minSpanSec) || spanSec > K.keepSec) return null;
+  const distKm = haversineKm(a, b);
+  if (distKm < Math.max(K.minMoveKm, (a.unc || 0) + (b.unc || 0))) return null; // przesunięcie w granicach szumu pozycji
+  const kmh = (distKm / spanSec) * 3600;
+  if (!(kmh >= K.minKmh && kmh <= K.maxKmh)) return null;
+  const bearing = bearingDeg(a, b);
+  if (headingDeg != null && Math.abs(angleDiff(bearing, headingDeg)) > K.headingTolDeg) return null; // ruch niezgodny z kursem – nie ufamy
+  return { kmh, bearing, spanSec, distKm };
 }
 
 /* ---------- normalizacja ---------- */
@@ -168,9 +197,10 @@ export function normalizeAlert(raw, scope) {
   if (typeof active !== "boolean") active = !(OFF.has(status) || OFF.has(level) || raw.finishedAt || raw.endedAt || raw.finished_at);
   const sc = scope || (raw.oblast && raw.name && raw.oblast !== raw.name && /район|raion|rejon/i.test(String(raw.name)) ? "raion" : "oblast");
   const reasons = [...new Set((Array.isArray(raw.reasons) ? raw.reasons : []).map(reasonPl).filter(Boolean))];
+  const oblastRaw = str(String(raw.oblast ?? raw.region ?? raw.regionName ?? raw.location_title ?? raw.locationTitle ?? raw.area ?? raw.name ?? ""), 80); // oryginalna nazwa (do dopasowania granic obwodu)
   return {
     id: String(raw.key ?? raw.id ?? raw.regionId ?? `${region}|${name}`).slice(0, 80) + "|" + sc,
-    region, name: sc === "raion" ? name : "", scope: sc, level, active, reasons,
+    region, oblastRaw, name: sc === "raion" ? name : "", scope: sc, level, active, reasons,
     kind: str(String(raw.type ?? raw.alertType ?? raw.alert_type ?? raw.kind ?? ""), 40).toLowerCase(),
     since: parseTime(raw.since ?? raw.startedAt ?? raw.startAt ?? raw.createdAt ?? raw.started_at ?? raw.updatedAt),
   };
@@ -187,7 +217,7 @@ export function normalizeMessage(raw) {
 
 /** Magazyn obiektów + korekta zegara urządzenia względem zegara serwera NEPTUN. */
 export class ThreatStore {
-  constructor() { this.items = new Map(); this.skewMs = 0; this.stats = { seen: 0, bad: 0 }; this.alerts = new Map(); this.messages = []; this.extras = { alertsAt: null, messagesAt: null, alertsErr: null, messagesErr: null }; }
+  constructor() { this.items = new Map(); this.hist = new Map(); this.skewMs = 0; this.stats = { seen: 0, bad: 0 }; this.alerts = new Map(); this.messages = []; this.extras = { alertsAt: null, messagesAt: null, alertsErr: null, messagesErr: null }; }
   applyAlerts(list, raions) {
     const m = new Map();
     for (const r of Array.isArray(list) ? list : []) { const a = normalizeAlert(r, "oblast"); if (a) m.set(a.id, a); }
@@ -212,14 +242,32 @@ export class ThreatStore {
     this.items.clear();
     this.stats = { seen: 0, bad: 0 }; // statystyka dotyczy ostatniej migawki (do wykrycia zmiany formatu)
     for (const r of Array.isArray(list) ? list : []) this.upsert(r);
+    for (const id of [...this.hist.keys()]) if (!this.items.has(id)) this.hist.delete(id); // obiekt zniknął z migawki: zapominamy jego ślad
   }
   upsert(raw) {
     this.stats.seen++;
     const t = normalizeThreat(raw);
     if (!t) { this.stats.bad++; return; }
+    this.trackMotion(t);
     this.items.set(t.id, t);
   }
-  remove(id) { if (id != null) this.items.delete(String(id)); }
+  remove(id) { if (id != null) { this.items.delete(String(id)); this.hist.delete(String(id)); } }
+  /** Zapamiętuje pozycję obiektu i, gdy źródło nie podaje prędkości, uzupełnia ją szacunkiem z ruchu (t.speedEst = true). */
+  trackMotion(t) {
+    const at = t.confirmedAt ?? t.updatedAt;
+    if (at == null || t.areaOnly || t.destination || t.status !== "active" || t.posQuality === "approx" || (t.uncertaintyKm ?? 0) > TRACK.maxUncKm) { this.hist.delete(t.id); return; }
+    let h = this.hist.get(t.id);
+    if (!h) this.hist.set(t.id, (h = []));
+    const last = h[h.length - 1];
+    if (last && at < last.at) return;                                                   // starszy odczyt niż już znany: pomijamy
+    if (last && at === last.at) h[h.length - 1] = { at, lat: t.lat, lon: t.lon, unc: t.uncertaintyKm ?? 0 };
+    else h.push({ at, lat: t.lat, lon: t.lon, unc: t.uncertaintyKm ?? 0 });
+    while (h.length > TRACK.maxPoints || (h.length > 1 && at - h[0].at > TRACK.keepSec * 1000)) h.shift();
+    if (t.speedKmh == null && t.headingDeg != null) {
+      const m = estimateMotion(h, t.headingDeg);
+      if (m) { t.speedKmh = Math.round(m.kmh); t.speedEst = true; }
+    }
+  }
 }
 
 /** Odpowiedź REST /api/v1/threats: { serverTime, threats: [...] } (toleruje też sam tablicę). */
@@ -353,7 +401,7 @@ export function assess(t, user, nowMs, ctx = {}) {
   const gap = Math.abs(crossKm) - pred.hw(alongKm) - acc;
   if (gap <= Lm.nearUserKm) {
     const eta = pred.timed ? alongKm / pred.speedKmh * 60 : null;
-    const etaTxt = eta != null && eta <= 180 ? ` Najbliżej za ok. ${Math.max(1, Math.round(eta))} min.` : "";
+    const etaTxt = eta != null && eta <= 180 ? ` Najbliżej za ok. ${Math.max(1, Math.round(eta))} min${t.speedEst ? " (prędkość oszacowana z ruchu obiektu)" : ""}.` : "";
     return { kind: "near", severity: "watch", distKm: dist, passKm: Math.abs(crossKm), etaMin: eta, text: `Szacunkowy tor może przechodzić w pobliżu Twojej pozycji (ok. ${fmtKm(Math.abs(crossKm))} od niej).${etaTxt} Nasłuchuj syren i Alertów RCB. ${SAFETY}` };
   }
   if (gap >= Lm.clearMarginKm) {
@@ -396,7 +444,9 @@ export function buildView(store, user, feedFresh, opts = {}) {
     const as = far
       ? { kind: "far", severity: "info", text: `Obiekt jest daleko od granicy Polski (ok. ${fmtKm(zone.distKm)}). Poza strefą ${LIMITS.zoneKm} km nie oceniamy wpływu na Twoją pozycję i nie wysyłamy powiadomień.` }
       : assess(t, user, now, { feedFresh, pred });
-    rows.push({ t, zone, far, pred, ageSec, assess: as });
+    // Czas do granicy (tylko obiekty ze znaną prędkością – podaną przez źródło albo oszacowaną z ruchu; tylko do wyświetlania).
+    const border = far || zone.inPoland || t.speedKmh == null ? null : borderApproach(t, now);
+    rows.push({ t, zone, far, pred, ageSec, border, assess: as });
   }
   rows.sort((a, b) => a.zone.distKm - b.zone.distKm);
   areaRows.sort((a, b) => a.zone.distKm - b.zone.distKm);

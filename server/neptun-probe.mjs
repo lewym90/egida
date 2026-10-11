@@ -4,9 +4,13 @@
 // Zasady: jasny User-Agent, zero omijania blokad (403/429 = zapis błędu i koniec), próbki ucięte i bez danych osobowych
 // (NEPTUN nie podaje danych osobowych). Źródło i atrybucja: neptun.in.ua.
 import { writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { mergeSeen, loadSeen, saveSeen } from "./neptun-seen.mjs";
 
 const BASE = process.env.NEPTUN_BASE || "https://neptun.in.ua/api/v1";
 const OUT = process.env.NEPTUN_SCHEMA_OUT || "neptun-schema.json";
+const SEEN = process.env.NEPTUN_SEEN || join(dirname(OUT), "neptun-seen.json"); // skumulowany raport (patrz neptun-seen.mjs)
+const seenThreats = [], seenFrames = [];
 const UA = "EGIDA/0.3 (unofficial PWA; format probe every 30 min; repo lewym90/egida)";
 
 const typeOf = (v) => (v === null ? "null" : Array.isArray(v) ? "array" : typeof v);
@@ -50,6 +54,7 @@ async function probe(path) {
     const list = Array.isArray(json) ? json : Object.values(json || {}).find(Array.isArray);
     // wartości pól wyliczeniowych z CAŁEJ listy obiektów oraz próbki rekordów ze śladem / celem (nie tylko pierwsze 3)
     const threats = Array.isArray(json?.threats) ? json.threats : Array.isArray(json) ? json : [];
+    if (path === "threats") seenThreats.push(...threats);
     const enums = {};
     for (const k of ["type", "status", "lifecycle", "positionQuality", "confidenceLevel", "displayConfidence"]) {
       const c = {}; for (const t of threats) if (t && t[k] != null) c[String(t[k])] = (c[String(t[k])] || 0) + 1; if (Object.keys(c).length) enums[k] = c;
@@ -72,6 +77,11 @@ function probeWs(ms = 20000) {
     ws.onmessage = (ev) => {
       if (res.frames.length >= 6) return;
       let j = null; try { j = JSON.parse(String(ev.data)); } catch {}
+      if (j) { // wszystkie ramki (nie tylko 6 pierwszych) trafiają do raportu skumulowanego
+        seenFrames.push({ type: j.type ?? null, keys: Object.keys(j), sample: clip(j.data ?? j) });
+        const d = j.data, list = Array.isArray(d) ? d : Array.isArray(d?.threats) ? d.threats : d?.threat ? [d.threat] : d && typeof d === "object" && d.id != null && d.lat != null ? [d] : [];
+        seenThreats.push(...list);
+      }
       if (res.frames.length < 6) res.frames.push(j ? { type: j.type ?? null, keys: Object.keys(j), shape: shape(j.data ?? null), sample: clip(j.data ?? j) } : { raw: String(ev.data).slice(0, 200) });
     };
     ws.onerror = () => { clearTimeout(timer); done({ error: "ws error" }); };
@@ -83,4 +93,5 @@ const report = { generatedAt: new Date().toISOString(), note: "Raport o struktur
 for (const p of ["threats", "alerts", "messages"]) report.rest.push(await probe(p));
 report.ws = await probeWs();
 writeFileSync(OUT, JSON.stringify(report, null, 1));
+try { saveSeen(SEEN, mergeSeen(loadSeen(SEEN), seenThreats, seenFrames)); } catch (e) { console.log("neptun-seen:", e.message); }
 console.log("neptun-probe:", report.rest.map((r) => `${r.path}=${r.status ?? r.error}`).join(" "), "ws=" + (report.ws.opened ? `ok(${report.ws.frames.length} ramek)` : report.ws.error || "brak"));

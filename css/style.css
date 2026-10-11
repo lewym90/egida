@@ -348,3 +348,13 @@ input[type="search"].sel{-webkit-appearance:none;appearance:none;width:100%;font
   #printSheet .pmuted{color:#444;font-size:10pt}
   #printSheet .pfoot{margin-top:16pt;padding-top:6pt;border-top:.75pt solid #777;font-size:9pt;color:#333}
 }
+
+/* v17: Ważne w regionie (neutralny wygląd, nigdy czerwony – to wiadomości, nie alarmy) */
+.newscard h2{margin:0 0 4px}
+.newslist{list-style:none;margin:0;padding:0}
+.newsitem+.newsitem{border-top:1px solid var(--line)}
+.newsitem a{display:flex;flex-direction:column;gap:2px;padding:10px 0;min-height:44px;color:var(--text);text-decoration:none}
+.newsitem .nt{font-family:var(--font-h);font-weight:700;font-size:1rem;line-height:1.35}
+.newsitem .nm{font-size:.8125rem;color:var(--muted,#5b6b78)}
+.list.newslist .newsitem{padding:0 14px}
+.smore2{display:inline-flex;align-items:center;gap:4px;min-height:44px;font-weight:700;color:var(--brand-ink)}

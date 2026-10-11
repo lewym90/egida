@@ -9,9 +9,11 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { ThreatStore, applySnapshotJson } from "../js/neptun.js";
 import { loadRegions } from "../js/regions.js";
 import { candidates, decide, markSent, buildMessage } from "./neptun-notify.mjs";
+import { mergeSeen, loadSeen, saveSeen } from "./neptun-seen.mjs";
 
 const URL_REST = process.env.NEPTUN_REST || "https://neptun.in.ua/api/v1/threats";
 const STATE_FILE = process.env.NEPTUN_STATE || "/opt/egida/neptun-state.json";
+const SEEN_FILE = process.env.NEPTUN_SEEN || "/opt/egida/neptun-seen.json"; // skumulowany raport typów i próbek (patrz neptun-seen.mjs)
 const TOKEN = process.env.TELEGRAM_BOT_TOKEN || "";
 const APP_URL = process.env.APP_URL || "";
 const UA = "EGIDA/0.3 (unofficial PWA; border watch every 10 s; repo lewym90/egida)";
@@ -49,6 +51,9 @@ async function tick() {
     json = await r.json();
   } catch (e) { failStreak++; log("NEPTUN błąd sieci:", e.message); return; }
   failStreak = 0;
+  if (!preview) { // zbieranie wiedzy o formacie: błąd zapisu nigdy nie przerywa powiadomień
+    try { saveSeen(SEEN_FILE, mergeSeen(loadSeen(SEEN_FILE), Array.isArray(json) ? json : json?.threats)); } catch (e) { log("neptun-seen:", e.message); }
+  }
   const store = new ThreatStore();
   try { applySnapshotJson(store, json); } catch (e) { log("FORMAT NEPTUN:", e.message); return; }
   const now = store.nowMs();

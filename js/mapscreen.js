@@ -5,6 +5,7 @@ import { CONFIG } from "./config.js";
 import { createFeed } from "./neptun-feed.js";
 import { ThreatStore, buildView, coneOutline, fmtKmPl, ageText, TYPES, LIMITS } from "./neptun.js";
 import { compassPl, destination } from "./geo.js";
+import { shadeAreas, shadeSignature } from "./ua-shade.js";
 import { demoThreats, demoAlerts, demoRaions, demoMessages, DEMO_USER } from "./demo.js";
 import { dirUrl, loadShelterDb, loadPspAround, makePspCache, mergeSources } from "./shelters.js";
 
@@ -92,10 +93,12 @@ function threatText(row) {
   const place = esc(t.locality || t.district || t.region || "");
   const where = zone.inPoland ? "nad terytorium Polski (wg NEPTUN)" : `ok. ${fmtKmPl(zone.distKm)} od granicy Polski (szacunek)`;
   const move = t.destination ? "kurs na tę miejscowość (dokładnej pozycji obiektu nie znamy)"
-    : t.headingDeg != null ? `kurs ${Math.round(t.headingDeg)}° (${compassPl(t.headingDeg)})${t.presumptive ? ", przypuszczalny" : ""}${t.speedKmh != null ? `, ok. ${Math.round(t.speedKmh)} km/h` : ""}` : "kurs nieznany";
+    : t.headingDeg != null ? `kurs ${Math.round(t.headingDeg)}° (${compassPl(t.headingDeg)})${t.presumptive ? ", przypuszczalny" : ""}${t.speedKmh != null ? `, ok. ${Math.round(t.speedKmh)} km/h${t.speedEst ? " (szacunek)" : ""}` : ""}` : "kurs nieznany";
+  const bd = row.border && row.border.ok && row.border.etaMin != null && row.border.etaMin <= 180 && row.border.level > 0
+    ? `do granicy Polski w tym tempie ok. ${Math.max(1, Math.round(row.border.etaMin))} min (szacunek, może się zmienić)` : "";
   const posn = !t.destination && t.posQuality === "approx" ? `pozycja przybliżona${t.uncertaintyKm ? ` (±${Math.round(t.uncertaintyKm)} km)` : ""}` : "";
   const conf = t.confidence ? `pewność: ${CONF[t.confidence]}${t.sourceCount != null ? ` (${t.sourceCount} ${t.sourceCount === 1 ? "źródło" : t.sourceCount < 5 ? "źródła" : "źródeł"})` : ""}` : "pewność nieznana";
-  return [place ? `${place}` : "", where, move, posn, esc(ageText(ageSec)), conf, pred.ok && pred.advancedKm > 1 ? "pozycja przeliczona na teraz" : ""].filter(Boolean).join(" · ");
+  return [place ? `${place}` : "", where, move, bd, posn, esc(ageText(ageSec)), conf, pred.ok && pred.advancedKm > 1 ? "pozycja przeliczona na teraz" : ""].filter(Boolean).join(" · ");
 }
 function badgesHtml(row) {
   const t = row.t;
@@ -157,6 +160,7 @@ export function renderMapHtml(ctx, { demo = false, diag = false } = {}) {
       <button class="chip" data-nf="drones" aria-pressed="false">Drony</button>
       <button class="chip" data-nf="fast" aria-pressed="false">Rakiety i bomby</button>
     </div>
+    <label class="switch" style="margin-top:6px"><input type="checkbox" id="lyUaShade" ${lay.uaShade !== false ? "checked" : ""}><span><b>Zaznacz na mapie obwody z alarmem w Ukrainie</b><span class="muted small">Mocniejsze cieniowanie: alarm w całym obwodzie. Lżejsze, przerywane: alarm tylko w części rejonów (nie znamy ich granic). To informacja o Ukrainie, nie o Polsce.</span></span></label>
     <label class="switch" style="margin-top:6px"><input type="checkbox" id="nepNear" ${lay.nepNear === true ? "checked" : ""}><span><b>Tylko okolice granicy Polski</b><span class="muted small">Domyślnie widać wszystkie obiekty z danych NEPTUN. Po włączeniu zostaną tylko te do ${LIMITS.zoneKm} km od granicy. Odległe obiekty są tylko pokazywane: nie wywołują ocen ani powiadomień.</span></span></label>
     <h2 style="margin-top:16px">Obiekty (od najbliższego granicy Polski)</h2>
     <div class="card flat"><ul class="list" id="nepList"></ul></div>
@@ -200,7 +204,10 @@ export function initMapScreen(ctx, { demo = false, diag = false } = {}) {
       const dt = setInterval(() => { const el = $("tileDiag"); if (!el || !baseL?.diag) return; const d = baseL.diag(); el.textContent = `Diagnostyka podkładu „${d.key}” (wariant ${d.variant}/${d.variants}, Referer: ${d.referrerPolicy})\nWczytane kafelki: ${d.loaded} · błędy: ${d.errors} · online: ${navigator.onLine}\nAdres: ${d.url}${d.lastBad ? `\nOstatni błędny kafelek: ${d.lastBad}` : ""}\nPrzybliżenie: ${map.getZoom()}`; }, 1000);
       cleanups.push(() => clearInterval(dt));
     }
+    map.createPane("uaAlerts").style.zIndex = 380; // cieniowanie obwodów pod torami i obiektami (overlayPane ma 400)
+    const gAlerts = L.layerGroup().addTo(map);
     const gShelters = L.layerGroup().addTo(map), gThreats = L.layerGroup().addTo(map), gUser = L.layerGroup().addTo(map);
+    let shadeSig = null; // podpis ostatnio narysowanego cieniowania: przerysowujemy tylko przy zmianie
     setTimeout(() => { if (!dead) map.invalidateSize(); }, 0);
 
     /* podkład */
@@ -287,13 +294,32 @@ export function initMapScreen(ctx, { demo = false, diag = false } = {}) {
     const scheduleRefresh = () => { if (pending) return; pending = setTimeout(() => { pending = null; refresh(); }, 300); };
     const feedFresh = () => (demo ? true : !!feed?.isFresh());
 
+    /** Cieniowanie obwodów z alarmem (tylko przy świeżych danych). Zwraca listę obwodów bez granic (do diagnostyki). */
+    function drawShade(alerts, show) {
+      const { areas, unmatched } = show ? shadeAreas(alerts) : { areas: [], unmatched: [] };
+      const sig = show ? shadeSignature(areas) : "";
+      if (sig === shadeSig) return unmatched;
+      shadeSig = sig;
+      gAlerts.clearLayers();
+      for (const a of areas) {
+        const style = a.whole
+          ? { color: "#B45309", weight: 1.5, opacity: 0.85, fillColor: "#B45309", fillOpacity: 0.24 }
+          : { color: "#B45309", weight: 1.5, opacity: 0.7, dashArray: "6 5", fillColor: "#B45309", fillOpacity: 0.08 };
+        const what = a.whole ? "alarm w całym obwodzie" : `alarm w ${a.raions} ${a.raions === 1 ? "rejonie" : "rejonach"} (granic rejonów nie pokazujemy)`;
+        const since = a.since ? ` · od ${esc(hhmm(a.since))}` : "";
+        const html = `<div class="pop">${demo ? "<b>DANE WYMYŚLONE (DEMO)</b><br>" : ""}<b>${esc(a.regionPl)}</b><br><span class="small">${esc(what)}${since}${a.reasons.length ? ` · ${esc(a.reasons.join(", "))}` : ""}</span><p class="small muted" style="margin:6px 0 0">Alarm powietrzny w Ukrainie wg NEPTUN (nieoficjalne). To nie jest alarm w Polsce.</p></div>`;
+        for (const ring of a.rings) L.polygon(ring.map(([lon, lat]) => [lat, lon]), { ...style, pane: "uaAlerts", smoothFactor: 1 }).bindPopup(html, { maxWidth: 280 }).addTo(gAlerts);
+      }
+      return unmatched;
+    }
+
     function refresh() {
       if (dead) return;
       const on = neptunWanted();
       $("nepBox").hidden = !on;
       redrawing = true;
       gThreats.clearLayers();
-      if (!on) { redrawing = false; openId = null; $("btnObjects").hidden = true; return; }
+      if (!on) { redrawing = false; openId = null; $("btnObjects").hidden = true; drawShade([], false); return; }
       if (demo) { store.applySnapshot(demoThreats(Date.now())); store.applyAlerts(demoAlerts(), demoRaions()); store.applyMessages(demoMessages(Date.now())); }
       const s = demo ? store : feed.store;
       const view = buildView(s, user, feedFresh(), { nearOnly: ml().nepNear === true, filter: nepFilter });
@@ -312,6 +338,7 @@ export function initMapScreen(ctx, { demo = false, diag = false } = {}) {
         msg = `Źródło odpowiada (${fs.via === "ws" ? "na żywo" : "odświeżanie co " + Math.round(CONFIG.neptun.pollMs / 1000) + " s"}). Obiektów z pozycją: ${view.rows.length}.${view.areaOnly ? ` Bez dokładnej pozycji (tylko obwód): ${view.areaOnly}.` : ""}`;
       }
       const dataOk = demo || (feed.isFresh() && !fs.formatWarning);
+      const shadeMiss = drawShade(view.alerts, dataOk && ml().uaShade !== false); // bez świeżych danych nie zostawiamy na mapie starego cieniowania
       $("nepStatus").className = "note " + cls;
       $("nepStatus").textContent = msg;
       $("nepList").innerHTML = dataOk && view.rows.length ? view.rows.slice(0, 60).map(itemHtml).join("") + (view.rows.length > 60 ? `<li class="obj muted small">…i ${view.rows.length - 60} dalszych.</li>` : "") : `<li class="obj muted">${dataOk ? "Brak obiektów." : "Brak aktualnych danych."}</li>`;
@@ -334,6 +361,7 @@ export function initMapScreen(ctx, { demo = false, diag = false } = {}) {
         `Ostatnia odpowiedź: ${esc(hhmm(fs.lastOkAt))}${fs.error ? ` · błąd: ${esc(fs.error)}` : ""}`,
         `Rekordy w ostatniej migawce: ${s.stats.seen}, odrzucone: ${s.stats.bad}`,
         `Alarmy w Ukrainie: ${ex.alertsAt ? "odebrane " + esc(hhmm(ex.alertsAt)) : "brak"}${ex.alertsErr ? ` · ${esc(ex.alertsErr)}` : ""}`,
+        `Obwody z alarmem bez granic na mapie: ${shadeMiss.length ? esc(shadeMiss.join(", ")) : "brak (Krymu nie cieniujemy)"}`,
         `Ukryte (włączone „Tylko okolice granicy”): ${view.farHidden}`,
       ].join("<br>");
       if (!dataOk) { redrawing = false; openId = null; return; } // bez świeżych danych nie rysujemy nic, co mogłoby sugerować obraz sytuacji
@@ -387,6 +415,7 @@ export function initMapScreen(ctx, { demo = false, diag = false } = {}) {
     });
     $("nepNo")?.addEventListener("click", () => { $("nepConsent").hidden = true; });
     $("nepNear")?.addEventListener("change", (e) => { ml().nepNear = e.target.checked; ctx.save(); refresh(); });
+    $("lyUaShade")?.addEventListener("change", (e) => { ml().uaShade = e.target.checked; ctx.save(); refresh(); });
     document.querySelectorAll("[data-nf]").forEach((b) => b.addEventListener("click", () => {
       nepFilter = b.dataset.nf;
       document.querySelectorAll("[data-nf]").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));

@@ -8,6 +8,7 @@ import { emptyPlan, normalizePlan, normalizePlaces, importState } from "./person
 import { renderEmergency, initEmergency, renderPlan, initPlan, renderPlaces, initPlaces, renderPrivacy, shareText, shareNote, printSheet, planPrintHtml, packPrintHtml, guidePrintHtml } from "./screens2.js";
 import { renderMapHtml, initMapScreen, destroyScreens } from "./mapscreen.js";
 import { renderSheltersHtml, initSheltersScreen } from "./sheltersscreen.js";
+import { normalizeNews, newsFresh, newsForRegion, ageLabel } from "./news.js";
 
 /* ---------- pomocnicze ---------- */
 const $ = (s, r = document) => r.querySelector(s);
@@ -95,6 +96,50 @@ const alertsFresh = () => {
   if (!alertsData.ok || !alertsData.updated) return false;
   return (Date.now() - new Date(alertsData.updated).getTime()) / 60000 <= CONFIG.staleAfterMin;
 };
+/* ---------- „Ważne w regionie”: aktualności z oficjalnych źródeł (Policja, MEN, RCB, urzędy, kuratoria), zebrane przez serwer ---------- */
+let newsData = null; // znormalizowany plik albo null (brak/niepoprawny)
+let newsScope = "region"; // region | all-pl | everything
+const NEWS_CACHE = "egida.news.v1";
+async function loadNews() {
+  if (!CONFIG.newsUrl) return;
+  try {
+    const r = await fetch(`${CONFIG.newsUrl}${CONFIG.newsUrl.includes("?") ? "&" : "?"}t=${Math.floor(Date.now() / 60000)}`, { cache: "no-store" });
+    if (!r.ok) throw new Error(r.status);
+    const j = await r.json();
+    const n = normalizeNews(j);
+    if (!n) throw new Error("format");
+    newsData = n;
+    try { localStorage.setItem(NEWS_CACHE, JSON.stringify(j)); } catch { /* brak miejsca / tryb prywatny */ }
+  } catch {
+    try { newsData = normalizeNews(JSON.parse(localStorage.getItem(NEWS_CACHE) || "null")) || newsData; } catch { /* uszkodzone */ }
+  }
+}
+const newsLink = (x) => `<li class="newsitem"><a href="${esc(x.url)}" target="_blank" rel="noopener noreferrer"><span class="nt">${esc(x.title)}</span><span class="nm">${esc(x.source)} · ${esc(ageLabel(x.date))}</span></a></li>`;
+function newsCardHtml() {
+  if (!newsData || !state.region) return "";
+  const fresh = newsFresh(newsData);
+  const list = fresh ? newsForRegion(newsData, state.region, { max: 3 }) : [];
+  if (fresh && !list.length) return "";
+  const body = fresh ? `<ul class="newslist">${list.map(newsLink).join("")}</ul>` : `<p class="muted small" style="margin:6px 0 0">Brak aktualnych danych. Wiadomości z oficjalnych stron mogą być nieaktualne, więc ich nie pokazujemy.</p>`;
+  return `<div class="card newscard"><h2>Ważne w regionie</h2>${body}<a class="smore2" href="#/wazne">Wszystkie wiadomości ${I.chevr}</a></div>`;
+}
+function newsListHtml() {
+  if (!CONFIG.newsUrl || !newsData) return `<div class="note neutral">Nie udało się pobrać wiadomości. Sprawdź połączenie. Oficjalne komunikaty są w zakładce <a href="#/alerty">Alerty</a>.</div>`;
+  if (!newsFresh(newsData)) return `<div class="note warn"><b>Brak aktualnych danych.</b> Wiadomości z oficjalnych stron nie były ostatnio odświeżane, więc ich nie pokazujemy. Sprawdź strony Policji i swojego urzędu wojewódzkiego.</div>`;
+  const list = newsScope === "everything" ? newsForRegion(newsData, null) : newsScope === "all-pl" ? newsForRegion(newsData, null, { onlyAll: true }) : newsForRegion(newsData, state.region);
+  if (!list.length) return `<div class="note neutral">Brak wiadomości o bezpieczeństwie w tym zakresie z ostatnich dni.</div>`;
+  return `<div class="card flat"><ul class="list newslist">${list.map(newsLink).join("")}</ul></div>`;
+}
+function screenWazne() {
+  const sc = [["region", state.region ? `Moje województwo` : "Moje woj. (wybierz)"], ["all-pl", "Cała Polska"], ["everything", "Wszystkie regiony"]];
+  const chips = sc.map(([id, t]) => `<button class="chip" data-newsscope="${id}" aria-pressed="${newsScope === id}">${t}</button>`).join("");
+  const upd = newsData?.generatedAt ? ` Ostatnie odświeżenie: ${esc(fmtDate(newsData.generatedAt))}.` : "";
+  return `<div class="hero"><h1>Ważne w regionie</h1><p>Wiadomości o bezpieczeństwie z oficjalnych stron: Policji, MEN, RCB, urzędów wojewódzkich i kuratoriów.</p></div>
+  <div class="chips" role="group" aria-label="Zakres">${chips}</div>
+  <div id="newsList">${newsListHtml()}</div>
+  <p class="muted small">Wpisy wybiera automatycznie program po słowach kluczowych (np. zagrożenie, ostrzeżenie, szkoła, ewakuacja) i odsyła do strony źródłowej. To nie są alerty: nie zastępują syren, Alertów RCB ani poleceń służb. Brak wpisu nie oznacza braku zagrożenia.${upd}</p>`;
+}
+
 /* Ocena: waga, ważność, odwołania (js/classify.js). „Aktywne” = jeszcze ważne i nieodwołane; reszta trafia do „Wcześniejsze”. */
 const inRegion = (a) => !state.region || a.voivodeship === state.region || a.voivodeship === "all";
 const regionAll = () => analyze(alertsData.items).filter(inRegion);
@@ -142,6 +187,7 @@ const NAV = [
 ];
 const TABS = [...NAV, { h: "#/wiecej", k: "wiecej", t: "Więcej", i: I.more }];
 const MORE = [
+  { h: "#/wazne", t: "Ważne w regionie", d: "Wiadomości z Policji, MEN, RCB i urzędów", i: I.bell },
   { h: "#/ustawienia", t: "Ustawienia", d: "Województwo, zgody, wygląd, Twoje dane", i: I.gear },
   { h: "#/plan-rodziny", t: "Plan rodziny", d: "Kontakty, miejsce spotkania, karty ICE", i: I.users },
   { h: "#/plecak", t: "Plecak i zapasy", d: "Zestaw na 72 godziny, zapas domowy, dokumenty", i: I.bag },
@@ -155,6 +201,7 @@ const MORE = [
 ];
 const SIDE = [
   ...NAV.slice(0, 2),
+  { h: "#/wazne", k: "wazne", t: "Ważne w regionie", i: I.bell },
   { h: "#/telegram", k: "telegram", t: "Powiadomienia Telegram", i: I.send },
   { h: "#/mapa", k: "mapa", t: "Mapa zagrożeń", i: I.map },
   { h: "#/schrony", k: "schrony", t: "Schrony i ukrycia", i: I.shield },
@@ -273,7 +320,7 @@ function screenPulpit() {
     const label = i === 1 ? `${st.t.replace("Przygotuj", "Spakuj")} <span class="muted small">· ${nPack} z ${tPack}</span>` : esc(st.t);
     return st.done ? `<li><a href="${st.h}"><span class="muted">${i === 1 ? label : esc(st.t)}</span><span class="stp">✓</span></a></li>` : `<li><a href="${st.h}"><span>${label}</span>${I.chevr}</a></li>`;
   }).join("");
-  return `<div class="hero"><h1>Pulpit</h1></div>${status}
+  return `<div class="hero"><h1>Pulpit</h1></div>${status}${newsCardHtml()}
   <div class="card ready"><div class="row" style="gap:16px">${ring(r.pct)}<div style="flex:1"><h2 style="margin:0">Twoja gotowość</h2><p class="muted small" style="margin:2px 0 0">Trzy małe kroki, żeby poczuć się pewniej.</p></div></div>
   <ul class="steps stepsnav">${steps}</ul></div>
   <div class="grid2 grid-d grid4">${tile("#/schrony", "t-green", I.pin, "Schrony blisko", nm != null ? `Najbliżej: ${nm} min pieszo` : "Najbliższe punkty schronienia")}${tile("#/pierwsza-pomoc", "t-red", I.heart, "Pierwsza pomoc", "Krok po kroku, offline")}${tile("#/plecak", "t-blue", I.bag, "Plecak i zapasy", "Zestaw na 72 godziny")}${tile("#/plan-rodziny", "t-amber", I.users, "Plan rodziny", "Kontakty i miejsce spotkania")}</div>
@@ -525,6 +572,7 @@ function render() {
   let inner;
   switch (route) {
     case "alerty": inner = screenAlerty(); break;
+    case "wazne": inner = screenWazne(); break;
     case "mapa": inner = screenMapa(arg); break;
     case "schrony": inner = renderSheltersHtml(geoCtx, { demo: arg === "demo" }); break;
     case "plan-rodziny": inner = renderPlan(geoCtx); break;
@@ -549,7 +597,7 @@ function render() {
   else if (route === "zagrozenie") initEmergency(geoCtx);
   else if (route === "miejsca") initPlaces(geoCtx);
   else if (route === "ustawienia") showSwVersion();
-  const titles = { pulpit: "Pulpit", alerty: "Alerty", mapa: "Mapa", poradnik: "Poradnik", plecak: "Plecak", "pierwsza-pomoc": "Pierwsza pomoc", test: "Test gotowości", ustawienia: "Ustawienia", zrodla: "Źródła", telegram: "Powiadomienia Telegram", schrony: "Schrony", "plan-rodziny": "Plan rodziny", zagrozenie: "Tryb zagrożenia", miejsca: "Ważne miejsca", prywatnosc: "Polityka prywatności", wiecej: "Więcej" };
+  const titles = { wazne: "Ważne w regionie", pulpit: "Pulpit", alerty: "Alerty", mapa: "Mapa", poradnik: "Poradnik", plecak: "Plecak", "pierwsza-pomoc": "Pierwsza pomoc", test: "Test gotowości", ustawienia: "Ustawienia", zrodla: "Źródła", telegram: "Powiadomienia Telegram", schrony: "Schrony", "plan-rodziny": "Plan rodziny", zagrozenie: "Tryb zagrożenia", miejsca: "Ważne miejsca", prywatnosc: "Polityka prywatności", wiecej: "Więcej" };
   document.title = `EGIDA – ${titles[route] || "Pulpit"}`;
   window.scrollTo(0, 0);
 }
@@ -667,6 +715,7 @@ document.addEventListener("click", (e) => {
   else if (b.id === "printPack") printSheet("Plecak i zapasy", packPrintHtml(state, esc), PLECAK.reviewed ? "" : DRAFT);
   else if (b.id === "importBtn") $("#importFile")?.click();
   else if (b.id === "refreshApp") { b.disabled = true; b.textContent = "Odświeżam…"; refreshApp(); }
+  else if (b.dataset.newsscope) { newsScope = b.dataset.newsscope; render(); }
   else if (b.dataset.filter) { alertFilter = b.dataset.filter; render(); }
   else if (b.dataset.when) { alertWhen = b.dataset.when; render(); }
   else if (b.dataset.ptab) { plecakTab = b.dataset.ptab; render(); }
@@ -689,6 +738,8 @@ window.addEventListener("hashchange", () => { if (parse().route === "test" && !p
 applyPrefs(); applyCounter();
 testAnswers = { ...(state.test?.answers || {}) };
 render();
+loadNews().then(() => { if (state.onboarded && ["pulpit", "wazne", ""].includes(parse().route) && !document.activeElement?.closest?.("select,input,textarea")) render(); });
+setInterval(() => loadNews().then(() => { if (["pulpit", "wazne"].includes(parse().route) && !document.activeElement?.closest?.("select,input,textarea")) render(); }), 10 * 60 * 1000);
 loadAlerts().then(() => { if (state.onboarded && ["pulpit", "alerty", "ustawienia", "telegram", ""].includes(parse().route) && !document.activeElement?.closest?.("select,input,textarea")) render(); });
 setInterval(() => loadAlerts().then(() => { if (["pulpit", "alerty", "ustawienia", "telegram"].includes(parse().route) && !document.activeElement?.closest?.("select,input,textarea")) render(); }), 5 * 60 * 1000);
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});

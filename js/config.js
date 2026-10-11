@@ -9,6 +9,8 @@ export const CONFIG = {
   // Skąd aplikacja czyta komunikaty. Plik wypychany z serwera na osobną gałąź „data” (nie obciąża GitHub Pages).
   // Można wskazać adres na VPS-ie, np. "https://twoja-domena.pl/alerts.json" (wymaga CORS).
   alertsUrl: "https://raw.githubusercontent.com/lewym90/egida/data/alerts.json",
+  // „Ważne w regionie”: aktualności z oficjalnych stron (Policja, MEN, RCB, urzędy, kuratoria), zbierane przez serwer EGIDA. Puste = funkcja wyłączona.
+  newsUrl: "https://raw.githubusercontent.com/lewym90/egida/data/news.json",
   // Po ilu minutach dane uznajemy za nieaktualne (wtedy nie pokazujemy statusu „brak komunikatów”).
   staleAfterMin: 90,
   // Publiczne kanały Telegram na województwo, np. { mazowieckie: "https://t.me/egida_mazowieckie" }.

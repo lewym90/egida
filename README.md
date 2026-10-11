@@ -59,3 +59,9 @@ Bez tokenu skrypt działa „na sucho”: zapisuje dane, niczego nie wysyła. Pr
 
 ## Dalej
 Alerty poziomu 2 z torem po weryfikacji formatu NEPTUN, zatwierdzenie treści (`reviewed`), zewnętrzny monitoring VPS.
+
+## v17 – „Ważne w regionie” (wiadomości z oficjalnych źródeł)
+- Serwer (`server/news-sync.mjs`, co ~15 min z `run.sh`) czyta aktualności Policji (KGP + 16 komend wojewódzkich, kanały RSS wyszukiwane na stronach jednostek), MEN, RCB, urzędów wojewódzkich i kuratoriów (`server/news-sources.mjs`), filtruje po słowach kluczowych bezpieczeństwa i zapisuje `news.json` oraz raport `news-report.json` na gałąź `data`.
+- Nic nie jest zatwierdzane ręcznie. Każdy wpis ma źródło i link do oryginału. Źródło odpowiadające kodem innym niż 200 jest pomijane (nic nie omijamy).
+- Aplikacja: karta „Ważne w regionie” na Pulpicie (3 najnowsze dla Twojego województwa + ogólnopolskie) i ekran `#/wazne`. Po 3 h bez odświeżenia: „Brak aktualnych danych”.
+- Dodanie źródła: jeden wpis w `server/news-sources.mjs`; co działa, widać w `news-report.json` na gałęzi `data`.
