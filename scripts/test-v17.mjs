@@ -37,6 +37,13 @@ ok("strona „Kanały RSS” jednostki: link /ra/rss albo odgadnięty z /opo/sit
   assert.deepEqual(discoverRssPages('<a href="/opo/sitemap">Mapa</a>', "https://opole.policja.gov.pl/"), ["https://opole.policja.gov.pl/opo/rss"]);
   assert.deepEqual(discoverRssPages("<p>nic</p>", "https://x.pl/"), []);
 });
+ok("lista HTML policji: data po streszczeniu (po linku), bez pożyczania daty od sąsiedniego wpisu", () => {
+  const h = `<div><h3><a href="/pom/informacje/wiadomosci/159579,Zakonczyla-sie-edycja.html">Zakończyła się XIX edycja PARAMEDYK 2026 w Trójmieście</a></h3><p>Zespół wygrał krajowe zawody taktyczno-medyczne. 09.10.2026 KWP w Gdańsku</p></div>
+  <div><h3><a href="/pom/informacje/wiadomosci/159571,Dzieki-kryminalnym.html">Dzięki kryminalnym z Oruni ponad 400 porcji narkotyków</a></h3><p>Mężczyzna ukrywał środki w mieszkaniu.</p></div>`;
+  const r = parseHtmlList(h, "https://pomorska.policja.gov.pl/pom/informacje/wiadomosci");
+  assert.equal(r.length, 1);
+  assert.ok(r[0].date.startsWith("2026-10-09"));
+});
 const HTML = `<ul><li><img src="a.jpg"><div>08.10.2026</div><a href="https://www.gov.pl/web/premier/szybka-reakcja-rzadu-na-przemoc-w-szkolach">Szybka reakcja rządu na przemoc w szkołach</a></li>
 <li><span>06.10.2026</span><a href="/web/rcb/komunikat-w-sprawie-pogody">Komunikat w sprawie pogody na weekend</a></li>
 <li><a href="/web/rcb/bez-daty-bez-daty-bez-daty">Wpis bez żadnej daty w pobliżu linku</a></li><li><a href="/x">Menu</a></li></ul>`;

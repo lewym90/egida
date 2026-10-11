@@ -126,12 +126,12 @@ function newsCardHtml() {
 function newsListHtml() {
   if (!CONFIG.newsUrl || !newsData) return `<div class="note neutral">Nie udało się pobrać wiadomości. Sprawdź połączenie. Oficjalne komunikaty są w zakładce <a href="#/alerty">Alerty</a>.</div>`;
   if (!newsFresh(newsData)) return `<div class="note warn"><b>Brak aktualnych danych.</b> Wiadomości z oficjalnych stron nie były ostatnio odświeżane, więc ich nie pokazujemy. Sprawdź strony Policji i swojego urzędu wojewódzkiego.</div>`;
-  const list = newsScope === "everything" ? newsForRegion(newsData, null) : newsScope === "all-pl" ? newsForRegion(newsData, null, { onlyAll: true }) : newsForRegion(newsData, state.region);
+  const list = newsScope === "everything" ? newsForRegion(newsData, null) : newsForRegion(newsData, state.region); // „Cała Polska” = wszystkie regiony razem, z nazwą źródła przy każdym wpisie
   if (!list.length) return `<div class="note neutral">Brak wiadomości o bezpieczeństwie w tym zakresie z ostatnich dni.</div>`;
   return `<div class="card flat"><ul class="list newslist">${list.map(newsLink).join("")}</ul></div>`;
 }
 function screenWazne() {
-  const sc = [["region", state.region ? `Moje województwo` : "Moje woj. (wybierz)"], ["all-pl", "Cała Polska"], ["everything", "Wszystkie regiony"]];
+  const sc = [["region", state.region ? `Moje województwo` : "Moje woj. (wybierz)"], ["everything", "Cała Polska"]];
   const chips = sc.map(([id, t]) => `<button class="chip" data-newsscope="${id}" aria-pressed="${newsScope === id}">${t}</button>`).join("");
   const upd = newsData?.generatedAt ? ` Ostatnie odświeżenie: ${esc(fmtDate(newsData.generatedAt))}.` : "";
   return `<div class="hero"><h1>Ważne w regionie</h1><p>Wiadomości o bezpieczeństwie z oficjalnych stron: Policji, MEN, RCB, urzędów wojewódzkich i kuratoriów.</p></div>

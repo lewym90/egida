@@ -91,11 +91,11 @@ export function parseHtmlList(html, baseUrl) {
     if (!url || seen.has(url)) continue;
     // Data: w treści linku, potem tuż przed nim (nagłówek karty), na końcu tuż po nim.
     const idx = m.index;
-    // Okno „przed” kończy się na poprzednim linku/elemencie listy, okno „po” na następnym, żeby nie pożyczyć daty od sąsiedniego wpisu.
-    let before = src.slice(Math.max(0, idx - 350), idx), after = src.slice(idx + m[0].length, idx + m[0].length + 200);
-    before = before.slice(Math.max(before.lastIndexOf("</a>") + 4, before.lastIndexOf("</li>") + 5, before.lastIndexOf("<li") >= 0 ? before.lastIndexOf("<li") : 0, 0));
-    const cut = after.search(/<a\b|<li\b/i); if (cut >= 0) after = after.slice(0, cut);
-    const date = dateFrom(stripTags(m[2])) || dateFrom(stripTags(before).slice(-60)) || dateFrom(stripTags(after).slice(0, 60));
+    // Okno „przed” kończy się na poprzednim linku/elemencie listy, okno „po” na następnym wpisie (link do artykułu /NNNN,Tytul.html lub <li>), żeby nie pożyczyć daty od sąsiada.
+    let before = src.slice(Math.max(0, idx - 350), idx), after = src.slice(idx + m[0].length, idx + m[0].length + 700);
+    before = before.slice(Math.max(before.lastIndexOf("</a>") + 4, before.lastIndexOf("</li>") + 5, before.lastIndexOf("</p>") + 4, before.lastIndexOf("<li") >= 0 ? before.lastIndexOf("<li") : 0, 0));
+    const cut = after.search(/<li\b|href\s*=\s*["'][^"']*\/\d{4,},/i); if (cut >= 0) after = after.slice(0, cut);
+    const date = dateFrom(stripTags(m[2])) || dateFrom(stripTags(before).slice(-60)) || dateFrom(stripTags(after).slice(0, 400));
     if (!date) continue;
     seen.add(url); out.push({ title: title.replace(DATE_RE, "").replace(/\s+/g, " ").trim() || title, url, date, summary: "" });
   }

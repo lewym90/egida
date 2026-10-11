@@ -11,7 +11,7 @@ const KWP = [
 const HTML_FALLBACK = { lubelskie: "https://lubelska.policja.gov.pl/lub/aktualnosci", lodzkie: "https://lodzka.policja.gov.pl/ld/informacje",
   opolskie: "https://opolska.policja.gov.pl/op/kwp-opole/aktualnosci", wielkopolskie: "https://wielkopolska.policja.gov.pl/wlk/aktualnosci",
   zachodniopomorskie: "https://zachodniopomorska.policja.gov.pl/sz/aktualnosci", swietokrzyskie: "https://swietokrzyska.policja.gov.pl/kie/dzialania-policji/aktualnosci",
-  pomorskie: "https://pomorska.policja.gov.pl/pom/aktualnosci" };
+  pomorskie: "https://pomorska.policja.gov.pl/pom/informacje/wiadomosci" };
 const KWP_NAME = { dolnoslaskie: "Policja Dolnośląska", "kujawsko-pomorskie": "Policja Kujawsko-Pomorska", lubelskie: "Policja Lubelska", lubuskie: "Policja Lubuska",
   lodzkie: "Policja Łódzka", malopolskie: "Policja Małopolska", mazowieckie: "Policja Mazowiecka", opolskie: "Policja Opolska", podkarpackie: "Policja Podkarpacka",
   podlaskie: "Policja Podlaska", pomorskie: "Policja Pomorska", slaskie: "Policja Śląska", swietokrzyskie: "Policja Świętokrzyska",
