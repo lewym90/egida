@@ -8,7 +8,7 @@ import { emptyPlan, normalizePlan, normalizePlaces, importState } from "./person
 import { renderEmergency, initEmergency, renderPlan, initPlan, renderPlaces, initPlaces, renderPrivacy, shareText, shareNote, printSheet, planPrintHtml, packPrintHtml, guidePrintHtml } from "./screens2.js";
 import { renderMapHtml, initMapScreen, destroyScreens } from "./mapscreen.js";
 import { renderSheltersHtml, initSheltersScreen } from "./sheltersscreen.js";
-import { normalizeNews, newsFresh, newsForRegion, ageLabel } from "./news.js";
+import { normalizeNews, newsFresh, newsForRegion, roadsForRegion, ROADS_LINK, ageLabel } from "./news.js";
 
 /* ---------- pomocnicze ---------- */
 const $ = (s, r = document) => r.querySelector(s);
@@ -96,7 +96,7 @@ const alertsFresh = () => {
   if (!alertsData.ok || !alertsData.updated) return false;
   return (Date.now() - new Date(alertsData.updated).getTime()) / 60000 <= CONFIG.staleAfterMin;
 };
-/* ---------- „Ważne w regionie”: aktualności z oficjalnych źródeł (Policja, MEN, RCB, urzędy, kuratoria), zebrane przez serwer ---------- */
+/* ---------- „Wiadomości z regionu i kraju”: aktualności z oficjalnych źródeł (Policja, MEN, RCB, urzędy, kuratoria), zebrane przez serwer ---------- */
 let newsData = null; // znormalizowany plik albo null (brak/niepoprawny)
 let newsScope = "region"; // region | all-pl | everything
 const NEWS_CACHE = "egida.news.v1";
@@ -114,14 +114,18 @@ async function loadNews() {
     try { newsData = normalizeNews(JSON.parse(localStorage.getItem(NEWS_CACHE) || "null")) || newsData; } catch { /* uszkodzone */ }
   }
 }
-const newsLink = (x) => `<li class="newsitem"><a href="${esc(x.url)}" target="_blank" rel="noopener noreferrer"><span class="nt">${esc(x.title)}</span><span class="nm">${esc(x.source)} · ${esc(ageLabel(x.date))}</span></a></li>`;
+const newsLink = (x) => `<li class="newsitem"><a href="${esc(x.url)}" target="_blank" rel="noopener noreferrer"><span class="nt">${esc(x.title)}</span><span class="nm">${x.kind === "media" ? '<span class="badge media">doniesienie medialne</span> ' : ""}${esc(x.source)} · ${esc(ageLabel(x.date))}</span></a></li>`;
+/* Utrudnienia na drogach krajowych (GDDKiA) dla Twojego województwa: wiersze do bloku „Dobrze wiedzieć” */
+const roadRows = () => (state.region && newsData && newsFresh(newsData) ? roadsForRegion(newsData, state.region) : []);
+const roadLi = (x) => `<li><span class="lbl">Drogi krajowe · GDDKiA</span><span class="shead">${esc(x.title)}</span><span class="ssub">od ${esc(fmtDate(x.date))}${x.until ? `, do ${esc(fmtDate(x.until))}` : ""}</span></li>`;
+const roadMore = (n) => `<a class="gall" href="${ROADS_LINK}" target="_blank" rel="noopener noreferrer">Utrudnienia na drogach krajowych${n > 3 ? ` (${n})` : ""} – GDDKiA ${I.ext}</a>`;
 function newsCardHtml() {
   if (!newsData || !state.region) return "";
   const fresh = newsFresh(newsData);
   const list = fresh ? newsForRegion(newsData, state.region, { max: 3 }) : [];
   if (fresh && !list.length) return "";
   const body = fresh ? `<ul class="newslist">${list.map(newsLink).join("")}</ul>` : `<p class="muted small" style="margin:6px 0 0">Brak aktualnych danych. Wiadomości z oficjalnych stron mogą być nieaktualne, więc ich nie pokazujemy.</p>`;
-  return `<div class="card newscard"><h2>Ważne w regionie</h2>${body}<a class="smore2" href="#/wazne">Wszystkie wiadomości ${I.chevr}</a></div>`;
+  return `<div class="card newscard"><h2>Wiadomości z regionu i kraju</h2>${body}<a class="smore2" href="#/wazne">Wszystkie wiadomości ${I.chevr}</a></div>`;
 }
 function newsListHtml() {
   if (!CONFIG.newsUrl || !newsData) return `<div class="note neutral">Nie udało się pobrać wiadomości. Sprawdź połączenie. Oficjalne komunikaty są w zakładce <a href="#/alerty">Alerty</a>.</div>`;
@@ -134,7 +138,7 @@ function screenWazne() {
   const sc = [["region", state.region ? `Moje województwo` : "Moje woj. (wybierz)"], ["everything", "Cała Polska"]];
   const chips = sc.map(([id, t]) => `<button class="chip" data-newsscope="${id}" aria-pressed="${newsScope === id}">${t}</button>`).join("");
   const upd = newsData?.generatedAt ? ` Ostatnie odświeżenie: ${esc(fmtDate(newsData.generatedAt))}.` : "";
-  return `<div class="hero"><h1>Ważne w regionie</h1><p>Wiadomości o bezpieczeństwie z oficjalnych stron: Policji, MEN, RCB, urzędów wojewódzkich i kuratoriów.</p></div>
+  return `<div class="hero"><h1>Wiadomości z regionu i kraju</h1><p>Wiadomości o bezpieczeństwie z oficjalnych stron: Policji, MEN, RCB, urzędów wojewódzkich i kuratoriów.</p></div>
   <div class="chips" role="group" aria-label="Zakres">${chips}</div>
   <div id="newsList">${newsListHtml()}</div>
   <p class="muted small">Wpisy wybiera automatycznie program po słowach kluczowych (np. zagrożenie, ostrzeżenie, szkoła, ewakuacja) i odsyła do strony źródłowej. To nie są alerty: nie zastępują syren, Alertów RCB ani poleceń służb. Brak wpisu nie oznacza braku zagrożenia.${upd}</p>`;
@@ -187,7 +191,7 @@ const NAV = [
 ];
 const TABS = [...NAV, { h: "#/wiecej", k: "wiecej", t: "Więcej", i: I.more }];
 const MORE = [
-  { h: "#/wazne", t: "Ważne w regionie", d: "Wiadomości z Policji, MEN, RCB i urzędów", i: I.bell },
+  { h: "#/wazne", t: "Wiadomości z regionu i kraju", d: "Policja, MEN, RCB i urzędy: bezpieczeństwo", i: I.bell },
   { h: "#/ustawienia", t: "Ustawienia", d: "Województwo, zgody, wygląd, Twoje dane", i: I.gear },
   { h: "#/plan-rodziny", t: "Plan rodziny", d: "Kontakty, miejsce spotkania, karty ICE", i: I.users },
   { h: "#/plecak", t: "Plecak i zapasy", d: "Zestaw na 72 godziny, zapas domowy, dokumenty", i: I.bag },
@@ -201,7 +205,7 @@ const MORE = [
 ];
 const SIDE = [
   ...NAV.slice(0, 2),
-  { h: "#/wazne", k: "wazne", t: "Ważne w regionie", i: I.bell },
+  { h: "#/wazne", k: "wazne", t: "Wiadomości z regionu i kraju", i: I.bell },
   { h: "#/telegram", k: "telegram", t: "Powiadomienia Telegram", i: I.send },
   { h: "#/mapa", k: "mapa", t: "Mapa zagrożeń", i: I.map },
   { h: "#/schrony", k: "schrony", t: "Schrony i ukrycia", i: I.shield },
@@ -284,7 +288,7 @@ function screenPulpit() {
   const fresh = alertsFresh();
   const list = regionAlerts();
   const name = esc(regionById(state.region)?.name);
-  let status;
+  let status, roadsShown = false;
   if (!state.region) {
     status = `<div class="status warn"><span class="ico">${I.pin}</span><div><h2>Wybierz województwo</h2><p>Pokażemy komunikaty dla Twojej okolicy. Użyj listy u góry ekranu.</p></div></div>`;
   } else if (!alertsData.loaded) {
@@ -308,10 +312,18 @@ function screenPulpit() {
     } else {
       status = `<div class="status ok"><span class="ico">${I.check}</span><div class="sbody"><h2>W Twojej okolicy jest spokojnie</h2><p class="slead">Brak aktywnych ostrzeżeń w znanych nam źródłach.</p><p class="smeta">${meta}</p><p class="sfine">Aplikacja nie zastępuje syren ani Alertu RCB.</p></div></div>`;
     }
-    if (info.length) {
+    const roads = roadRows();
+    if (info.length || roads.length) {
       const gs = groupAlerts(info);
-      status += `<div class="goodtoknow"><h2><span class="tri">${I.alert}</span>Dobrze wiedzieć</h2><ul class="slist">${gs.slice(0, 3).map((g) => `<li>${msgParts(g.items[0], g.items.length, true)}</li>`).join("")}</ul>${gs.length > 3 || info.length > gs.length ? `<a class="gall" href="#/alerty">Zobacz wszystkie (${info.length}) ${I.chevr}</a>` : `<a class="gall" href="#/alerty">Wszystkie komunikaty ${I.chevr}</a>`}</div>`;
+      const alertLis = gs.slice(0, 3).map((g) => `<li>${msgParts(g.items[0], g.items.length, true)}</li>`).join("");
+      const alertLink = info.length ? (gs.length > 3 || info.length > gs.length ? `<a class="gall" href="#/alerty">Zobacz wszystkie (${info.length}) ${I.chevr}</a>` : `<a class="gall" href="#/alerty">Wszystkie komunikaty ${I.chevr}</a>`) : "";
+      status += `<div class="goodtoknow"><h2><span class="tri">${I.alert}</span>Dobrze wiedzieć</h2><ul class="slist">${alertLis}${roads.slice(0, 3).map(roadLi).join("")}</ul>${alertLink}${roads.length ? roadMore(roads.length) : ""}</div>`;
+      roadsShown = true;
     }
+  }
+  if (!roadsShown) { // statusu z komunikatów nie ma (np. dane nieaktualne), ale utrudnienia drogowe mamy
+    const roads = roadRows();
+    if (roads.length) status += `<div class="goodtoknow"><h2><span class="tri">${I.alert}</span>Dobrze wiedzieć</h2><ul class="slist">${roads.slice(0, 3).map(roadLi).join("")}</ul>${roadMore(roads.length)}</div>`;
   }
   const nm = nearestMinutes();
   const tile = (h, cls, i, t, sub, soon) => `<a class="tile ${soon ? "soon" : ""}" href="${h}"><span class="ti ${cls}">${i}</span><b>${t}</b><span class="muted small">${sub}</span>${soon ? '<span class="badge soon" style="align-self:flex-start">wkrótce</span>' : ""}</a>`;
@@ -597,7 +609,7 @@ function render() {
   else if (route === "zagrozenie") initEmergency(geoCtx);
   else if (route === "miejsca") initPlaces(geoCtx);
   else if (route === "ustawienia") showSwVersion();
-  const titles = { wazne: "Ważne w regionie", pulpit: "Pulpit", alerty: "Alerty", mapa: "Mapa", poradnik: "Poradnik", plecak: "Plecak", "pierwsza-pomoc": "Pierwsza pomoc", test: "Test gotowości", ustawienia: "Ustawienia", zrodla: "Źródła", telegram: "Powiadomienia Telegram", schrony: "Schrony", "plan-rodziny": "Plan rodziny", zagrozenie: "Tryb zagrożenia", miejsca: "Ważne miejsca", prywatnosc: "Polityka prywatności", wiecej: "Więcej" };
+  const titles = { wazne: "Wiadomości", pulpit: "Pulpit", alerty: "Alerty", mapa: "Mapa", poradnik: "Poradnik", plecak: "Plecak", "pierwsza-pomoc": "Pierwsza pomoc", test: "Test gotowości", ustawienia: "Ustawienia", zrodla: "Źródła", telegram: "Powiadomienia Telegram", schrony: "Schrony", "plan-rodziny": "Plan rodziny", zagrozenie: "Tryb zagrożenia", miejsca: "Ważne miejsca", prywatnosc: "Polityka prywatności", wiecej: "Więcej" };
   document.title = `EGIDA – ${titles[route] || "Pulpit"}`;
   window.scrollTo(0, 0);
 }

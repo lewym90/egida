@@ -14,7 +14,7 @@ export function normalizeNews(raw) {
     const title = String(x.title || "").trim().slice(0, 240), url = String(x.url || ""), t = Date.parse(x.date);
     const region = x.region === "all" || x.region === "mixed" || IDS.has(x.region) ? x.region : null; // „mixed” = portal krajowy bez ustalonego regionu
     if (!title || !httpsOnly(url) || !Number.isFinite(t) || !region) continue;
-    items.push({ id: String(x.id || url).slice(0, 200), title, summary: String(x.summary || "").slice(0, 300), url, date: new Date(t).toISOString(), source: String(x.source || "").slice(0, 80), region });
+    items.push({ id: String(x.id || url).slice(0, 200), title, summary: String(x.summary || "").slice(0, 300), url, date: new Date(t).toISOString(), source: String(x.source || "").slice(0, 80), region, kind: String(x.kind || "").slice(0, 20), until: Number.isFinite(Date.parse(x.until)) ? new Date(x.until).toISOString() : null });
   }
   items.sort((a, b) => b.date.localeCompare(a.date));
   return { generatedAt: Number.isFinite(Date.parse(raw.generatedAt)) ? new Date(raw.generatedAt).toISOString() : null, items };
@@ -28,7 +28,7 @@ export function newsFresh(feed, nowMs = Date.now()) {
 /** Wpisy dla województwa użytkownika + ogólnopolskie (bez województwa: wszystkie, także „mixed”). opts: {max, onlyRegion, onlyAll} */
 export function newsForRegion(feed, regionId, opts = {}) {
   if (!feed) return [];
-  let l = feed.items;
+  let l = feed.items.filter((x) => x.kind !== "gddkia"); // utrudnienia drogowe GDDKiA mają własne miejsce: „Dobrze wiedzieć” na Pulpicie
   if (opts.onlyAll) l = l.filter((x) => x.region === "all");
   else if (regionId) l = l.filter((x) => (opts.onlyRegion ? x.region === regionId : x.region === regionId || x.region === "all"));
   return opts.max ? l.slice(0, opts.max) : l;
@@ -43,3 +43,11 @@ export function ageLabel(iso, nowMs = Date.now()) {
   const d = Math.floor(m / 1440);
   return d === 1 ? "wczoraj" : `${d} dni temu`;
 }
+
+/** Zdarzenia i zamknięcia dróg krajowych (GDDKiA) tylko dla wskazanego województwa; trwające, od najnowszych. */
+export function roadsForRegion(feed, regionId, opts = {}, nowMs = Date.now()) {
+  if (!feed || !regionId) return [];
+  const l = feed.items.filter((x) => x.kind === "gddkia" && x.region === regionId && (!x.until || Date.parse(x.until) >= nowMs));
+  return opts.max ? l.slice(0, opts.max) : l;
+}
+export const ROADS_LINK = "https://drogi.gddkia.gov.pl/informacje-drogowe/lista-utrudnien";

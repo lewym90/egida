@@ -358,3 +358,5 @@ input[type="search"].sel{-webkit-appearance:none;appearance:none;width:100%;font
 .newsitem .nm{font-size:.8125rem;color:var(--muted,#5b6b78)}
 .list.newslist .newsitem{padding:0 14px}
 .smore2{display:inline-flex;align-items:center;gap:4px;min-height:44px;font-weight:700;color:var(--brand-ink)}
+.badge.media{background:var(--note);color:var(--text-card);border:1px solid var(--line);padding:1px 8px;margin-right:2px}
+.goodtoknow .gall{display:flex;align-items:center;gap:6px;min-height:44px}

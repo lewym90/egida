@@ -17,16 +17,40 @@ const KWP_NAME = { dolnoslaskie: "Policja Dolnośląska", "kujawsko-pomorskie": 
   podlaskie: "Policja Podlaska", pomorskie: "Policja Pomorska", slaskie: "Policja Śląska", swietokrzyskie: "Policja Świętokrzyska",
   "warminsko-mazurskie": "Policja Warmińsko-Mazurska", wielkopolskie: "Policja Wielkopolska", zachodniopomorskie: "Policja Zachodniopomorska" };
 
+const RADIO = [
+  ["dolnoslaskie", "Polskie Radio Wrocław", "https://radiowroclaw.pl/feed/"],
+  ["lubelskie", "Radio Lublin", "https://radio.lublin.pl/feed/"], // (sprawdzony)
+  ["lodzkie", "Radio Łódź", "https://radiolodz.pl/feed/"], // (sprawdzony)
+  ["malopolskie", "Radio Kraków", "https://radiokrakow.pl/feed/"],
+  ["opolskie", "Radio Opole", "https://radio.opole.pl/feed/"],
+  ["podkarpackie", "Polskie Radio Rzeszów", "https://www.radio.rzeszow.pl/feed/"], // (sprawdzony)
+  ["podlaskie", "Polskie Radio Białystok", "https://radio.bialystok.pl/feed/"],
+  ["pomorskie", "Radio Gdańsk", "https://radiogdansk.pl/feed/"], // (sprawdzony)
+  ["slaskie", "Polskie Radio Katowice", "https://www.radio.katowice.pl/feed/"],
+  ["swietokrzyskie", "Radio Kielce", "https://radiokielce.pl/feed/"], // (sprawdzony)
+  ["warminsko-mazurskie", "Polskie Radio Olsztyn", "https://www.radio.olsztyn.pl/feed/"],
+  ["wielkopolskie", "Polskie Radio Poznań", "https://radiopoznan.fm/feed/"],
+  ["zachodniopomorskie", "Radio Szczecin", "https://radioszczecin.pl/rss/rss.php"], // (sprawdzony)
+  ["lubuskie", "Radio Zachód", "https://radiozachod.pl/feed/"],
+  ["mazowieckie", "Radio dla Ciebie", "https://radiodlaciebie.pl/feed/"],
+];
+
 export const SOURCES = [
   // Ogólnopolskie (sprawdzone z serwera EGIDA: HTTP 200)
   // Portal policja.pl zbiera wiadomości ze WSZYSTKICH regionów, więc nie wiemy, którego dotyczą: region „mixed” = pokazujemy tylko w zakresie „Wszystkie regiony”.
   { id: "policja-pl", label: "Policja (portal krajowy)", region: "mixed", kind: "rss", filter: "safety", urls: ["https://policja.pl/dokumenty/rss/1-rss-1.rss"] },
   { id: "rcb", label: "Rządowe Centrum Bezpieczeństwa", region: "all", kind: "html", filter: "all", urls: ["https://www.gov.pl/web/rcb/wiadomosci", "https://www.gov.pl/web/rcb"] },
   { id: "men", label: "Ministerstwo Edukacji Narodowej", region: "all", kind: "html", filter: "school", urls: ["https://www.gov.pl/web/edukacja/wiadomosci", "https://www.gov.pl/web/edukacja"] },
+  // Drogi krajowe: oficjalny plik XML GDDKiA (zdarzenia i zamknięcia dróg, z województwem). Źródło: Generalna Dyrekcja Dróg Krajowych i Autostrad.
+  { id: "gddkia", label: "GDDKiA (drogi krajowe)", region: "all", kind: "gddkia", filter: "all", noCap: true, urls: ["https://www.archiwum.gddkia.gov.pl/dane/zima_html/utrdane.xml"] },
   // Województwo: Policja (kanał RSS „Aktualności” wyszukiwany na stronie głównej jednostki)
   ...KWP.map(([region, host]) => ({ id: "kwp-" + region, label: KWP_NAME[region], region, kind: "rss", filter: "safety", discover: `https://${host}.policja.gov.pl/`,
     // Mazowsze: adres sprawdzony ręcznie, używany też, gdyby wyszukiwanie zawiodło.
     htmlFallback: HTML_FALLBACK[region], urls: region === "mazowieckie" ? ["https://mazowiecka.policja.gov.pl/dokumenty/rss/271-rss-o-1488.rss"] : undefined })),
+  // Doniesienia medialne: regionalne rozgłośnie publiczne (Polskie Radio), po jednej na województwo. Region wynika z samej rozgłośni.
+  // Adresy oznaczone „(sprawdzony)” odpowiedziały jako RSS przy ręcznym sprawdzeniu; pozostałe to kandydaci – o ich działaniu decyduje news-report.json.
+  // Serwer czyta robots.txt rozgłośni i pomija źródło, jeśli zabrania pobierania.
+  ...RADIO.map(([region, label, url]) => ({ id: "radio-" + region, label, region, kind: "media", filter: "media", urls: [url] })),
   // Urzędy wojewódzkie i kuratoria (sprawdzone z serwera: HTTP 200)
   { id: "uw-lodzki", label: "Łódzki Urząd Wojewódzki", region: "lodzkie", kind: "html", filter: "safety", urls: ["https://www.gov.pl/web/uw-lodzki/wiadomosci", "https://www.gov.pl/web/uw-lodzki"] },
   { id: "kuratorium-waw", label: "Mazowieckie Kuratorium Oświaty", region: "mazowieckie", kind: "html", filter: "school", urls: ["https://www.kuratorium.waw.pl/pl/informacje/aktualnosci"] },

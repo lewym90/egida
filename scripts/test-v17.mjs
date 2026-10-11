@@ -1,8 +1,8 @@
 // Testy v17: „Ważne w regionie” – parsery RSS/HTML, filtry, deduplikacja (serwer) i logika aplikacji (js/news.js). Dane SZTUCZNE.
 import assert from "node:assert/strict";
-import { parseRss, parseHtmlList, discoverFeeds, discoverRssPages, passesFilter, toItem, mergeItems, safeHttps } from "../server/news-lib.mjs";
+import { passesMedia, robotsAllows, parseGddkia, warsawToMs, parseRss, parseHtmlList, discoverFeeds, discoverRssPages, passesFilter, toItem, mergeItems, safeHttps } from "../server/news-lib.mjs";
 import { SOURCES } from "../server/news-sources.mjs";
-import { newsForRegion, newsFresh, ageLabel, normalizeNews, NEWS_STALE_H } from "../js/news.js";
+import { roadsForRegion, newsForRegion, newsFresh, ageLabel, normalizeNews, NEWS_STALE_H } from "../js/news.js";
 import { VOIVODESHIPS } from "../js/content.js";
 let n = 0;
 const ok = (name, fn) => { try { fn(); } catch (e) { e.message = `[${name}] ${e.message}`; throw e; } n++; };
@@ -43,6 +43,13 @@ ok("lista HTML policji: data po streszczeniu (po linku), bez pożyczania daty od
   const r = parseHtmlList(h, "https://pomorska.policja.gov.pl/pom/informacje/wiadomosci");
   assert.equal(r.length, 1);
   assert.ok(r[0].date.startsWith("2026-10-09"));
+});
+ok("lista HTML policji: karta w jednym linku (obrazek, tytuł, streszczenie, <time datetime>)", () => {
+  const card = (id, t, d) => `<li class="nnews"><a href="/lub/aktualnosci/${id},Slug.html" class="grid"><div class="img-holder" style="background-image:url(/x.png)"></div><div class="col"><h3>${t}</h3><p>${"Długie streszczenie wpisu. ".repeat(20)}</p><time datetime="${d}">11.10.2026</time><span class="dodatek">KGP</span></div></a></li>`;
+  const r = parseHtmlList(card(173279, "Tymczasowy areszt dla 24-latka za udział w bójce z użyciem noża", "2026-10-11") + card(173281, "Podsumowanie tygodnia w Ośrodku Szkolenia Policji w Lublinie", "2026-10-10"), "https://lubelska.policja.gov.pl/lub/aktualnosci");
+  assert.equal(r.length, 2);
+  assert.equal(r[0].title, "Tymczasowy areszt dla 24-latka za udział w bójce z użyciem noża");
+  assert.ok(r[1].date.startsWith("2026-10-10"));
 });
 const HTML = `<ul><li><img src="a.jpg"><div>08.10.2026</div><a href="https://www.gov.pl/web/premier/szybka-reakcja-rzadu-na-przemoc-w-szkolach">Szybka reakcja rządu na przemoc w szkołach</a></li>
 <li><span>06.10.2026</span><a href="/web/rcb/komunikat-w-sprawie-pogody">Komunikat w sprawie pogody na weekend</a></li>
@@ -86,11 +93,63 @@ ok("mergeItems: ta sama wiadomość z portalu krajowego i z komendy – zostaje 
   assert.deepEqual(mergeItems([[a], [b]], NOW).map((x) => x.region), ["dolnoslaskie"]);
   assert.deepEqual(mergeItems([[b], [a]], NOW).map((x) => x.region), ["dolnoslaskie"]);
 });
+const XML = `<?xml version="1.0" encoding="UTF-8"?><utrudnienia gen="2026-10-11T16:18:01+0200">
+<utr><typ>W</typ><nr_drogi>A1</nr_drogi><woj>pomorskie</woj><km>44.350</km><nazwa_odcinka>Kopytkowo - Pelplin</nazwa_odcinka><data_powstania>2026-10-11 14:45:00</data_powstania><data_likwidacji>2026-10-11 20:30:00</data_likwidacji><objazd>Kierunek Gdańsk</objazd><skutki>Zablokowana jezdnia prawa</skutki><droga_zamknieta>false</droga_zamknieta></utr>
+<utr><typ>U</typ><nr_drogi>A1</nr_drogi><woj>pomorskie</woj><km>65.1</km><nazwa_odcinka>Kopytkowo - Warlubie</nazwa_odcinka><data_powstania>2026-09-23 06:00:00</data_powstania><data_likwidacji>2026-11-08 18:00:00</data_likwidacji><skutki>Zwężenie</skutki><droga_zamknieta>false</droga_zamknieta></utr>
+<utr><typ>U</typ><nr_drogi>DK19</nr_drogi><woj>podkarpackie</woj><km>10</km><nazwa_odcinka>Rzeszów - Boguchwała</nazwa_odcinka><data_powstania>2026-10-01 06:00:00</data_powstania><data_likwidacji>2026-10-30 18:00:00</data_likwidacji><skutki>Przebudowa mostu</skutki><droga_zamknieta>true</droga_zamknieta></utr>
+<utr><typ>W</typ><nr_drogi>DK8</nr_drogi><woj>łódzkie</woj><km>5</km><nazwa_odcinka>Zakończone</nazwa_odcinka><data_powstania>2026-10-11 08:00:00</data_powstania><data_likwidacji>2026-10-11 10:00:00</data_likwidacji><skutki>Wypadek</skutki></utr>
+<utr><typ>W</typ><nr_drogi>DK7</nr_drogi><woj>nieznane</woj><km>1</km><data_powstania>2026-10-11 08:00:00</data_powstania></utr></utrudnienia>`;
+ok("GDDKiA: czas polski (lato/zima), zdarzenia i zamknięcia tak, roboty i zakończone nie", () => {
+  assert.equal(new Date(warsawToMs("2026-10-11 14:45:00")).toISOString(), "2026-10-11T12:45:00.000Z");
+  assert.equal(new Date(warsawToMs("2026-11-08 10:00:00")).toISOString(), "2026-11-08T09:00:00.000Z");
+  const r = parseGddkia(XML, NOW + 3 * 36e5, VOIVODESHIPS.map((v) => v.id)); // „teraz” = 13:00Z
+  assert.deepEqual(r.map((x) => x.region), ["pomorskie", "podkarpackie"]);
+  assert.match(r[0].title, /^A1 · Kopytkowo - Pelplin: zablokowana jezdnia prawa$/);
+  assert.match(r[1].title, /droga zamknięta/);
+  assert.ok(r.every((x) => x.url.startsWith("https://drogi.gddkia.gov.pl/")));
+  const it = toItem(r[1], { filter: "all", label: "GDDKiA (drogi krajowe)", region: "all", kind: "gddkia" }, NOW + 3 * 36e5);
+  assert.equal(it.region, "podkarpackie"); assert.ok(it.until); // trwające zamknięcie nie odpada po 14 dniach
+  assert.equal(mergeItems([[it]], NOW + 3 * 36e5).length, 1);
+});
+ok("media: poważne zdarzenia tak, sport/kultura/rozmowy nie", () => {
+  for (const t of ["Dachowanie samochodu na S12 pod Lublinem. Zablokowany prawy pas ruchu", "Pożar hali w Radomiu. Ewakuowano pracowników", "Alarm bombowy w szkole. Policja sprawdza budynek", "Nie żyje 18-latek. Tragiczny wypadek na DK 17", "Ostrzeżenie przed wichurami w regionie"]) assert.ok(passesMedia(t), t);
+  for (const t of ["Porażka Czarnych w Zamościu", "Mariusz Kamiński „Historia z drugiej ręki” | Reportaż", "Koncert w filharmonii. Atak bólu w wykonaniu zespołu", "Piotr Robakowski, ekspert ds. bezpieczeństwa, będzie Gościem Radia Gdańsk", "Wiadomości sportowe: mecz z zagrożeniem spadku", "Targi Gesty [WIDEO, ZDJĘCIA]"]) assert.ok(!passesMedia(t), t);
+});
+ok("media: wpis z radia ma etykietę kind=media, bez streszczenia i z regionem rozgłośni", () => {
+  const src = SOURCES.find((x) => x.id === "radio-lubelskie");
+  const it = toItem({ title: "Dachowanie samochodu na S12. Zablokowany prawy pas ruchu", url: "https://radio.lublin.pl/a", date: "2026-10-11T09:14:00Z", summary: "Treść, której nie pokazujemy" }, src, NOW);
+  assert.equal(it.kind, "media"); assert.equal(it.summary, ""); assert.equal(it.region, "lubelskie"); assert.equal(it.source, "Radio Lublin");
+  assert.equal(SOURCES.filter((x) => x.kind === "media").length, 15);
+});
+ok("robots.txt: Disallow dla * blokuje, Allow doprecyzowuje, brak pliku = wolno", () => {
+  assert.equal(robotsAllows("User-agent: *\nDisallow: /", "/feed/"), false);
+  assert.equal(robotsAllows("User-agent: *\nDisallow: /wp-admin/\nAllow: /wp-admin/admin-ajax.php", "/feed/"), true);
+  assert.equal(robotsAllows("User-agent: *\nDisallow: /feed", "/feed/"), false);
+  assert.equal(robotsAllows("User-agent: *\nDisallow: /feed\nAllow: /feed/$", "/feed/"), true);
+  assert.equal(robotsAllows("User-agent: Googlebot\nDisallow: /", "/feed/"), true);
+  assert.equal(robotsAllows("", "/feed/"), true);
+});
+ok("mergeItems: oficjalne źródło wygrywa z mediami przy tej samej wiadomości", () => {
+  const a = { id: "m/1", title: "Pożar hali w Radomiu", summary: "", url: "https://m/1", date: "2026-10-11T08:00:00.000Z", source: "Radio X", region: "mazowieckie", kind: "media" };
+  const b = { ...a, id: "p/1", url: "https://p/1", source: "Policja Mazowiecka", kind: "rss" };
+  assert.deepEqual(mergeItems([[a], [b]], NOW).map((x) => x.kind), ["rss"]);
+});
+ok("GDDKiA: osobno od wiadomości, tylko dla swojego województwa i tylko trwające", () => {
+  const f = normalizeNews({ generatedAt: "2026-10-11T09:50:00Z", items: [
+    { id: "g1", title: "A1 · Kopytkowo - Pelplin: zablokowana jezdnia prawa", url: "https://drogi.gddkia.gov.pl/informacje-drogowe/lista-utrudnien", date: "2026-10-11T08:00:00Z", until: "2026-10-11T12:00:00Z", source: "GDDKiA (drogi krajowe)", region: "pomorskie", kind: "gddkia" },
+    { id: "g2", title: "DK17: droga zamknięta", url: "https://drogi.gddkia.gov.pl/informacje-drogowe/lista-utrudnien", date: "2026-10-11T07:00:00Z", until: "2026-10-11T08:00:00Z", source: "GDDKiA (drogi krajowe)", region: "pomorskie", kind: "gddkia" },
+    { id: "n1", title: "Wiadomość", url: "https://a/1", date: "2026-10-11T07:00:00Z", source: "Policja Pomorska", region: "pomorskie", kind: "rss" }] });
+  assert.deepEqual(newsForRegion(f, "pomorskie").map((x) => x.id), ["n1"]);
+  assert.deepEqual(newsForRegion(f, null).map((x) => x.id), ["n1"]);
+  assert.deepEqual(roadsForRegion(f, "pomorskie", {}, NOW).map((x) => x.id), ["g1"]);
+  assert.deepEqual(roadsForRegion(f, "lubelskie", {}, NOW), []);
+  assert.deepEqual(roadsForRegion(f, null, {}, NOW), []);
+});
 ok("safeHttps", () => { assert.equal(safeHttps("http://a.pl"), null); assert.equal(safeHttps("data:text/html,x"), null); assert.ok(safeHttps("https://a.pl/x")); });
 ok("źródła: 16 jednostek Policji, wszystkie id województw istnieją, adresy https", () => {
   const ids = new Set(VOIVODESHIPS.map((v) => v.id));
   assert.equal(SOURCES.filter((s) => s.id.startsWith("kwp-")).length, 16);
-  for (const s of SOURCES) { assert.ok(s.region === "all" || s.region === "mixed" || ids.has(s.region), s.id); assert.ok(["rss", "html"].includes(s.kind)); for (const u of [...(s.urls || []), s.discover].filter(Boolean)) assert.ok(u.startsWith("https://"), u); }
+  for (const s of SOURCES) { assert.ok(s.region === "all" || s.region === "mixed" || ids.has(s.region), s.id); assert.ok(["rss", "html", "gddkia", "media"].includes(s.kind)); for (const u of [...(s.urls || []), s.discover].filter(Boolean)) assert.ok(u.startsWith("https://"), u); }
   assert.equal(new Set(SOURCES.map((s) => s.id)).size, SOURCES.length);
 });
 

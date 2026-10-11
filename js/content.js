@@ -128,6 +128,8 @@ export const READINESS_QUESTIONS = [
 export const SOURCES = [
   { n: "Komunikaty RSO (TVP Technologie)", l: "Dane publiczne", u: "https://komunikaty.tvp.pl", w: "Alerty RCB, ostrzeżenia IMGW, woda, drogi" },
   { n: "Rządowe Centrum Bezpieczeństwa (gov.pl/rcb)", l: "Teksty: CC BY-SA 4.0", u: "https://www.gov.pl/web/rcb", w: "Poradnik bezpieczeństwa, komunikaty" },
+  { n: "Policja, MEN, urzędy wojewódzkie i kuratoria oświaty", l: "Publiczne strony instytucji; EGIDA pokazuje tylko tytuł, źródło i link do oryginału", u: "https://policja.pl", w: "Wiadomości z regionu i kraju o bezpieczeństwie (wybór automatyczny po słowach kluczowych)" },
+  { n: "GDDKiA: utrudnienia na drogach krajowych", l: "Dane publiczne GDDKiA (plik XML „Dane do pobrania”); teksty serwisu: CC BY-SA 4.0", u: "https://drogi.gddkia.gov.pl", w: "Zdarzenia i zamknięcia dróg krajowych w wiadomościach z regionu i kraju" },
   { n: "Polska Rada Resuscytacji / ERC", l: "Wytyczne 2025", u: "https://www.prc.krakow.pl", w: "Pierwsza pomoc (opracowanie własne zgodne z wytycznymi)" },
   { n: "NEPTUN (neptun.in.ua)", l: "Otwarte API, warunki: neptun.in.ua/api-terms. Nieoficjalny agregator, nie system ostrzegania", u: "https://neptun.in.ua", w: "Obserwacje dronów i rakiet nad Ukrainą (mapa, beta, nieoficjalne; powiadomienia na kanałach Telegram). Dane: Karta powitryanykh tryvoh — NEPTUN" },
   { n: "Rejestr Punktów Schronienia (MSWiA / Państwowa Straż Pożarna)", l: "Dane publiczne udostępniane przez PSP w pakiecie offline aplikacji „Gdzie się ukryć”. Licencja nie jest określona w repozytorium PSP; do zgody KG PSP: patrz uwagi wydawcy", u: "https://gdziesieukryc.pl", w: "Punkty schronienia (adres, dostępność). EGIDA nie jest aplikacją PSP; dane bywają niepełne lub nieaktualne" },

@@ -4,7 +4,9 @@
 //   node news-sync.mjs            – normalny przebieg (zapis $NEWS_OUT i $NEWS_REPORT_OUT)
 //   node news-sync.mjs --dump     – tylko wypisz raport, nic nie zapisuj
 import { writeFileSync, readFileSync, renameSync } from "node:fs";
-import { parseRss, parseHtmlList, discoverFeeds, discoverRssPages, toItem, mergeItems } from "./news-lib.mjs";
+import { robotsAllows } from "./news-lib.mjs";
+import { VOIVODESHIPS } from "../js/content.js";
+import { parseGddkia, parseRss, parseHtmlList, discoverFeeds, discoverRssPages, toItem, mergeItems } from "./news-lib.mjs";
 import { SOURCES } from "./news-sources.mjs";
 
 const OUT = process.env.NEWS_OUT || "news.json";
@@ -14,6 +16,15 @@ const CACHE = process.env.NEWS_CACHE_FILE || "news-feeds.json"; // znalezione ad
 const DUMP = process.argv.includes("--dump");
 const now = Date.now();
 
+const robotsCache = new Map();
+async function robotsOk(url) { // dla mediów: szanujemy robots.txt rozgłośni
+  const u = new URL(url);
+  if (!robotsCache.has(u.origin)) {
+    try { const r = await fetch(u.origin + "/robots.txt", { headers: { "user-agent": UA }, signal: AbortSignal.timeout(10000) }); robotsCache.set(u.origin, r.ok ? await r.text() : ""); }
+    catch { robotsCache.set(u.origin, ""); }
+  }
+  return robotsAllows(robotsCache.get(u.origin), u.pathname + u.search);
+}
 let cache = {}; try { cache = JSON.parse(readFileSync(CACHE, "utf8")); } catch { /* pierwszy przebieg */ }
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const lastAt = new Map(); // grzeczność: min. 1,2 s między zapytaniami do tej samej domeny nadrzędnej (policja.gov.pl itp.)
@@ -24,7 +35,9 @@ async function get(url) {
   if (wait > 0) await sleep(wait);
   const r = await fetch(url, { headers: { "user-agent": UA, accept: "application/rss+xml, application/xml, text/html;q=0.9, */*;q=0.5" }, redirect: "follow", signal: AbortSignal.timeout(20000) });
   if (!r.ok) throw new Error(`HTTP ${r.status}`);
-  return r.text();
+  // Kodowanie z nagłówka XML (np. windows-1250 / iso-8859-2), żeby polskie litery się nie psuły.
+  const buf = new Uint8Array(await r.arrayBuffer()), head = new TextDecoder("latin1").decode(buf.slice(0, 200)), enc = /encoding\s*=\s*["']([\w-]+)["']/i.exec(head)?.[1] || "utf-8";
+  try { return new TextDecoder(enc).decode(buf); } catch { return new TextDecoder("utf-8").decode(buf); }
 }
 
 async function runSource(src) {
@@ -55,8 +68,9 @@ async function runSource(src) {
     }
     for (const u of urls) {
       try {
+        if (src.kind === "media" && !(await robotsOk(u))) throw new Error("robots.txt rozgłośni zabrania pobierania – pomijam");
         const body = await get(u);
-        const items = src.kind === "rss" ? parseRss(body) : parseHtmlList(body, u);
+        const items = src.kind === "gddkia" ? parseGddkia(body, now, VOIVODESHIPS.map((v) => v.id)) : src.kind === "rss" || src.kind === "media" ? parseRss(body) : parseHtmlList(body, u);
         rep.urls.push({ url: u, status: 200, items: items.length });
         raws.push(...items);
         if (items.length) break; // pierwszy działający adres wystarcza
@@ -64,7 +78,7 @@ async function runSource(src) {
     }
     if (!raws.length && src.htmlFallback) { // zapasowo: lista „Aktualności” ze strony jednostki
       try { const html = await get(src.htmlFallback); const items = parseHtmlList(html, src.htmlFallback);
-        if (items.length < 3) rep.htmlSample = [...html.matchAll(/<a[^>]+href\s*=\s*["'][^"']*\/\d{4,},[^>]*>/gi)].slice(0, 2).map((m) => html.slice(Math.max(0, m.index - 150), m.index + 450));; // diagnostyka układu strony
+        if (items.length < 3) rep.htmlSample = [...html.matchAll(/<a[^>]+href\s*=\s*["'][^"']*\/\d{4,},[^>]*>/gi)].slice(0, 2).map((m) => html.slice(Math.max(0, m.index - 150), m.index + 1400));; // diagnostyka układu strony
         rep.urls.push({ url: src.htmlFallback, status: 200, items: items.length, fallback: true }); raws.push(...items); }
       catch (e) { rep.urls.push({ url: src.htmlFallback, error: String(e.message || e), fallback: true }); }
     }
@@ -73,6 +87,7 @@ async function runSource(src) {
     if (!rep.ok) rep.error = rep.urls.map((x) => x.error).filter(Boolean)[0] || "brak wpisów w odpowiedzi";
   } catch (e) { rep.error = String(e.message || e); }
   const items = raws.map((r) => toItem(r, src, now)).filter(Boolean);
+  if (src.noCap) items.noCap = true;
   rep.kept = items.length;
   return { rep, items };
 }

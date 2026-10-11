@@ -60,8 +60,13 @@ Bez tokenu skrypt działa „na sucho”: zapisuje dane, niczego nie wysyła. Pr
 ## Dalej
 Alerty poziomu 2 z torem po weryfikacji formatu NEPTUN, zatwierdzenie treści (`reviewed`), zewnętrzny monitoring VPS.
 
-## v17 – „Ważne w regionie” (wiadomości z oficjalnych źródeł)
+## v17 – „Wiadomości z regionu i kraju” (wiadomości z oficjalnych źródeł)
 - Serwer (`server/news-sync.mjs`, co ~15 min z `run.sh`) czyta aktualności Policji (KGP + 16 komend wojewódzkich, kanały RSS wyszukiwane na stronach jednostek), MEN, RCB, urzędów wojewódzkich i kuratoriów (`server/news-sources.mjs`), filtruje po słowach kluczowych bezpieczeństwa i zapisuje `news.json` oraz raport `news-report.json` na gałąź `data`.
 - Nic nie jest zatwierdzane ręcznie. Każdy wpis ma źródło i link do oryginału. Źródło odpowiadające kodem innym niż 200 jest pomijane (nic nie omijamy).
-- Aplikacja: karta „Ważne w regionie” na Pulpicie (3 najnowsze dla Twojego województwa + ogólnopolskie) i ekran `#/wazne`. Po 3 h bez odświeżenia: „Brak aktualnych danych”.
+- Aplikacja: karta „Wiadomości z regionu i kraju” na Pulpicie (3 najnowsze dla Twojego województwa + ogólnopolskie) i ekran `#/wazne`. Po 3 h bez odświeżenia: „Brak aktualnych danych”.
 - Dodanie źródła: jeden wpis w `server/news-sources.mjs`; co działa, widać w `news-report.json` na gałęzi `data`.
+
+### v18 – dopiski do wiadomości
+- Utrudnienia na drogach krajowych (GDDKiA, oficjalny plik XML: zdarzenia i zamknięcia) pokazują się w bloku „Dobrze wiedzieć” na Pulpicie dla Twojego województwa, nie na liście wiadomości.
+- Doniesienia medialne: po jednej regionalnej rozgłośni publicznej na województwo (`server/news-sources.mjs`, lista RADIO). Tylko tytuł + link, oznaczone „doniesienie medialne”, filtr: poważne zdarzenia (bez sportu, kultury i rozmów). Serwer czyta robots.txt rozgłośni i pomija źródło, jeśli zabrania pobierania. Które rozgłośnie działają, widać w `news-report.json`.
+- Wiadomości z kraju, z komend wojewódzkich i z mediów są deduplikowane po tytule (wygrywa źródło oficjalne).
