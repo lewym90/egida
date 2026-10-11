@@ -63,7 +63,9 @@ async function runSource(src) {
       } catch (e) { rep.urls.push({ url: u, error: String(e.message || e) }); }
     }
     if (!raws.length && src.htmlFallback) { // zapasowo: lista „Aktualności” ze strony jednostki
-      try { const items = parseHtmlList(await get(src.htmlFallback), src.htmlFallback); rep.urls.push({ url: src.htmlFallback, status: 200, items: items.length, fallback: true }); raws.push(...items); }
+      try { const html = await get(src.htmlFallback); const items = parseHtmlList(html, src.htmlFallback);
+        if (items.length < 3) rep.htmlSample = [...html.matchAll(/<a[^>]+href\s*=\s*["'][^"']*\/\d{4,},[^>]*>/gi)].slice(0, 2).map((m) => html.slice(Math.max(0, m.index - 150), m.index + 450));; // diagnostyka układu strony
+        rep.urls.push({ url: src.htmlFallback, status: 200, items: items.length, fallback: true }); raws.push(...items); }
       catch (e) { rep.urls.push({ url: src.htmlFallback, error: String(e.message || e), fallback: true }); }
     }
     rep.fetched = raws.length;

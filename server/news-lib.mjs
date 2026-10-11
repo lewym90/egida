@@ -113,11 +113,18 @@ export function toItem(raw, src, nowMs) {
 }
 
 /** Łączy wpisy ze wszystkich źródeł: deduplikacja po adresie, limit na źródło, sortowanie od najnowszych. */
+const titleKey = (t) => String(t).toLowerCase().replace(/ł/g, "l").normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").trim().slice(0, 80);
+/** Łączy wpisy ze wszystkich źródeł: deduplikacja po adresie i po tytule (ta sama wiadomość z portalu krajowego i z komendy; zostaje wersja z komendy), limit na źródło, sortowanie od najnowszych. */
 export function mergeItems(lists, nowMs) {
   const byId = new Map();
   for (const items of lists) {
     const per = [...items].sort((a, b) => b.date.localeCompare(a.date)).slice(0, LIMITS.perSource);
     for (const it of per) if (!byId.has(it.id)) byId.set(it.id, it);
   }
-  return [...byId.values()].filter((x) => nowMs - new Date(x.date).getTime() <= LIMITS.maxAgeDays * 864e5).sort((a, b) => b.date.localeCompare(a.date)).slice(0, LIMITS.total);
+  const byTitle = new Map();
+  for (const it of byId.values()) {
+    const k = titleKey(it.title), cur = byTitle.get(k);
+    if (!cur || (cur.region === "mixed" && it.region !== "mixed")) byTitle.set(k, it);
+  }
+  return [...byTitle.values()].filter((x) => nowMs - new Date(x.date).getTime() <= LIMITS.maxAgeDays * 864e5).sort((a, b) => b.date.localeCompare(a.date)).slice(0, LIMITS.total);
 }

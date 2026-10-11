@@ -80,6 +80,12 @@ ok("mergeItems: deduplikacja, sortowanie, limit na źródło", () => {
   assert.equal(m[0].id, "a/0");
   assert.ok(m.every((x, i) => i === 0 || m[i - 1].date >= x.date));
 });
+ok("mergeItems: ta sama wiadomość z portalu krajowego i z komendy – zostaje wersja z komendy", () => {
+  const a = { id: "p/1", title: "Miał do odsiadki ponad 3 lata za oszustwa!", summary: "", url: "https://p/1", date: "2026-10-11T08:00:00.000Z", source: "Policja (portal krajowy)", region: "mixed", kind: "rss" };
+  const b = { ...a, id: "d/2", url: "https://d/2", source: "Policja Dolnośląska", region: "dolnoslaskie" };
+  assert.deepEqual(mergeItems([[a], [b]], NOW).map((x) => x.region), ["dolnoslaskie"]);
+  assert.deepEqual(mergeItems([[b], [a]], NOW).map((x) => x.region), ["dolnoslaskie"]);
+});
 ok("safeHttps", () => { assert.equal(safeHttps("http://a.pl"), null); assert.equal(safeHttps("data:text/html,x"), null); assert.ok(safeHttps("https://a.pl/x")); });
 ok("źródła: 16 jednostek Policji, wszystkie id województw istnieją, adresy https", () => {
   const ids = new Set(VOIVODESHIPS.map((v) => v.id));
