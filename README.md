@@ -52,5 +52,10 @@ Bez tokenu skrypt działa „na sucho”: zapisuje dane, niczego nie wysyła. Pr
 - **Strażnik** (`server/watchdog.mjs`): alarm na Telegram przy awarii pobierania komunikatów. `node server/tg-admin-id.mjs` pokazuje `ADMIN_CHAT_ID` (po wpisaniu w `.env`), `bash server/install.sh --watchdog-cron` włącza (co 10 min), `--watchdog-uncron` wyłącza, `node server/watchdog.mjs --status` pokazuje stan. Nie wykryje awarii całego VPS (potrzebny monitoring zewnętrzny).
 - Nowe treści (tryb zagrożenia, polityka prywatności, instrukcje) mają `reviewed: null` – wymagają zatwierdzenia; polityka prywatności – przeglądu prawnego.
 
+## Wersja 16: czas dotarcia, cieniowanie obwodów, raport typów NEPTUN
+- **Szacowanie prędkości** (`estimateMotion`, `ThreatStore.trackMotion` w `js/neptun.js`): NEPTUN nie podaje prędkości, więc aplikacja liczy ją z przesunięcia kolejnych potwierdzonych pozycji (dokładność ≤ 6 km, przesunięcie ≥ 3 km i większe od niepewności pozycji, kierunek zgodny z kursem ±50°). Wynik jest oznaczony „(szacunek)” i służy tylko do wyświetlania toru oraz „do granicy Polski w tym tempie ok. N min”. Nie wszczyna alarmu i nie wpływa na powiadomienia Telegram (obserwator na serwerze nie trzyma historii pozycji).
+- **Cieniowanie obwodów z alarmem w Ukrainie** (`js/ua-shade.js`, granice `js/ua-oblasts.js` generowane `node scripts/build-ua-oblasts.mjs <ne_10m_admin_1_states_provinces.geojson>` z Natural Earth): cały obwód zacieniowany mocniej, obwód z alarmem tylko w części rejonów lżej i przerywaną linią (granic rejonów nie mamy). Krym i Sewastopol nie są cieniowane (brak w Natural Earth). Przełącznik w panelu mapy.
+- **Raport `neptun-seen.json`** (gałąź `data`, `server/neptun-seen.mjs`): zapis wszystkich widzianych typów obiektów, pól, wartości pól wyliczeniowych oraz pierwszych próbek rzadkich rekordów (z `trail`, z prędkością, grupowych…). Zasilają go obserwator (co 10 s) i sonda; plik tylko rośnie. Surowy plik na serwerze: `/opt/egida/neptun-seen.json`.
+
 ## Dalej
 Alerty poziomu 2 z torem po weryfikacji formatu NEPTUN, zatwierdzenie treści (`reviewed`), zewnętrzny monitoring VPS.
