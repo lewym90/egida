@@ -1,0 +1,905 @@
+{
+ "generatedAt": "2026-10-11T00:15:01.616Z",
+ "note": "Raport o strukturze danych NEPTUN (neptun.in.ua). Próbki ucięte, tylko do diagnostyki formatu.",
+ "rest": [
+  {
+   "path": "threats",
+   "status": 200,
+   "ms": 659,
+   "contentType": "application/json",
+   "bytes": 1100,
+   "cors": "*",
+   "enums": {
+    "type": {
+     "kab": 1
+    },
+    "status": {
+     "active": 1
+    },
+    "lifecycle": {
+     "confirmed": 1
+    },
+    "positionQuality": {
+     "confirmed": 1
+    },
+    "confidenceLevel": {
+     "high": 1
+    },
+    "displayConfidence": {
+     "high": 1
+    }
+   },
+   "withTrail": [
+    {
+     "id": "trk_00255526",
+     "type": "kab",
+     "title": "Керована авіабомба",
+     "region": "Харківська область",
+     "district": "",
+     "locality": "Приколотне",
+     "lat": 50.192597934967914,
+     "lon": 37.46919448954995,
+     "heading": null,
+     "confidenceLevel": "high",
+     "sourceCount": 3,
+     "updatedAt": "2026-10-11T00:12:42Z",
+     "explanationShort": "Керована авіабомба — Приколотне, Харківська область. Підтверджень: 3.",
+     "status": "active",
+     "confirmedAt": "2026-10-11T00:12:42Z",
+     "uncertaintyKm": 10,
+     "positionQuality": "confirmed",
+     "trail": [
+      {
+       "lat": 50.186,
+       "lon": 37.476,
+       "t": "2026-10-10T23:49:55Z"
+      },
+      {
+       "lat": 50.20485048018567,
+       "lon": 37.4565564709995,
+       "t": "2026-10-10T23:50:12Z"
+      },
+      {
+       "lat": 50.19834600066953,
+       "lon": 37.46326558582626,
+       "t": "2026-10-10T23:50:12Z"
+      },
+      {
+       "lat": 50.186999229944796,
+       "lon": 37.4749693336075,
+       "t": "2026-10-10T23:54:49Z"
+      },
+      {
+       "lat": 50.215097825662944,
+       "lon": 37.44598673712519,
+       "t": "2026-10-11T00:01:54Z"
+      }
+     ],
+     "lifecycle": "confirmed",
+     "displayConfidence": "high"
+    }
+   ],
+   "withCount": [],
+   "areaOnly": [],
+   "stale": [],
+   "topLevel": [
+    "serverTime",
+    "threats"
+   ],
+   "shape": {
+    "type": "object",
+    "fields": {
+     "serverTime": {
+      "type": "string"
+     },
+     "threats": {
+      "type": "array",
+      "length": 1,
+      "item": {
+       "type": "object",
+       "fields": {
+        "id": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "1/1"
+        },
+        "type": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "1/1"
+        },
+        "title": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "1/1"
+        },
+        "region": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "1/1"
+        },
+        "district": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "1/1"
+        },
+        "locality": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "1/1"
+        },
+        "lat": {
+         "types": [
+          "number"
+         ],
+         "presentIn": "1/1"
+        },
+        "lon": {
+         "types": [
+          "number"
+         ],
+         "presentIn": "1/1"
+        },
+        "heading": {
+         "types": [
+          "null"
+         ],
+         "presentIn": "1/1"
+        },
+        "confidenceLevel": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "1/1"
+        },
+        "sourceCount": {
+         "types": [
+          "number"
+         ],
+         "presentIn": "1/1"
+        },
+        "updatedAt": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "1/1"
+        },
+        "explanationShort": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "1/1"
+        },
+        "status": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "1/1"
+        },
+        "confirmedAt": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "1/1"
+        },
+        "uncertaintyKm": {
+         "types": [
+          "number"
+         ],
+         "presentIn": "1/1"
+        },
+        "positionQuality": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "1/1"
+        },
+        "trail": {
+         "types": [
+          "array"
+         ],
+         "presentIn": "1/1",
+         "nested": {
+          "type": "array",
+          "length": 7,
+          "item": {
+           "types": [
+            "object"
+           ]
+          }
+         }
+        },
+        "lifecycle": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "1/1"
+        },
+        "displayConfidence": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "1/1"
+        }
+       }
+      }
+     }
+    }
+   },
+   "samples": [
+    {
+     "id": "trk_00255526",
+     "type": "kab",
+     "title": "Керована авіабомба",
+     "region": "Харківська область",
+     "district": "",
+     "locality": "Приколотне",
+     "lat": 50.192597934967914,
+     "lon": 37.46919448954995,
+     "heading": null,
+     "confidenceLevel": "high",
+     "sourceCount": 3,
+     "updatedAt": "2026-10-11T00:12:42Z",
+     "explanationShort": "Керована авіабомба — Приколотне, Харківська область. Підтверджень: 3.",
+     "status": "active",
+     "confirmedAt": "2026-10-11T00:12:42Z",
+     "uncertaintyKm": 10,
+     "positionQuality": "confirmed",
+     "trail": [
+      {
+       "lat": 50.186,
+       "lon": 37.476,
+       "t": "2026-10-10T23:49:55Z"
+      },
+      {
+       "lat": 50.20485048018567,
+       "lon": 37.4565564709995,
+       "t": "2026-10-10T23:50:12Z"
+      },
+      {
+       "lat": 50.19834600066953,
+       "lon": 37.46326558582626,
+       "t": "2026-10-10T23:50:12Z"
+      },
+      {
+       "lat": 50.186999229944796,
+       "lon": 37.4749693336075,
+       "t": "2026-10-10T23:54:49Z"
+      },
+      {
+       "lat": 50.215097825662944,
+       "lon": 37.44598673712519,
+       "t": "2026-10-11T00:01:54Z"
+      }
+     ],
+     "lifecycle": "confirmed",
+     "displayConfidence": "high"
+    }
+   ],
+   "scalarFields": {
+    "serverTime": "2026-10-11T00:14:58.979Z"
+   }
+  },
+  {
+   "path": "alerts",
+   "status": 200,
+   "ms": 89,
+   "contentType": "application/json",
+   "bytes": 4988,
+   "cors": "*",
+   "topLevel": [
+    "version",
+    "updatedAt",
+    "raions",
+    "oblasts"
+   ],
+   "shape": {
+    "type": "object",
+    "fields": {
+     "version": {
+      "type": "number"
+     },
+     "updatedAt": {
+      "type": "string"
+     },
+     "raions": {
+      "type": "array",
+      "length": 25,
+      "item": {
+       "type": "object",
+       "fields": {
+        "key": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "25/25"
+        },
+        "name": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "25/25"
+        },
+        "oblast": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "25/25"
+        },
+        "since": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "25/25"
+        },
+        "level": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "25/25"
+        },
+        "reasons": {
+         "types": [
+          "array"
+         ],
+         "presentIn": "24/25",
+         "nested": {
+          "type": "array",
+          "length": 1,
+          "item": {
+           "types": [
+            "string"
+           ]
+          }
+         }
+        }
+       }
+      }
+     },
+     "oblasts": {
+      "type": "array",
+      "length": 3,
+      "item": {
+       "type": "object",
+       "fields": {
+        "key": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "3/3"
+        },
+        "name": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "3/3"
+        },
+        "oblast": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "3/3"
+        },
+        "since": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "3/3"
+        },
+        "level": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "3/3"
+        }
+       }
+      }
+     }
+    }
+   },
+   "samples": [
+    {
+     "key": "бахмутський",
+     "name": "Бахмутський район",
+     "oblast": "Донецька область",
+     "since": "2026-10-10T17:05:50.098184Z",
+     "level": "red",
+     "reasons": [
+      "Ракетна загроза (червоний рівень)"
+     ]
+    },
+    {
+     "key": "бердянський",
+     "name": "Бердянський район",
+     "oblast": "Запорізька область",
+     "since": "2026-10-10T22:10:09.228882Z",
+     "level": "red",
+     "reasons": [
+      "Ракетна загроза (червоний рівень)"
+     ]
+    },
+    {
+     "key": "броварський",
+     "name": "Броварський район",
+     "oblast": "Київська область",
+     "since": "2026-10-10T23:48:13.988177Z",
+     "level": "yellow",
+     "reasons": [
+      "Дронова загроза (жовтий рівень)"
+     ]
+    }
+   ],
+   "scalarFields": {
+    "version": 1791677549,
+    "updatedAt": "2026-10-11T00:12:29.033224233Z"
+   }
+  },
+  {
+   "path": "messages",
+   "status": 200,
+   "ms": 108,
+   "contentType": "application/json",
+   "bytes": 18140,
+   "cors": "*",
+   "topLevel": [
+    "messages",
+    "updatedAt"
+   ],
+   "shape": {
+    "type": "object",
+    "fields": {
+     "messages": {
+      "type": "array",
+      "length": 120,
+      "item": {
+       "type": "object",
+       "fields": {
+        "channel": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "50/50"
+        },
+        "text": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "50/50"
+        },
+        "date": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "50/50"
+        }
+       }
+      }
+     },
+     "updatedAt": {
+      "type": "string"
+     }
+    }
+   },
+   "samples": [
+    {
+     "channel": "@monitor1654",
+     "text": "Активність ворожої авіації на сході⚠️",
+     "date": "2026-10-11T00:14:37Z"
+    },
+    {
+     "channel": "@kharkivlife",
+     "text": "Активність ворожої авіації на сході",
+     "date": "2026-10-11T00:14:12Z"
+    },
+    {
+     "channel": "@monitor1654",
+     "text": "Активність ворожої авіації на сході⚠️",
+     "date": "2026-10-11T00:13:48Z"
+    }
+   ],
+   "scalarFields": {
+    "updatedAt": "2026-10-11T00:14:50.380266262Z"
+   }
+  }
+ ],
+ "ws": {
+  "url": "/stream",
+  "frames": [
+   {
+    "type": "snapshot",
+    "keys": [
+     "type",
+     "ts",
+     "data"
+    ],
+    "shape": {
+     "type": "object",
+     "fields": {
+      "threats": {
+       "type": "array",
+       "length": 1,
+       "item": {
+        "type": "object",
+        "fields": {
+         "id": {
+          "types": [
+           "string"
+          ],
+          "presentIn": "1/1"
+         },
+         "type": {
+          "types": [
+           "string"
+          ],
+          "presentIn": "1/1"
+         },
+         "title": {
+          "types": [
+           "string"
+          ],
+          "presentIn": "1/1"
+         },
+         "region": {
+          "types": [
+           "string"
+          ],
+          "presentIn": "1/1"
+         },
+         "district": {
+          "types": [
+           "string"
+          ],
+          "presentIn": "1/1"
+         },
+         "locality": {
+          "types": [
+           "string"
+          ],
+          "presentIn": "1/1"
+         },
+         "lat": {
+          "types": [
+           "number"
+          ],
+          "presentIn": "1/1"
+         },
+         "lon": {
+          "types": [
+           "number"
+          ],
+          "presentIn": "1/1"
+         },
+         "heading": {
+          "types": [
+           "null"
+          ],
+          "presentIn": "1/1"
+         },
+         "confidenceLevel": {
+          "types": [
+           "string"
+          ],
+          "presentIn": "1/1"
+         },
+         "sourceCount": {
+          "types": [
+           "number"
+          ],
+          "presentIn": "1/1"
+         },
+         "updatedAt": {
+          "types": [
+           "string"
+          ],
+          "presentIn": "1/1"
+         },
+         "explanationShort": {
+          "types": [
+           "string"
+          ],
+          "presentIn": "1/1"
+         },
+         "status": {
+          "types": [
+           "string"
+          ],
+          "presentIn": "1/1"
+         },
+         "confirmedAt": {
+          "types": [
+           "string"
+          ],
+          "presentIn": "1/1"
+         },
+         "uncertaintyKm": {
+          "types": [
+           "number"
+          ],
+          "presentIn": "1/1"
+         },
+         "positionQuality": {
+          "types": [
+           "string"
+          ],
+          "presentIn": "1/1"
+         },
+         "trail": {
+          "types": [
+           "array"
+          ],
+          "presentIn": "1/1",
+          "nested": {
+           "type": "array",
+           "length": 7,
+           "item": {
+            "types": [
+             "object"
+            ]
+           }
+          }
+         },
+         "lifecycle": {
+          "types": [
+           "string"
+          ],
+          "presentIn": "1/1"
+         },
+         "displayConfidence": {
+          "types": [
+           "string"
+          ],
+          "presentIn": "1/1"
+         }
+        }
+       }
+      }
+     }
+    },
+    "sample": {
+     "threats": [
+      {
+       "id": "trk_00255526",
+       "type": "kab",
+       "title": "Керована авіабомба",
+       "region": "Харківська область",
+       "district": "",
+       "locality": "Приколотне",
+       "lat": 50.192597934967914,
+       "lon": 37.46919448954995,
+       "heading": null,
+       "confidenceLevel": "high",
+       "sourceCount": 3,
+       "updatedAt": "2026-10-11T00:12:42Z",
+       "explanationShort": "Керована авіабомба — Приколотне, Харківська область. Підтверджень: 3.",
+       "status": "active",
+       "confirmedAt": "2026-10-11T00:12:42Z",
+       "uncertaintyKm": 10,
+       "positionQuality": "confirmed",
+       "trail": [
+        "{…}",
+        "{…}",
+        "{…}",
+        "{…}",
+        "{…}"
+       ],
+       "lifecycle": "confirmed",
+       "displayConfidence": "high"
+      }
+     ]
+    }
+   },
+   {
+    "type": "alerts",
+    "keys": [
+     "type",
+     "ts",
+     "data"
+    ],
+    "shape": {
+     "type": "object",
+     "fields": {
+      "version": {
+       "type": "number"
+      },
+      "updatedAt": {
+       "type": "string"
+      },
+      "raions": {
+       "type": "array",
+       "length": 25,
+       "item": {
+        "type": "object",
+        "fields": {
+         "key": {
+          "types": [
+           "string"
+          ],
+          "presentIn": "25/25"
+         },
+         "name": {
+          "types": [
+           "string"
+          ],
+          "presentIn": "25/25"
+         },
+         "oblast": {
+          "types": [
+           "string"
+          ],
+          "presentIn": "25/25"
+         },
+         "since": {
+          "types": [
+           "string"
+          ],
+          "presentIn": "25/25"
+         },
+         "level": {
+          "types": [
+           "string"
+          ],
+          "presentIn": "25/25"
+         },
+         "reasons": {
+          "types": [
+           "array"
+          ],
+          "presentIn": "24/25",
+          "nested": {
+           "type": "array",
+           "length": 1,
+           "item": {
+            "types": [
+             "string"
+            ]
+           }
+          }
+         }
+        }
+       }
+      },
+      "oblasts": {
+       "type": "array",
+       "length": 3,
+       "item": {
+        "type": "object",
+        "fields": {
+         "key": {
+          "types": [
+           "string"
+          ],
+          "presentIn": "3/3"
+         },
+         "name": {
+          "types": [
+           "string"
+          ],
+          "presentIn": "3/3"
+         },
+         "oblast": {
+          "types": [
+           "string"
+          ],
+          "presentIn": "3/3"
+         },
+         "since": {
+          "types": [
+           "string"
+          ],
+          "presentIn": "3/3"
+         },
+         "level": {
+          "types": [
+           "string"
+          ],
+          "presentIn": "3/3"
+         }
+        }
+       }
+      }
+     }
+    },
+    "sample": {
+     "version": 1791677549,
+     "updatedAt": "2026-10-11T00:12:29.033224233Z",
+     "raions": [
+      {
+       "key": "бахмутський",
+       "name": "Бахмутський район",
+       "oblast": "Донецька область",
+       "since": "2026-10-10T17:05:50.098184Z",
+       "level": "red",
+       "reasons": [
+        "Ракетна загроза (червоний рівень)"
+       ]
+      },
+      {
+       "key": "бердянський",
+       "name": "Бердянський район",
+       "oblast": "Запорізька область",
+       "since": "2026-10-10T22:10:09.228882Z",
+       "level": "red",
+       "reasons": [
+        "Ракетна загроза (червоний рівень)"
+       ]
+      },
+      {
+       "key": "броварський",
+       "name": "Броварський район",
+       "oblast": "Київська область",
+       "since": "2026-10-10T23:48:13.988177Z",
+       "level": "yellow",
+       "reasons": [
+        "Дронова загроза (жовтий рівень)"
+       ]
+      },
+      {
+       "key": "василівський",
+       "name": "Василівський район",
+       "oblast": "Запорізька область",
+       "since": "2026-10-10T22:10:09.066088Z",
+       "level": "red",
+       "reasons": [
+        "Ракетна загроза (червоний рівень)"
+       ]
+      },
+      {
+       "key": "вишгородський",
+       "name": "Вишгородський район",
+       "oblast": "Київська область",
+       "since": "2026-10-10T23:48:14.177372Z",
+       "level": "yellow",
+       "reasons": [
+        "Дронова загроза (жовтий рівень)"
+       ]
+      }
+     ],
+     "oblasts": [
+      {
+       "key": "автономна республіка крим",
+       "name": "Автономна Республіка Крим",
+       "oblast": "Автономна Республіка Крим",
+       "since": "2022-12-10T22:22:00Z",
+       "level": "red"
+      },
+      {
+       "key": "луганська",
+       "name": "Луганська область",
+       "oblast": "Луганська область",
+       "since": "2022-04-04T16:45:00Z",
+       "level": "red"
+      },
+      {
+       "key": "севастополь",
+       "name": "Севастополь",
+       "oblast": "Автономна Республіка Крим",
+       "since": "2022-12-10T22:22:00Z",
+       "level": "red"
+      }
+     ]
+    }
+   },
+   {
+    "type": "heartbeat",
+    "keys": [
+     "type",
+     "ts"
+    ],
+    "shape": {
+     "type": "null"
+    },
+    "sample": {
+     "type": "heartbeat",
+     "ts": "2026-10-11T00:15:09.641Z"
+    }
+   }
+  ],
+  "opened": true
+ }
+}
