@@ -45,6 +45,9 @@ button,select,input{font:inherit;color:inherit}
 
 /* Układ */
 .shell{display:block;min-height:100dvh}
+/* Telefon: przewija się panel aplikacji, a nie cała strona. Dolny pasek zostaje na miejscu i nie da się „wyciągnąć” pustego obszaru pod nim (iOS odbijał stronę razem z paskiem). */
+@media (max-width:959px){html,body{height:100%;overflow:hidden;overscroll-behavior:none}.shell{height:100vh;height:100dvh;min-height:0;overflow-y:auto;overflow-x:hidden;overscroll-behavior:none;-webkit-overflow-scrolling:touch}}
+@media print{html,body{height:auto!important;overflow:visible!important}.shell{height:auto!important;overflow:visible!important}}
 .side{display:none}
 .main{max-width:520px;margin:0 auto;padding:0 16px 150px}
 .topbar{display:flex;align-items:center;flex-wrap:wrap;gap:10px;padding:14px 0 10px;background:var(--bg)}

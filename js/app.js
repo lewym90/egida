@@ -653,7 +653,7 @@ function render() {
   else if (route === "ustawienia") showSwVersion();
   const titles = { wazne: "Wiadomości", pulpit: "Pulpit", alerty: "Alerty", mapa: "Mapa", poradnik: "Poradnik", plecak: "Plecak", "pierwsza-pomoc": "Pierwsza pomoc", test: "Test gotowości", ustawienia: "Ustawienia", zrodla: "Źródła", telegram: "Powiadomienia Telegram", schrony: "Schrony", "plan-rodziny": "Plan rodziny", zagrozenie: "Tryb zagrożenia", miejsca: "Ważne miejsca", prywatnosc: "Polityka prywatności", wiecej: "Więcej" };
   document.title = `EGIDA – ${titles[route] || "Pulpit"}`;
-  window.scrollTo(0, 0);
+  window.scrollTo(0, 0); { const sh = document.querySelector(".shell"); if (sh) sh.scrollTop = 0; }
 }
 
 /* ---------- GPS -> województwo (uproszczone granice PRG/GUGiK, bez wysyłania pozycji) ---------- */

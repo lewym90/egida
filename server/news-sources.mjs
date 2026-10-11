@@ -22,10 +22,10 @@ const NATIONAL = [
   ["polsatnews", "Polsat News", ["https://www.polsatnews.pl/rss/polska.xml"]],
   ["tvn24", "TVN24", ["https://tvn24.pl/najnowsze.xml", "https://tvn24.pl/polska.xml"]],
   ["rmf24", "RMF24", ["https://www.rmf24.pl/fakty/polska/feed", "https://www.rmf24.pl/feed"]],
-  ["radiozet", "Radio ZET", ["https://wiadomosci.radiozet.pl/rss", "https://www.radiozet.pl/rss"]],
+  ["radiozet", "Radio ZET", ["https://wiadomosci.radiozet.pl/rss"], "https://wiadomosci.radiozet.pl/"], // adres kanału serwer wyszukuje na stronie głównej (link rel=alternate)
   ["interia", "Interia", ["https://wydarzenia.interia.pl/feed", "https://wydarzenia.interia.pl/polska/feed"]],
-  ["tvpinfo", "TVP Info", ["https://www.tvp.info/feed", "https://www.tvp.info/rss"]],
-  ["polskieradio24", "Polskie Radio 24", ["https://www.polskieradio24.pl/rss", "https://www.polskieradio.pl/rss"]],
+  ["tvpinfo", "TVP Info", ["https://www.tvp.info/feed"], "https://www.tvp.info/"],
+  // Polskie Radio 24: robots.txt zabrania pobierania – pomijamy.
   ["info112", "Info112", ["https://info112.pl/feed/"]],
 ];
 // Komendy Wojewódzkie PSP na gov.pl (adresy: gov.pl/web/kwpsp-<miasto>/aktualnosci).
@@ -76,11 +76,11 @@ export const SOURCES = [
     urls: ["https://www.radio.katowice.pl/"], scrape: { link: "^https://(?:www\\.)?radio\\.katowice\\.pl/zobacz,\\d+," } },
   // WARSTWA 2: portale ogólnopolskie (RSS). Wpis trafia do województwa wymienionego w tytule (miejscowość lub region); zagrożenie krajowe bez miejsca (np. zamach) – do całego kraju.
   // Pokazujemy wyłącznie nagłówek, nazwę źródła i link. Podane adresy to kandydaci: pierwszy, który odpowie i zawiera wpisy, jest używany; robots.txt respektowany; o działaniu decyduje news-report.json.
-  ...NATIONAL.map(([id, label, urls]) => ({ id: "media-" + id, label, region: "all", kind: "media", filter: "media", national: true, urls })),
+  ...NATIONAL.map(([id, label, urls, discover]) => ({ id: "media-" + id, label, region: "all", kind: "media", filter: "media", national: true, urls, ...(discover ? { discover } : {}) })),
   // Regionalne portale: Lublin112 (Lubelskie) – cały RSS; wiadomości „z kraju” pomijamy, chyba że dotyczą zagrożenia w Polsce.
   { id: "media-lublin112", label: "Lublin112", region: "lubelskie", kind: "media", filter: "media", local: true, urls: ["https://www.lublin112.pl/feed/"] },
   // WARSTWA 3: Państwowa Straż Pożarna – komendy wojewódzkie (oficjalne, szybsze niż policja przy pożarach, powodziach, wypadkach). Kilka możliwych adresów: pierwszy działający wystarcza.
-  ...PSP.map(([region, slugs]) => ({ id: "kwpsp-" + region, label: "Straż Pożarna (KW PSP) – " + (VOIV_NAME[region] || region), region, kind: "html", filter: "safety", urls: slugs.map((x) => `https://www.gov.pl/web/kwpsp-${x}/aktualnosci`) })),
+  ...PSP.map(([region, slugs]) => ({ id: "kwpsp-" + region, label: "Straż Pożarna (KW PSP) – " + (VOIV_NAME[region] || region), region, kind: "html", filter: "safety", urls: slugs.flatMap((x) => [`https://www.gov.pl/web/kwpsp-${x}/aktualnosci`, `https://www.gov.pl/web/kwpsp-${x}/wiadomosci`]) })),
   // Urzędy wojewódzkie i kuratoria (sprawdzone z serwera: HTTP 200)
   // Urzędy wojewódzkie (gov.pl): ostrzeżenia, komunikaty, informacje wojewody. Wiadomości lub strona główna urzędu; o działaniu każdego decyduje news-report.json.
   { id: "uw-dolnoslaski", label: "Dolnośląski Urząd Wojewódzki", region: "dolnoslaskie", kind: "html", filter: "safety", urls: ["https://www.gov.pl/web/uw-dolnoslaski/wiadomosci", "https://www.gov.pl/web/uw-dolnoslaski"] },

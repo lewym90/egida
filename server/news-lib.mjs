@@ -41,8 +41,10 @@ export function parseRss(xml) {
   const arr = (x) => (x == null ? [] : Array.isArray(x) ? x : [x]);
   const txt = (v) => (v && typeof v === "object" ? v["#text"] ?? "" : v ?? "");
   const out = [];
+  const base = safeHttps(stripTags(txt(j?.rss?.channel?.link))); // niektóre kanały (np. Radio Opole) podają adresy względne
+  const abs = (l) => { const x = stripTags(txt(l)); if (!x) return null; try { return safeHttps(new URL(x, base || undefined).href); } catch { return null; } };
   for (const it of arr(j?.rss?.channel?.item)) {
-    const title = stripTags(txt(it.title)), url = safeHttps(stripTags(txt(it.link)));
+    const title = stripTags(txt(it.title)), url = abs(it.link);
     if (!title || !url) continue;
     out.push({ title, url, date: toIso(txt(it.pubDate) || txt(it.date) || txt(it["dc:date"])), summary: stripTags(txt(it.description)), cats: arr(it.category).map((c) => stripTags(txt(c))).join(" ") });
   }

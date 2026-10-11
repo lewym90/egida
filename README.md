@@ -101,3 +101,8 @@ Alerty poziomu 2 z torem po weryfikacji formatu NEPTUN, zatwierdzenie treści (`
 - **Warstwa 2 – szybszy obieg:** doniesienia medialne odświeżane co ~5 min (`node news-sync.mjs --fast`), pozostałe źródła co ~14 min.
 - **Warstwa 3 – Straż Pożarna:** 16 komend wojewódzkich PSP (gov.pl/web/kwpsp-<miasto>/aktualnosci).
 - Poprawka lokalizacji: „walczą” nie jest już Wałczem, a „z łodzi” (mała litera) nie jest Łodzią.
+
+## Wersja 24: dolny pasek na telefonie stoi w miejscu
+- Na telefonie przewija się panel aplikacji (`.shell`), a nie cała strona, więc nie da się już „wyciągnąć” pustego obszaru pod dolnym paskiem (iOS odbijał stronę razem z paskiem). Na komputerze bez zmian; wydruk bez zmian.
+- **Mapa obiektów (NEPTUN): ślad i szacunek.** Obok ostatniej zgłoszonej pozycji rysujemy przebytą drogę (punkty z API i z kolejnych odczytów, godzina po dotknięciu kropki). Dla dronów z kursem, ale bez prędkości, pokazujemy osobny znacznik „≈ teraz (szacunek)”: ostatnie zgłoszenie przesunięte wzdłuż kursu o typową prędkość (dron 180 km/h, rozpoznawczy 120 km/h), tylko dla zgłoszeń od 30 s do 10 min, bez rakiet i bomb. Szacunek służy wyłącznie do wyświetlania; oceny i powiadomienia go nie używają.
+- **Źródła wiadomości:** Radio Opole (adresy względne w RSS), wyszukiwanie kanału na stronach Radia ZET i TVP Info, rezerwowe adresy KW PSP (np. Katowice `/wiadomosci`), usunięty Polskie Radio 24 (robots.txt zabrania pobierania).

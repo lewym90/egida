@@ -29,7 +29,7 @@ ok("Lublin112: wpis z Lublina → lubelskie; wiadomość z kraju odpada; zamach 
   assert.equal(mk("media-lublin112", "Zatrzymano mężczyznę, który planował zamach na Donalda Tuska. Groźby dotyczyły też szefa MON", "Kraj, zamach").region, "all");
 });
 ok("źródła: portale krajowe, Lublin112 i 16 komend PSP są na liście, wszystkie z jawnym adresem https", () => {
-  for (const id of ["media-polsatnews", "media-tvn24", "media-rmf24", "media-radiozet", "media-interia", "media-tvpinfo", "media-polskieradio24", "media-info112", "media-lublin112"]) assert.ok(S(id), id);
+  for (const id of ["media-polsatnews", "media-tvn24", "media-rmf24", "media-radiozet", "media-interia", "media-tvpinfo", "media-info112", "media-lublin112"]) assert.ok(S(id), id);
   const psp = SOURCES.filter((x) => x.id.startsWith("kwpsp-")); assert.equal(psp.length, 16);
   for (const s of SOURCES) for (const u of s.urls || []) assert.ok(/^https:\/\//.test(u), s.id + " " + u);
   assert.equal(new Set(SOURCES.map((x) => x.id)).size, SOURCES.length);
@@ -43,5 +43,10 @@ ok("gazetter: „walczą” i „z łodzi” nie są miejscowościami, Łódź i
     assert.ok(!mentionsRegion("Strażacy walczą z ogniem", "zachodniopomorskie"));
   assert.ok(!mentionsRegion("Uratowano rybaków z łodzi", "lodzkie"));
   assert.ok(mentionsRegion("Pożar w Łodzi", "lodzkie") && mentionsRegion("Wypadek w Wałczu", "zachodniopomorskie"));
+});
+ok("telefon: przewija się panel .shell, strona jest zablokowana (dolny pasek nie odbija się z treścią)", () => {
+  const css = readFileSync(new URL("../css/style.css", import.meta.url), "utf8");
+  assert.ok(/@media \(max-width:959px\)\{html,body\{height:100%;overflow:hidden;overscroll-behavior:none\}\.shell\{[^}]*overflow-y:auto/.test(css));
+  assert.ok(/@media print\{html,body\{height:auto!important/.test(css));
 });
 console.log(`OK: ${n} grup testów v23 przeszło`);

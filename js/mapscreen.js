@@ -98,7 +98,7 @@ function threatText(row) {
     ? `do granicy Polski w tym tempie ok. ${Math.max(1, Math.round(row.border.etaMin))} min (szacunek, może się zmienić)` : "";
   const posn = !t.destination && t.posQuality === "approx" ? `pozycja przybliżona${t.uncertaintyKm ? ` (±${Math.round(t.uncertaintyKm)} km)` : ""}` : "";
   const conf = t.confidence ? `pewność: ${CONF[t.confidence]}${t.sourceCount != null ? ` (${t.sourceCount} ${t.sourceCount === 1 ? "źródło" : t.sourceCount < 5 ? "źródła" : "źródeł"})` : ""}` : "pewność nieznana";
-  return [place ? `${place}` : "", where, move, bd, posn, esc(ageText(ageSec)), conf, pred.ok && pred.advancedKm > 1 ? "pozycja przeliczona na teraz" : ""].filter(Boolean).join(" · ");
+  return [place ? `${place}` : "", where, move, bd, posn, esc(ageText(ageSec)), conf, pred.ok && pred.advancedKm > 1 ? "pozycja przeliczona na teraz" : "", row.est ? `szacunkowo teraz ok. ${fmtKmPl(row.est.km)} dalej (typowa prędkość ${row.est.kmh} km/h – tylko szacunek)` : ""].filter(Boolean).join(" · ");
 }
 function badgesHtml(row) {
   const t = row.t;
@@ -378,6 +378,16 @@ export function initMapScreen(ctx, { demo = false, diag = false } = {}) {
           L.polyline([[here.lat, here.lon], [end.lat, end.lon]], { color: col, weight: 2.5, dashArray: row.pred.timed ? "8 6" : "2 8", opacity: row.pred.timed ? 0.9 : 0.6, interactive: false }).addTo(gThreats);
           row.pred.marks.filter((k) => k.minutes <= 30).forEach((k) => L.circleMarker([k.lat, k.lon], { radius: 4, color: "#fff", weight: 1, fillColor: col, fillOpacity: 1, interactive: false }).bindTooltip(`+${k.minutes} min`, { permanent: idx < 4, direction: "right", className: "thr-tip", offset: [6, 0] }).addTo(gThreats));
           if (row.pred.advancedKm > 1) L.circleMarker([t.lat, t.lon], { radius: 3, color: col, weight: 1.5, fillOpacity: 0, interactive: false }).addTo(gThreats);
+        }
+        if (row.trail?.length) { // ślad: droga z kolejnych zgłoszeń (cieńsza linia z kropkami; godzina po dotknięciu kropki)
+          L.polyline([...row.trail.map((p) => [p.lat, p.lon]), [t.lat, t.lon]], { color: col, weight: 2, opacity: 0.55, interactive: false }).addTo(gThreats);
+          row.trail.forEach((p) => L.circleMarker([p.lat, p.lon], { radius: 4, color: "#fff", weight: 1, fillColor: col, fillOpacity: 0.7 }).bindTooltip(`zgłoszenie ${hhmm(p.at)}`, { direction: "top" }).addTo(gThreats));
+        }
+        if (row.est) { // szacowane położenie „teraz”: osobny, wyraźnie oznaczony znacznik
+          L.polyline([[t.lat, t.lon], [row.est.lat, row.est.lon]], { color: col, weight: 2, dashArray: "2 6", opacity: 0.8, interactive: false }).addTo(gThreats);
+          L.circleMarker([row.est.lat, row.est.lon], { radius: 11, color: col, weight: 2, dashArray: "4 4", fillColor: col, fillOpacity: 0.12 })
+            .bindTooltip("≈ teraz (szacunek)", { permanent: idx < 4, direction: "top", className: "thr-tip", offset: [0, -8] })
+            .bindPopup(`<div class="pop"><b>Szacowane położenie, nie dane ze źródła.</b><p class="small" style="margin:6px 0">Ostatnie zgłoszenie było ${esc(ageText(row.ageSec))}. Przy kursie ${Math.round(t.headingDeg)}°${t.presumptive ? " (przypuszczalnym)" : ""} i typowej prędkości ok. ${row.est.kmh} km/h obiekt mógł od tego czasu przebyć ok. ${fmtKmPl(row.est.km)}. Prawdziwy tor i prędkość mogą być inne.</p></div>`, { maxWidth: 280 }).addTo(gThreats);
         }
         const mk = L.marker([here.lat, here.lon], { icon: threatIcon(L, row), keyboard: false, zIndexOffset: 500 }).bindPopup(popupHtml(row, demo), { autoClose: false, closeOnClick: false, autoPan: true, maxWidth: 300 }).addTo(gThreats);
         mk.on("click", () => { openId = String(t.id); });

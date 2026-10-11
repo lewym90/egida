@@ -117,6 +117,16 @@ function pickCoords(raw) {
   return c;
 }
 
+/** Ślad z API: [{lat, lon, t}] → [{at, lat, lon}] (najwyżej 40 ostatnich poprawnych punktów, od najstarszego). */
+export function parseTrail(v) {
+  if (!Array.isArray(v)) return [];
+  const out = [];
+  for (const p of v) {
+    const lat = num(p?.lat), lon = num(p?.lon), at = parseTime(p?.t ?? p?.at ?? p?.time);
+    if (lat >= -90 && lat <= 90 && lon >= -180 && lon <= 180 && at != null) out.push({ at, lat, lon });
+  }
+  return out.sort((a, b) => a.at - b.at).slice(-40);
+}
 export function normalizeThreat(input) {
   if (!input || typeof input !== "object") return null;
   // GeoJSON Feature: łączymy properties z geometry
@@ -164,6 +174,7 @@ export function normalizeThreat(input) {
     posQuality: str(String(raw.positionQuality ?? ""), 16).toLowerCase() || null,
     lifecycle: str(String(raw.lifecycle ?? ""), 16).toLowerCase() || null,
     launchedAt: parseTime(raw.launchedAt ?? raw.firstSeenAt ?? raw.createdAt),
+    trail: parseTrail(raw.trail),
   };
 }
 
@@ -243,15 +254,37 @@ export class ThreatStore {
     this.stats = { seen: 0, bad: 0 }; // statystyka dotyczy ostatniej migawki (do wykrycia zmiany formatu)
     for (const r of Array.isArray(list) ? list : []) this.upsert(r);
     for (const id of [...this.hist.keys()]) if (!this.items.has(id)) this.hist.delete(id); // obiekt zniknął z migawki: zapominamy jego ślad
+    for (const id of [...(this.path?.keys() || [])]) if (!this.items.has(id)) this.path.delete(id);
   }
   upsert(raw) {
     this.stats.seen++;
     const t = normalizeThreat(raw);
     if (!t) { this.stats.bad++; return; }
     this.trackMotion(t);
+    this.notePath(t);
     this.items.set(t.id, t);
   }
-  remove(id) { if (id != null) { this.items.delete(String(id)); this.hist.delete(String(id)); } }
+  remove(id) { if (id != null) { this.items.delete(String(id)); this.hist.delete(String(id)); this.path?.delete(String(id)); } }
+  /** Pamięć przebytej drogi (wszystkie pozycje, także przybliżone) – do rysowania śladu. Nie służy do liczenia prędkości. */
+  notePath(t) {
+    const at = t.confirmedAt ?? t.updatedAt;
+    if (at == null || t.areaOnly || t.destination) return;
+    this.path ||= new Map();
+    let h = this.path.get(t.id);
+    if (!h) this.path.set(t.id, (h = []));
+    const last = h[h.length - 1];
+    if (last && at <= last.at) return;
+    if (last && haversineKm(last, t) < 0.3) { h[h.length - 1] = { at, lat: t.lat, lon: t.lon }; return; }
+    h.push({ at, lat: t.lat, lon: t.lon });
+    while (h.length > 40) h.shift();
+  }
+  /** Ślad obiektu: punkty z API i z naszej pamięci, od najstarszego, bez bliskich duplikatów, bez ostatniej (bieżącej) pozycji. */
+  trailOf(t) {
+    const pts = [...(t.trail || []), ...(this.path?.get(t.id) || [])].sort((a, b) => a.at - b.at), out = [];
+    for (const p of pts) { const l = out[out.length - 1]; if (!l || haversineKm(l, p) >= 0.3) out.push(p); }
+    while (out.length && haversineKm(out[out.length - 1], t) < 0.3) out.pop();
+    return out.slice(-30);
+  }
   /** Zapamiętuje pozycję obiektu i, gdy źródło nie podaje prędkości, uzupełnia ją szacunkiem z ruchu (t.speedEst = true). */
   trackMotion(t) {
     const at = t.confirmedAt ?? t.updatedAt;
@@ -341,6 +374,24 @@ export function predict(t, nowMs, over = {}) {
       .map((m) => ({ ...m, ...destination(here, t.headingDeg, m.km), halfWidthKm: hw(m.km) }))
     : [];
   return { ok: true, timed, ageSec, anchor, here, bearing: t.headingDeg, speedKmh: t.speedKmh, advancedKm, horizonKm, hw, marks };
+}
+
+/* ---------- szacowane położenie „teraz” (tylko do wyświetlania, nigdy do alarmów i ocen) ----------
+ * Gdy źródło nie podaje prędkości, a z ruchu jej nie da się policzyć, dla dronów przyjmujemy typową prędkość i przesuwamy znacznik
+ * wzdłuż kursu od ostatniego zgłoszenia. Pokazujemy to jako wyraźnie oznaczony SZACUNEK, osobno od ostatniej znanej pozycji. */
+export const TYPICAL_KMH = { uav: 180, recon: 120 };
+export const ESTIMATE = { minAgeSec: 30, maxUncKm: 30 };
+export function estimateNow(t, nowMs, over = {}) {
+  const K = { ...LIMITS, ...ESTIMATE, ...over };
+  const kmh = TYPICAL_KMH[t.type];
+  if (!kmh || t.speedKmh != null || t.areaOnly || t.destination || t.headingDeg == null || t.status !== "active" || t.advisory) return null;
+  if ((t.uncertaintyKm ?? 0) > K.maxUncKm) return null;
+  const at = t.confirmedAt ?? t.updatedAt;
+  if (at == null) return null;
+  const ageSec = (nowMs - at) / 1000;
+  if (!(ageSec >= K.minAgeSec) || ageSec > K.maxAgeSec) return null;
+  const km = (kmh * ageSec) / 3600, p = destination({ lat: t.lat, lon: t.lon }, t.headingDeg, km);
+  return { lat: p.lat, lon: p.lon, kmh, km, ageSec, assumedCourse: t.presumptive === true };
 }
 
 /** Kontur pasa niepewności do narysowania: lewa i prawa krawędź + oś. */
@@ -446,7 +497,7 @@ export function buildView(store, user, feedFresh, opts = {}) {
       : assess(t, user, now, { feedFresh, pred });
     // Czas do granicy (tylko obiekty ze znaną prędkością – podaną przez źródło albo oszacowaną z ruchu; tylko do wyświetlania).
     const border = far || zone.inPoland || t.speedKmh == null ? null : borderApproach(t, now);
-    rows.push({ t, zone, far, pred, ageSec, border, assess: as });
+    rows.push({ t, zone, far, pred, ageSec, border, assess: as, trail: store.trailOf(t), est: pred.ok && pred.timed ? null : estimateNow(t, now) });
   }
   rows.sort((a, b) => a.zone.distKm - b.zone.distKm);
   areaRows.sort((a, b) => a.zone.distKm - b.zone.distKm);
