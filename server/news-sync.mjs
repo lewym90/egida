@@ -121,5 +121,6 @@ const save = (file, obj) => { const tmp = `${file}.${process.pid}.tmp`; writeFil
 let prev = []; try { prev = JSON.parse(readFileSync(OUT, "utf8")).items || []; } catch { /* pierwszy przebieg */ }
 const failedLabels = new Set(results.filter((r) => !r.rep.ok).map((r) => r.rep.label));
 const keep = prev.filter((p) => failedLabels.has(p.source));
-save(OUT, { generatedAt: report.generatedAt, items: mergeItems([items, keep], now) });
+keep.noCap = true; // uwaga: scalamy listy źródeł jeszcze raz razem z zachowanymi – NIE wolno traktować już scalonego wyniku jako jednego źródła (limit na źródło ucinał go do 15)
+save(OUT, { generatedAt: report.generatedAt, items: mergeItems([...results.map((r) => r.items), keep], now) });
 save(REPORT, report);

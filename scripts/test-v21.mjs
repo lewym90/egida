@@ -1,4 +1,5 @@
 // v21: ta sama wiadomość nigdy nie pokazuje się dwa razy (komunikaty RSO i wiadomości z kilku źródeł).
+import { readFileSync } from "node:fs";
 import assert from "node:assert/strict";
 import { storyTokens, sameStory, dedupeSimilar } from "../js/similar.js";
 import { dedupeNews } from "../js/news.js";
@@ -38,5 +39,15 @@ ok("ten sam zamach opisany czterema różnymi zdaniami to jedna sprawa, inne zda
   assert.equal(dedupeSimilar(T, (x) => x, { share: 0.75, minTokens: 4 }).length, 1);
   const other = ["Zamach bombowy w Paryżu. Nie żyją ludzie", "Pożar tartaku w Bolesławiu koło Olkusza. Na miejscu dziewięć zastępów straży"];
   assert.equal(dedupeSimilar([T[0], ...other], (x) => x, { share: 0.75, minTokens: 4 }).length, 3);
+});
+ok("news-sync scala listy źródeł jednym przebiegiem (bez ponownego scalania wyniku)", () => {
+  const src = readFileSync(new URL("../server/news-sync.mjs", import.meta.url), "utf8");
+  assert.ok(!/mergeItems\(\[items,\s*keep\]/.test(src), "mergeItems([items, keep]) ucina wynik do 15");
+  assert.ok(/mergeItems\(\[\.\.\.results\.map/.test(src));
+  const NOW = Date.parse("2026-10-11T12:00:00Z");
+  const T = ["Pożar magazynu opon w Radomiu", "Wypadek autobusu szkolnego koło Nowego Sącza", "Rzeka Wisła przekroczyła stan ostrzegawczy w Toruniu", "Burza z gradem nad Podhalem uszkodziła dachy", "Awaria prądu w Białymstoku dotknęła tysiące odbiorców", "Wyciek gazu na osiedlu w Gdyni", "Zaginął turysta w Bieszczadach", "Ostrzeżenie przed gołoledzią na Śląsku", "Kradzież kabli zatrzymała pociągi pod Opolem", "Atak hakerski na szpital w Kielcach", "Kolizja tramwajów w Łodzi", "Zatrucie czadem w kamienicy w Szczecinie", "Osuwisko zablokowało drogę w Kłodzku", "Śnieżyca w Tatrach zamknęła szlaki", "Susza hydrologiczna w Wielkopolsce", "Pożar lasu pod Zieloną Górą", "Zerwany most w Lubaniu", "Wybuch butli gazowej w Rzeszowie", "Awaryjne lądowanie śmigłowca w Olsztynie", "Fala upałów w Lublinie"];
+  const lists = Array.from({ length: 4 }, (_, s) => T.slice(s * 5, s * 5 + 5).map((w, i) => ({ id: `s${s}-${i}`, region: "all", kind: "rss", source: "s" + s, url: `https://x/${s}/${i}`, title: w, summary: "", date: "2026-10-11T10:00:00Z" })));
+  const out = mergeItems(lists, NOW);
+  assert.ok(out.length >= 18, "za mało: " + out.length);
 });
 console.log(`OK: ${n} grup testów v21 przeszło`);
