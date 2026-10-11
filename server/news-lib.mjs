@@ -1,7 +1,7 @@
 // EGIDA – logika „Ważne w regionie”: parsery RSS i list gov.pl, filtr słów kluczowych, deduplikacja. Czysta, bez sieci (testy: scripts/test-v17.mjs).
 // Zasada: tylko oficjalne, zaufane źródła (Policja, MEN, RCB, urzędy wojewódzkie, kuratoria). Nic nie piszemy od siebie, nic nie omijamy.
 import { XMLParser } from "fast-xml-parser";
-import { mentionsRegion } from "./news-places.mjs";
+import { mentionsRegion, nationalThreat, regionsMentioned } from "./news-places.mjs";
 
 export const LIMITS = { perSource: 15, total: 200, maxAgeDays: 14, titleChars: 200, summaryChars: 280 };
 
@@ -112,6 +112,29 @@ export function parseHtmlList(html, baseUrl) {
   return out;
 }
 
+/**
+ * Rozgłośnie bez kanału RSS: czytamy listę wiadomości ze strony. Bierzemy tylko linki pasujące do wzorca artykułów rozgłośni (rule.link),
+ * tytuł z nagłówka, atrybutu title albo najdłuższego fragmentu tekstu w linku. Daty na stronie bywają niejednoznaczne (np. „godzinę temu”),
+ * więc datę ustala wywołujący (pierwsze zobaczenie wpisu przez serwer).
+ */
+export function parseMediaHtml(html, baseUrl, rule) {
+  const re = new RegExp(rule.link), deny = rule.deny ? new RegExp(rule.deny, "i") : null, best = new Map();
+  for (const m of String(html).matchAll(/<a\b([^>]*)>([\s\S]*?)<\/a>/gi)) {
+    const hm = /href\s*=\s*["']([^"']+)["']/i.exec(m[1]); if (!hm) continue;
+    let url; try { url = safeHttps(new URL(hm[1].replace(/&amp;/g, "&"), baseUrl).href); } catch { continue; }
+    if (!url) continue; url = url.replace(/#.*$/, "");
+    if (!re.test(url) || (deny && deny.test(url))) continue;
+    const hd = /<h[1-6][^>]*>([\s\S]*?)<\/h[1-6]>/i.exec(m[2]);
+    const tt = /\btitle\s*=\s*["']([^"']+)["']/i.exec(m[1]);
+    const segs = m[2].split(/<[^>]+>/).map((x) => stripTags(x)).filter((x) => x.length >= 20);
+    const cands = [hd ? stripTags(hd[1]) : "", tt ? stripTags(tt[1]) : "", segs.sort((a, b) => b.length - a.length)[0] || ""].filter((x) => x.length >= 20 && x.length <= 240);
+    const t = cands[0];
+    if (!t) continue;
+    if (!best.has(url) || (best.get(url).length < t.length && !hd)) best.set(url, t);
+  }
+  return [...best].map(([url, title]) => ({ title: clip(title.replace(/\s+/g, " ").trim(), LIMITS.titleChars), url, summary: "" }));
+}
+
 /** Normalizacja wpisu źródłowego do formatu news.json. */
 export function toItem(raw, src, nowMs) {
   if (!raw.date) return null;
@@ -119,9 +142,17 @@ export function toItem(raw, src, nowMs) {
   if (!Number.isFinite(t) || t > nowMs + 36e5 || (!active && nowMs - t > LIMITS.maxAgeDays * 864e5)) return null; // za stare albo z przyszłości
   if (!passesFilter(src.filter, raw.title, raw.summary)) return null;
   // Media: wpis musi dotyczyć województwa rozgłośni (tytuł lub kategorie wskazują miejscowość/region), inaczej to wiadomość z kraju lub ze świata.
-  if (src.kind === "media" && !mentionsRegion(`${raw.title} ${raw.cats || ""}`, src.region)) return null;
+  // Wyjątek: poważne zagrożenie bezpieczeństwa w Polsce (zamach, planowany atak) – pokazujemy je w województwie, które wymieniono w tekście, a gdy miejsca nie ma, w całym kraju.
+  let region = raw.region || src.region;
+  if (src.kind === "media") {
+    const txt = `${raw.title} ${raw.cats || ""}`;
+    if (!mentionsRegion(txt, src.region)) {
+      if (!nationalThreat(txt)) return null;
+      region = regionsMentioned(txt)[0] || "all";
+    }
+  }
   const id = raw.key ? `gddkia/${raw.key}` : raw.url.replace(/^https:\/\/(www\.)?/, "").replace(/[?#].*$/, "");
-  return { id, title: clip(raw.title, LIMITS.titleChars), summary: src.kind === "media" ? "" : clip(raw.summary || "", LIMITS.summaryChars), url: raw.url, date: new Date(t).toISOString(), source: src.label, region: raw.region || src.region, kind: src.kind, ...(active ? { until: raw.until } : {}) };
+  return { id, title: clip(raw.title, LIMITS.titleChars), summary: src.kind === "media" ? "" : clip(raw.summary || "", LIMITS.summaryChars), url: raw.url, date: new Date(t).toISOString(), source: src.label, region, kind: src.kind, ...(active ? { until: raw.until } : {}) };
 }
 
 /** Łączy wpisy ze wszystkich źródeł: deduplikacja po adresie, limit na źródło, sortowanie od najnowszych. */
@@ -193,7 +224,7 @@ const MEDIA_SAFETY = ["alarm", "bomb", "ewakuac", "zagroz", "ostrzez", "grozb", 
 const MEDIA_DENY = ["mecz", "liga", "ligi", "turniej", "puchar", "zawodnik", "zawodnicz", "pilkarz", "pilkark", "siatkar", "koszykar", "reprezentacj", "wyscig", "koncert", "festiwal", "wystaw", "premiera", "premiery",
   "kino", "teatr", "spektakl", "konkurs", "rocznic", "jubileusz", "horoskop", "rozmowa", "reportaz", "podcast", "felieton", "wideo", "quiz", "gosc", "wywiad", "ekspert", "pogoda na", "targi", "zwyciez", "pokonal", "przegral"];
 /** Filtr mediów: tytuł musi zawierać słowo o zagrożeniu/poważnym zdarzeniu i nie zawierać słów ze sportu, kultury i rozmów. */
-export function passesMedia(title) { return matches(title, MEDIA_SAFETY) && !matches(title, MEDIA_DENY); }
+export function passesMedia(title) { return matches(title, MEDIA_SAFETY) && (!matches(title, MEDIA_DENY) || nationalThreat(title)); } // „zamach na premiera” nie jest premierą teatralną
 
 /** Minimalny czytnik robots.txt: czy User-agent „*” (lub nasz) może pobrać ścieżkę. Brak pliku = wolno. */
 export function robotsAllows(txt, path, ua = "egida") {

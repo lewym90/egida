@@ -28,3 +28,19 @@ export function mentionsRegion(text, regionId) {
   const r = REGEX[regionId], t = fold(text);
   return !!r && r.test(t) && !(EXCLUDE[regionId] || []).some((x) => t.includes(x));
 }
+
+// ---------- Zdarzenia o znaczeniu ogólnopolskim ----------
+// Wiadomość z rozgłośni regionalnej, która nie wskazuje miejscowości, jest zwykle odrzucana (może być z kraju lub ze świata).
+// Wyjątek: poważne zagrożenie bezpieczeństwa w Polsce (zamach, planowany atak, terroryzm), które trzeba pokazać, choć nie znamy miejsca.
+const THREAT = /(^|[^a-z0-9])(?:zamach|terroryst|terror|dywersj|sabotaz|zakladnik|ladunk[a-z]{0,3} wybuchow|bomb[a-z]{0,3} w |(?:planowan|przygotowywan|udaremnion|zapobiezon)[a-z]{0,6} (?:zamach|atak)|atak[a-z]{0,2} (?:na|w) (?:premier|prezydent|posl|polityk|szkol|przedszkol|dworc|lotnisk|elektrowni|infrastruktur|centrum handlow)|strzelanin[a-z]{0,2} (?:w|na) (?:szkol|uczeln|centrum))/;
+const FOREIGN = /(^|[^a-z0-9])(?:dzibuti|izrael|gaz[aey]\b|iran|syri|afganist|jemen|libi|libanu|somali|nigeri|sudan|egipt|turcj|chin|japon|indi[ia]|pakistan|usa\b|stan[a-z]{0,2} zjednoczon|niemc|francj|wielk[a-z]{1,3} brytani|londyn|paryz|berlin|waszyngton|nowy jork|moskw|kijow|ukrain|rosj|bialorus|migrant[a-z]{0,3} (?:statk|lodz)|statk)/;
+const POLISH = /(^|[^a-z0-9])(?:polsk|polac|polic|polski)/;
+
+/** Czy tytuł opisuje poważne zagrożenie bezpieczeństwa o znaczeniu ogólnopolskim (bez wskazanej miejscowości)? Zagraniczne zdarzenia odpadają. */
+export function nationalThreat(text) {
+  const t = fold(text);
+  if (!THREAT.test(t)) return false;
+  return !FOREIGN.test(t) || POLISH.test(t);
+}
+/** Województwa wskazane w tekście (kolejność jak w gazetteerze). */
+export function regionsMentioned(text) { return Object.keys(PLACES).filter((id) => mentionsRegion(text, id)); }

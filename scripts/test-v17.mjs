@@ -1,7 +1,7 @@
 // Testy v17: „Ważne w regionie” – parsery RSS/HTML, filtry, deduplikacja (serwer) i logika aplikacji (js/news.js). Dane SZTUCZNE.
 import assert from "node:assert/strict";
-import { mentionsRegion } from "../server/news-places.mjs";
-import { passesMedia, robotsAllows, parseGddkia, warsawToMs, parseRss, parseHtmlList, discoverFeeds, discoverRssPages, passesFilter, toItem, mergeItems, safeHttps } from "../server/news-lib.mjs";
+import { mentionsRegion, nationalThreat } from "../server/news-places.mjs";
+import { passesMedia, robotsAllows, parseGddkia, warsawToMs, parseRss, parseHtmlList, discoverFeeds, discoverRssPages, passesFilter, toItem, mergeItems, safeHttps, parseMediaHtml } from "../server/news-lib.mjs";
 import { SOURCES } from "../server/news-sources.mjs";
 import { roadsForRegion, newsForRegion, newsFresh, ageLabel, normalizeNews, NEWS_STALE_H } from "../js/news.js";
 import { VOIVODESHIPS } from "../js/content.js";
@@ -120,17 +120,44 @@ ok("media: wpis z radia ma etykietę kind=media, bez streszczenia i z regionem r
   const src = SOURCES.find((x) => x.id === "radio-lubelskie");
   const it = toItem({ title: "Dachowanie samochodu na S12 pod Lublinem. Zablokowany prawy pas ruchu", url: "https://radio.lublin.pl/a", date: "2026-10-11T09:14:00Z", summary: "Treść, której nie pokazujemy" }, src, NOW);
   assert.equal(it.kind, "media"); assert.equal(it.summary, ""); assert.equal(it.region, "lubelskie"); assert.equal(it.source, "Radio Lublin");
-  assert.equal(SOURCES.filter((x) => x.kind === "media").length, 11);
+  assert.equal(SOURCES.filter((x) => x.kind === "media").length, 13);
 });
 ok("media: wpis spoza województwa rozgłośni odpada (Dżibuti nie leży na Podkarpaciu)", () => {
   const src = SOURCES.find((x) => x.id === "radio-podkarpackie");
   const mk = (title, cats = "") => toItem({ title, url: "https://radio.rzeszow.pl/" + title.length, date: "2026-10-11T09:14:00Z", summary: "", cats }, src, NOW);
   assert.equal(mk("Katastrofa statku z migrantami. Co najmniej 139 osób nie żyje"), null);
-  assert.equal(mk("Policja zatrzymała mężczyznę podejrzanego o planowanie ataku na Donalda Tuska"), null);
+  assert.equal(mk("Statek z migrantami zatonął. Zamach terrorystyczny w Dżibuti"), null, "zagraniczny zamach odpada");
+  assert.equal(mk("Atak rekina na plaży. Nie żyje turysta"), null);
   assert.ok(mk("Pożar hali w Mielcu. Ewakuowano pracowników"));
   assert.ok(mk("Wypadek na trasie. Zginęła kobieta", "Rzeszów Wiadomości"));
   assert.ok(mentionsRegion("Pożar w Radomsku", "lodzkie")); assert.ok(!mentionsRegion("Pożar w Radomsku", "mazowieckie"));
   assert.ok(!mentionsRegion("Łódź nie miała okrętu, a my mamy brzeg i koło", "wielkopolskie"));
+});
+ok("media: zagrożenie o znaczeniu ogólnopolskim zostaje, bez miejscowości trafia do „Cała Polska”", () => {
+  const src = SOURCES.find((x) => x.id === "radio-podkarpackie");
+  const mk = (title) => toItem({ title, url: "https://radio.rzeszow.pl/" + title.length, date: "2026-10-11T09:14:00Z", summary: "" }, src, NOW);
+  assert.equal(mk("Policja zatrzymała mężczyznę podejrzanego o planowanie ataku na Donalda Tuska").region, "all");
+  assert.equal(mk("Zamach terrorystyczny planowano w Gdańsku. Zatrzymano trzy osoby").region, "pomorskie", "miejsce z tekstu wskazuje województwo");
+  assert.equal(mk("Udaremniono zamach w Rzeszowie. Zatrzymano podejrzanego").region, "podkarpackie");
+  assert.equal(nationalThreat("Zamach w Polsce: zatrzymano podejrzanych"), true);
+  assert.equal(nationalThreat("Zamach w Paryżu. Nie żyją ludzie"), false);
+  assert.equal(nationalThreat("Pożar hali. Straty szacowane na milion"), false);
+});
+ok("rozgłośnie bez RSS: linki artykułów ze strony, tytuł z nagłówka/atrybutu/tekstu, bez śmieci", () => {
+  const rule = (id) => SOURCES.find((x) => x.id === id).scrape;
+  const wro = parseMediaHtml(`<a href="/articles/view/164661/Wypalanie-lisci"><img src=a.jpg></a><a href="/articles/view/164661/Wypalanie-lisci"><h3>Pożar w Legnicy. Strażacy gasili halę przez całą noc</h3></a><a href="/ArticlesCategories/index/180/informacje">Informacje dla komitetów wyborczych</a>`, "https://www.radiowroclaw.pl/articlesCategories/index/5/x", rule("radio-dolnoslaskie"));
+  assert.equal(wro.length, 1); assert.equal(wro[0].url, "https://www.radiowroclaw.pl/articles/view/164661/Wypalanie-lisci"); assert.match(wro[0].title, /Legnicy/);
+  const pik = parseMediaHtml(`<a href="161,142669,swietuja-pierniki" title="Wypadek na S5 pod Bydgoszczą. Są ranni, droga zablokowana">x</a>`, "https://www.radiopik.pl/", rule("radio-kujawsko-pomorskie"));
+  assert.equal(pik[0].url, "https://www.radiopik.pl/161,142669,swietuja-pierniki"); assert.match(pik[0].title, /Bydgoszcz/);
+  const kra = parseMediaHtml(`<a href="https://www.radiokrakow.pl/aktualnosci/krakow/pozar-kamienicy-na-kazimierzu/">Pożar kamienicy na Kazimierzu. Ewakuowano mieszkańców</a><a href="https://www.radiokrakow.pl/aktualnosci/sport/mecz-cracovii/">Cracovia wygrała ważny mecz u siebie</a><a href="https://www.radiokrakow.pl/audycje/x/">Audycja poranna Radia Kraków zaprasza</a>`, "https://www.radiokrakow.pl/aktualnosci/", rule("radio-malopolskie"));
+  assert.equal(kra.length, 1);
+  const poz = parseMediaHtml(`<a href="https://radiopoznan.fm/informacje/materialy-sponsorowane/dach-blacha-czy-dachowka-co-lepsze">Co jest lepsze na dach blacha czy dachówka</a><a href="https://radiopoznan.fm/informacje/wielkopolska/pozar-w-koninie-trzy-osoby-ranne">Pożar w Koninie. Trzy osoby ranne</a>`, "https://radiopoznan.fm/", rule("radio-wielkopolskie"));
+  assert.equal(poz.length, 1); assert.match(poz[0].title, /Koninie/);
+  // pełna droga: wpis o zamachu z Radia Kraków bez miejscowości trafia do „Cała Polska”, lokalny pożar zostaje w małopolskim
+  const src = SOURCES.find((x) => x.id === "radio-malopolskie");
+  const mk = (title) => toItem({ title, url: "https://www.radiokrakow.pl/aktualnosci/" + title.length, date: "2026-10-11T09:14:00Z", summary: "" }, src, NOW);
+  assert.equal(mk("Alarm w służbach. Policja otrzymała informację o możliwym zamachu na premiera i szefa MON").region, "all");
+  assert.equal(mk("Pożar kamienicy na Kazimierzu w Krakowie. Ewakuowano mieszkańców").region, "malopolskie");
 });
 ok("RSS 1.0 (RDF) jest czytany", () => {
   const r = parseRss(`<?xml version="1.0"?><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns="http://purl.org/rss/1.0/" xmlns:dc="http://purl.org/dc/elements/1.1/"><item><title>Pożar w Szczecinie</title><link>https://radioszczecin.pl/a</link><dc:date>2026-10-11T09:00:00+02:00</dc:date></item></rdf:RDF>`);

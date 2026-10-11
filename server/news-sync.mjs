@@ -6,7 +6,7 @@
 import { writeFileSync, readFileSync, renameSync } from "node:fs";
 import { robotsAllows } from "./news-lib.mjs";
 import { VOIVODESHIPS } from "../js/content.js";
-import { parseGddkia, parseRss, parseHtmlList, discoverFeeds, discoverRssPages, toItem, mergeItems } from "./news-lib.mjs";
+import { parseGddkia, parseRss, parseHtmlList, parseMediaHtml, discoverFeeds, discoverRssPages, toItem, mergeItems } from "./news-lib.mjs";
 import { SOURCES } from "./news-sources.mjs";
 
 const OUT = process.env.NEWS_OUT || "news.json";
@@ -24,6 +24,14 @@ async function robotsOk(url) { // dla mediów: szanujemy robots.txt rozgłośni
     catch { robotsCache.set(u.origin, ""); }
   }
   return robotsAllows(robotsCache.get(u.origin), u.pathname + u.search);
+}
+// Rozgłośnie czytane ze stron (bez RSS): kiedy serwer po raz pierwszy zobaczył dany wpis. To jest data wpisu w „Doniesieniach medialnych”.
+const SEEN_FILE = process.env.NEWS_SEEN_FILE || "news-seen.json";
+let seen = {}; try { seen = JSON.parse(readFileSync(SEEN_FILE, "utf8")); } catch { /* pierwszy przebieg */ }
+seen.urls ||= {}; seen.sources ||= {};
+function stamp(srcId, items) {
+  const first = !seen.sources[srcId]; // pierwszy przebieg tego źródła: wpisy na stronie mogą mieć kilka godzin, więc cofamy datę
+  return items.map((it) => { if (!(it.url in seen.urls)) seen.urls[it.url] = first ? now - 6 * 36e5 : now; return { ...it, date: new Date(seen.urls[it.url]).toISOString() }; });
 }
 let cache = {}; try { cache = JSON.parse(readFileSync(CACHE, "utf8")); } catch { /* pierwszy przebieg */ }
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -70,10 +78,10 @@ async function runSource(src) {
       try {
         if (src.kind === "media" && !(await robotsOk(u))) throw new Error("robots.txt rozgłośni zabrania pobierania – pomijam");
         const body = await get(u);
-        const items = src.kind === "gddkia" ? parseGddkia(body, now, VOIVODESHIPS.map((v) => v.id)) : src.kind === "rss" || src.kind === "media" ? parseRss(body) : parseHtmlList(body, u);
+        const items = src.scrape ? stamp(src.id, parseMediaHtml(body, u, src.scrape)) : src.kind === "gddkia" ? parseGddkia(body, now, VOIVODESHIPS.map((v) => v.id)) : src.kind === "rss" || src.kind === "media" ? parseRss(body) : parseHtmlList(body, u);
         rep.urls.push({ url: u, status: 200, items: items.length });
         raws.push(...items);
-        if (items.length) break; // pierwszy działający adres wystarcza
+        if (items.length && !src.scrape) break; // pierwszy działający adres wystarcza (strony rozgłośni czytamy wszystkie podane)
       } catch (e) { rep.urls.push({ url: u, error: String(e.message || e) }); }
     }
     if (!raws.length && src.htmlFallback) { // zapasowo: lista „Aktualności” ze strony jednostki
@@ -82,6 +90,7 @@ async function runSource(src) {
         rep.urls.push({ url: src.htmlFallback, status: 200, items: items.length, fallback: true }); raws.push(...items); }
       catch (e) { rep.urls.push({ url: src.htmlFallback, error: String(e.message || e), fallback: true }); }
     }
+    if (src.scrape && rep.urls.some((x) => x.status === 200)) seen.sources[src.id] = now;
     rep.fetched = raws.length;
     rep.ok = rep.urls.some((x) => x.status === 200 && x.items > 0);
     if (!rep.ok) rep.error = rep.urls.map((x) => x.error).filter(Boolean)[0] || "brak wpisów w odpowiedzi";
@@ -105,6 +114,8 @@ if (DUMP) process.exit(0);
 
 if (!okCount) { console.log("Żadne źródło nie odpowiedziało – zostaje poprzedni news.json"); try { writeFileSync(REPORT, JSON.stringify(report, null, 1)); } catch { /* ignoruj */ } process.exit(1); }
 try { writeFileSync(CACHE, JSON.stringify(cache)); } catch { /* ignoruj */ }
+for (const [u, t] of Object.entries(seen.urls)) if (now - t > 21 * 864e5) delete seen.urls[u]; // porządek w pamięci
+try { writeFileSync(SEEN_FILE, JSON.stringify(seen)); } catch { /* ignoruj */ }
 const save = (file, obj) => { const tmp = `${file}.${process.pid}.tmp`; writeFileSync(tmp, JSON.stringify(obj)); renameSync(tmp, file); };
 // Wpisy ze źródeł, które chwilowo zawiodły, zachowujemy z poprzedniego pliku (do limitu wieku), aby wiadomość nie znikała przez jeden błąd sieci.
 let prev = []; try { prev = JSON.parse(readFileSync(OUT, "utf8")).items || []; } catch { /* pierwszy przebieg */ }

@@ -78,3 +78,12 @@ Alerty poziomu 2 z torem po weryfikacji formatu NEPTUN, zatwierdzenie treści (`
 - Poradnik „Co robić”: 24 instrukcje w trzech grupach (zagrożenia, brak prądu i awarie, informacje i oszustwa).
 - Plecak: dłuższe listy, nowa zakładka „Rodzina” (plan rodzinny). Treść robocza (`reviewed: null`) do zatwierdzenia merytorycznego.
 - `npm test` obejmuje `scripts/test-v19.mjs`.
+
+## Wersja 20: zagrożenia ogólnopolskie i poprawione źródła radiowe
+- Wpis z radia regionalnego bez wskazanej miejscowości jest odrzucany, chyba że opisuje poważne zagrożenie bezpieczeństwa w Polsce (zamach, planowany atak, terroryzm…). Wtedy trafia do województwa z tekstu, a bez miejsca do „Cała Polska”. Zdarzenia zagraniczne odpadają.
+- Poprawione adresy: Radio Opole, Radio Olsztyn, Radio Szczecin. Wyłączone (brak kanału): Radio Zachód, Radio Katowice, Radio dla Ciebie.
+
+## Wersja 21: wszystkie województwa mają „Doniesienia medialne” i Urząd Wojewódzki
+- Rozgłośnie bez kanału RSS (Wrocław, Bydgoszcz/Toruń PiK, Kraków, Poznań, Katowice) są czytane ze stron (wzorzec adresów artykułów, robots.txt respektowany). Datą wpisu jest pierwsze zobaczenie go przez serwer (`news-seen.json`).
+- Radio Białystok zabrania pobierania, Radio Zachód straciło domenę, a Mazowsze nie ma regionalnej rozgłośni: te województwa mają Urząd Wojewódzki. Urzędy wojewódzkie dodano dla wszystkich 16 województw.
+- Filtr mediów: „zamach na premiera” nie jest już mylony z premierą teatralną.

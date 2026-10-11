@@ -20,15 +20,12 @@ const KWP_NAME = { dolnoslaskie: "Policja Dolnośląska", "kujawsko-pomorskie": 
 const RADIO = [
   ["lubelskie", "Radio Lublin", "https://radio.lublin.pl/feed/"], // (sprawdzony)
   ["lodzkie", "Radio Łódź", "https://radiolodz.pl/feed/"], // (sprawdzony)
-  ["opolskie", "Radio Opole", "https://radio.opole.pl/12,0,rss"],
+  ["opolskie", "Radio Opole", "https://radio.opole.pl/rss.php?idp=100"],
   ["podkarpackie", "Polskie Radio Rzeszów", "https://www.radio.rzeszow.pl/feed/"], // (sprawdzony)
   ["pomorskie", "Radio Gdańsk", "https://radiogdansk.pl/feed/"], // (sprawdzony)
-  ["slaskie", "Polskie Radio Katowice", "https://www.radio.katowice.pl/feed/"],
   ["swietokrzyskie", "Radio Kielce", "https://radiokielce.pl/feed/"], // (sprawdzony)
-  ["warminsko-mazurskie", "Polskie Radio Olsztyn", "https://www.radio.olsztyn.pl/feed/"],
-  ["zachodniopomorskie", "Radio Szczecin", "https://radioszczecin.pl/rss/rss.php"], // (sprawdzony)
-  ["lubuskie", "Radio Zachód", "https://radiozachod.pl/feed/"],
-  ["mazowieckie", "Radio dla Ciebie", "https://radiodlaciebie.pl/feed/"],
+  ["warminsko-mazurskie", "Polskie Radio Olsztyn", "https://radioolsztyn.pl/feed/"],
+  ["zachodniopomorskie", "Radio Szczecin", "https://radioszczecin.pl/rss.php"], // (sprawdzony)
 ];
 
 export const SOURCES = [
@@ -45,10 +42,38 @@ export const SOURCES = [
     htmlFallback: HTML_FALLBACK[region], urls: region === "mazowieckie" ? ["https://mazowiecka.policja.gov.pl/dokumenty/rss/271-rss-o-1488.rss"] : undefined })),
   // Doniesienia medialne: regionalne rozgłośnie publiczne (Polskie Radio), po jednej na województwo. Region wynika z samej rozgłośni.
   // Adresy oznaczone „(sprawdzony)” odpowiedziały jako RSS przy sprawdzeniu; pozostałe to kandydaci – o ich działaniu decyduje news-report.json.
-// Bez źródła radiowego (nie znaleziono publicznego kanału RSS): dolnośląskie, małopolskie, podlaskie, wielkopolskie, kujawsko-pomorskie.
+// Bez radia: lubuskie (domena Radia Zachód wystawiona na sprzedaż), mazowieckie (brak regionalnej rozgłośni Polskiego Radia), podlaskie (Radio Białystok zabrania pobierania w robots.txt). Te województwa mają Urząd Wojewódzki.
   // Serwer czyta robots.txt rozgłośni i pomija źródło, jeśli zabrania pobierania.
   ...RADIO.map(([region, label, url]) => ({ id: "radio-" + region, label, region, kind: "media", filter: "media", urls: [url] })),
+  // Rozgłośnie bez kanału RSS: czytamy listę wiadomości ze strony (wzorzec adresu artykułu sprawdzony na stronie rozgłośni; robots.txt respektowany).
+  // Datą wpisu jest moment pierwszego zobaczenia go przez serwer.
+  { id: "radio-dolnoslaskie", label: "Polskie Radio Wrocław", region: "dolnoslaskie", kind: "media", filter: "media",
+    urls: ["https://www.radiowroclaw.pl/articlesCategories/index/5/dolny-slask", "https://www.radiowroclaw.pl/articlesCategories/index/4/wroclaw"], scrape: { link: "^https://www\\.radiowroclaw\\.pl/articles/view/\\d+/" } },
+  { id: "radio-kujawsko-pomorskie", label: "Polskie Radio PiK", region: "kujawsko-pomorskie", kind: "media", filter: "media",
+    urls: ["https://www.radiopik.pl/"], scrape: { link: "^https://www\\.radiopik\\.pl/\\d+,\\d+,[a-z0-9-]+" } },
+  { id: "radio-malopolskie", label: "Polskie Radio Kraków", region: "malopolskie", kind: "media", filter: "media",
+    urls: ["https://www.radiokrakow.pl/aktualnosci/"], scrape: { link: "^https://www\\.radiokrakow\\.pl/aktualnosci/[a-z0-9-]+/[a-z0-9-]+(?:/[a-z0-9-]+)?/?$", deny: "/aktualnosci/(?:sport|kultura)/" } },
+  { id: "radio-wielkopolskie", label: "Polskie Radio Poznań", region: "wielkopolskie", kind: "media", filter: "media",
+    urls: ["https://radiopoznan.fm/"], scrape: { link: "^https://radiopoznan\\.fm/informacje/[a-z0-9-]+/[a-z0-9-]+", deny: "materialy-sponsorowane|/kultura/|/sport/" } },
+  { id: "radio-slaskie", label: "Polskie Radio Katowice", region: "slaskie", kind: "media", filter: "media",
+    urls: ["https://www.radio.katowice.pl/"], scrape: { link: "^https://(?:www\\.)?radio\\.katowice\\.pl/zobacz,\\d+," } },
   // Urzędy wojewódzkie i kuratoria (sprawdzone z serwera: HTTP 200)
+  // Urzędy wojewódzkie (gov.pl): ostrzeżenia, komunikaty, informacje wojewody. Wiadomości lub strona główna urzędu; o działaniu każdego decyduje news-report.json.
+  { id: "uw-dolnoslaski", label: "Dolnośląski Urząd Wojewódzki", region: "dolnoslaskie", kind: "html", filter: "safety", urls: ["https://www.gov.pl/web/uw-dolnoslaski/wiadomosci", "https://www.gov.pl/web/uw-dolnoslaski"] },
+  { id: "uw-kujawsko-pomorski", label: "Kujawsko-Pomorski Urząd Wojewódzki", region: "kujawsko-pomorskie", kind: "html", filter: "safety", urls: ["https://www.gov.pl/web/uw-kujawsko-pomorski/wiadomosci", "https://www.gov.pl/web/uw-kujawsko-pomorski"] },
+  { id: "uw-lubelski", label: "Lubelski Urząd Wojewódzki", region: "lubelskie", kind: "html", filter: "safety", urls: ["https://www.gov.pl/web/uw-lubelski/wiadomosci", "https://www.gov.pl/web/uw-lubelski"] },
+  { id: "uw-lubuski", label: "Lubuski Urząd Wojewódzki", region: "lubuskie", kind: "html", filter: "safety", urls: ["https://www.gov.pl/web/uw-lubuski/wiadomosci", "https://www.gov.pl/web/uw-lubuski"] },
+  { id: "uw-malopolski", label: "Małopolski Urząd Wojewódzki", region: "malopolskie", kind: "html", filter: "safety", urls: ["https://www.gov.pl/web/uw-malopolski/wiadomosci", "https://www.gov.pl/web/uw-malopolski"] },
+  { id: "uw-mazowiecki", label: "Mazowiecki Urząd Wojewódzki", region: "mazowieckie", kind: "html", filter: "safety", urls: ["https://www.gov.pl/web/uw-mazowiecki/wiadomosci", "https://www.gov.pl/web/uw-mazowiecki"] },
+  { id: "uw-opolski", label: "Opolski Urząd Wojewódzki", region: "opolskie", kind: "html", filter: "safety", urls: ["https://www.gov.pl/web/uw-opolski/wiadomosci", "https://www.gov.pl/web/uw-opolski"] },
+  { id: "uw-podkarpacki", label: "Podkarpacki Urząd Wojewódzki", region: "podkarpackie", kind: "html", filter: "safety", urls: ["https://www.gov.pl/web/uw-podkarpacki/wiadomosci", "https://www.gov.pl/web/uw-podkarpacki"] },
+  { id: "uw-podlaski", label: "Podlaski Urząd Wojewódzki", region: "podlaskie", kind: "html", filter: "safety", urls: ["https://www.gov.pl/web/uw-podlaski/wiadomosci", "https://www.gov.pl/web/uw-podlaski"] },
+  { id: "uw-pomorski", label: "Pomorski Urząd Wojewódzki", region: "pomorskie", kind: "html", filter: "safety", urls: ["https://www.gov.pl/web/uw-pomorski/wiadomosci", "https://www.gov.pl/web/uw-pomorski"] },
+  { id: "uw-slaski", label: "Śląski Urząd Wojewódzki", region: "slaskie", kind: "html", filter: "safety", urls: ["https://www.gov.pl/web/uw-slaski/wiadomosci", "https://www.gov.pl/web/uw-slaski"] },
+  { id: "uw-swietokrzyski", label: "Świętokrzyski Urząd Wojewódzki", region: "swietokrzyskie", kind: "html", filter: "safety", urls: ["https://www.gov.pl/web/uw-swietokrzyski/wiadomosci", "https://www.gov.pl/web/uw-swietokrzyski"] },
+  { id: "uw-warminsko-mazurski", label: "Warmińsko-Mazurski Urząd Wojewódzki", region: "warminsko-mazurskie", kind: "html", filter: "safety", urls: ["https://www.gov.pl/web/uw-warminsko-mazurski/wiadomosci", "https://www.gov.pl/web/uw-warminsko-mazurski"] },
+  { id: "uw-wielkopolski", label: "Wielkopolski Urząd Wojewódzki", region: "wielkopolskie", kind: "html", filter: "safety", urls: ["https://www.gov.pl/web/uw-wielkopolski/wiadomosci", "https://www.gov.pl/web/uw-wielkopolski"] },
+  { id: "uw-zachodniopomorski", label: "Zachodniopomorski Urząd Wojewódzki", region: "zachodniopomorskie", kind: "html", filter: "safety", urls: ["https://www.gov.pl/web/uw-zachodniopomorski/wiadomosci", "https://www.gov.pl/web/uw-zachodniopomorski"] },
   { id: "uw-lodzki", label: "Łódzki Urząd Wojewódzki", region: "lodzkie", kind: "html", filter: "safety", urls: ["https://www.gov.pl/web/uw-lodzki/wiadomosci", "https://www.gov.pl/web/uw-lodzki"] },
   { id: "kuratorium-waw", label: "Mazowieckie Kuratorium Oświaty", region: "mazowieckie", kind: "html", filter: "school", urls: ["https://www.kuratorium.waw.pl/pl/informacje/aktualnosci"] },
 ];
