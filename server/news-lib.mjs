@@ -67,6 +67,14 @@ export function discoverFeeds(html, baseUrl) {
   return list;
 }
 
+/** Strony „Kanały RSS” jednostki Policji (np. /ra/rss, /opo/rss): link z głównej strony albo odgadnięty z innych linków /<skrót>/sitemap, /<skrót>/wai. */
+export function discoverRssPages(html, baseUrl) {
+  const out = new Set(), src = String(html);
+  for (const m of src.matchAll(/href\s*=\s*["']([^"']*\/[a-z0-9]{2,6}\/rss\/?)["']/gi)) { try { out.add(new URL(m[1], baseUrl).href); } catch { /* pomiń */ } }
+  if (!out.size) for (const m of src.matchAll(/href\s*=\s*["'][^"']*?\/([a-z0-9]{2,6})\/(?:sitemap|wai|kontakt)\/?["']/gi)) { try { out.add(new URL(`/${m[1]}/rss`, baseUrl).href); } catch { /* pomiń */ } break; }
+  return [...out].slice(0, 2);
+}
+
 const DATE_RE = /\b(\d{2})\.(\d{2})\.(\d{4})\b|\b(\d{4})-(\d{2})-(\d{2})\b/;
 const dateFrom = (s) => { const m = DATE_RE.exec(s); if (!m) return null; const [y, mo, d] = m[1] ? [m[3], m[2], m[1]] : [m[4], m[5], m[6]]; return toIso(`${y}-${mo}-${d}T12:00:00+02:00`); };
 

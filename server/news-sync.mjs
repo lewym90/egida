@@ -4,16 +4,24 @@
 //   node news-sync.mjs            – normalny przebieg (zapis $NEWS_OUT i $NEWS_REPORT_OUT)
 //   node news-sync.mjs --dump     – tylko wypisz raport, nic nie zapisuj
 import { writeFileSync, readFileSync, renameSync } from "node:fs";
-import { parseRss, parseHtmlList, discoverFeeds, toItem, mergeItems } from "./news-lib.mjs";
+import { parseRss, parseHtmlList, discoverFeeds, discoverRssPages, toItem, mergeItems } from "./news-lib.mjs";
 import { SOURCES } from "./news-sources.mjs";
 
 const OUT = process.env.NEWS_OUT || "news.json";
 const REPORT = process.env.NEWS_REPORT_OUT || "news-report.json";
 const UA = "EGIDA/0.3 (unofficial PWA; reads public news pages of Polish public institutions every ~15 min; repo lewym90/egida)";
+const CACHE = process.env.NEWS_CACHE_FILE || "news-feeds.json"; // znalezione adresy kanałów RSS (żeby nie szukać ich co 15 min)
 const DUMP = process.argv.includes("--dump");
 const now = Date.now();
 
+let cache = {}; try { cache = JSON.parse(readFileSync(CACHE, "utf8")); } catch { /* pierwszy przebieg */ }
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const lastAt = new Map(); // grzeczność: min. 1,2 s między zapytaniami do tej samej domeny nadrzędnej (policja.gov.pl itp.)
+const family = (u) => new URL(u).hostname.split(".").slice(-3).join(".");
 async function get(url) {
+  const fam = family(url), wait = 1200 - (Date.now() - (lastAt.get(fam) || 0));
+  lastAt.set(fam, Date.now() + Math.max(0, wait));
+  if (wait > 0) await sleep(wait);
   const r = await fetch(url, { headers: { "user-agent": UA, accept: "application/rss+xml, application/xml, text/html;q=0.9, */*;q=0.5" }, redirect: "follow", signal: AbortSignal.timeout(20000) });
   if (!r.ok) throw new Error(`HTTP ${r.status}`);
   return r.text();
@@ -24,13 +32,21 @@ async function runSource(src) {
   const raws = [];
   try {
     let urls = src.urls || [];
-    if (src.discover) { // kanały RSS Policji różnią się adresem między jednostkami: odczytujemy je ze strony głównej
-      try {
-        const html = await get(src.discover);
-        const found = discoverFeeds(html, src.discover).slice(0, 3);
-        rep.discovered = found.length;
-        if (found.length) urls = found;
-      } catch (e) { rep.discoverError = String(e.message || e); }
+    if (src.discover) { // kanały RSS Policji różnią się adresem między jednostkami: szukamy raz, potem pamiętamy
+      if (cache[src.id]?.length) { urls = cache[src.id]; rep.fromCache = true; }
+      else {
+        try {
+          const html = await get(src.discover);
+          let found = discoverFeeds(html, src.discover);
+          if (!found.length) for (const pg of discoverRssPages(html, src.discover)) { // strona „Kanały RSS” jednostki
+            try { found = discoverFeeds(await get(pg), pg); } catch (e) { rep.discoverError = String(e.message || e); }
+            if (found.length) break;
+          }
+          found = found.slice(0, 3);
+          rep.discovered = found.length;
+          if (found.length) { urls = found; cache[src.id] = found; }
+        } catch (e) { rep.discoverError = String(e.message || e); }
+      }
       if (!urls.length) throw new Error(rep.discoverError || "nie znaleziono kanału RSS na stronie");
     }
     for (const u of urls) {
@@ -53,7 +69,7 @@ async function runSource(src) {
 
 const results = [];
 const queue = [...SOURCES];
-await Promise.all(Array.from({ length: 4 }, async () => { for (let s; (s = queue.shift()); ) results.push(await runSource(s)); })); // 4 równolegle, grzecznie
+await Promise.all(Array.from({ length: 3 }, async () => { for (let s; (s = queue.shift()); ) results.push(await runSource(s)); })); // 3 równolegle, ale zapytania do jednej domeny idą z odstępem
 
 const items = mergeItems(results.map((r) => r.items), now);
 const okCount = results.filter((r) => r.rep.ok).length;
@@ -63,6 +79,7 @@ console.log(`Źródła: ${okCount}/${SOURCES.length}, wpisów w news.json: ${ite
 if (DUMP) process.exit(0);
 
 if (!okCount) { console.log("Żadne źródło nie odpowiedziało – zostaje poprzedni news.json"); try { writeFileSync(REPORT, JSON.stringify(report, null, 1)); } catch { /* ignoruj */ } process.exit(1); }
+try { writeFileSync(CACHE, JSON.stringify(cache)); } catch { /* ignoruj */ }
 const save = (file, obj) => { const tmp = `${file}.${process.pid}.tmp`; writeFileSync(tmp, JSON.stringify(obj)); renameSync(tmp, file); };
 // Wpisy ze źródeł, które chwilowo zawiodły, zachowujemy z poprzedniego pliku (do limitu wieku), aby wiadomość nie znikała przez jeden błąd sieci.
 let prev = []; try { prev = JSON.parse(readFileSync(OUT, "utf8")).items || []; } catch { /* pierwszy przebieg */ }

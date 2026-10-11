@@ -1,6 +1,6 @@
 // Testy v17: „Ważne w regionie” – parsery RSS/HTML, filtry, deduplikacja (serwer) i logika aplikacji (js/news.js). Dane SZTUCZNE.
 import assert from "node:assert/strict";
-import { parseRss, parseHtmlList, discoverFeeds, passesFilter, toItem, mergeItems, safeHttps } from "../server/news-lib.mjs";
+import { parseRss, parseHtmlList, discoverFeeds, discoverRssPages, passesFilter, toItem, mergeItems, safeHttps } from "../server/news-lib.mjs";
 import { SOURCES } from "../server/news-sources.mjs";
 import { newsForRegion, newsFresh, ageLabel, normalizeNews, NEWS_STALE_H } from "../js/news.js";
 import { VOIVODESHIPS } from "../js/content.js";
@@ -31,6 +31,11 @@ ok("odkrywanie kanałów RSS Policji ze strony głównej", () => {
   assert.ok(f[0].includes("rss-o-"));
   assert.ok(f.every((u) => u.startsWith("https://mazowiecka.policja.gov.pl/dokumenty/rss/")));
   assert.equal(discoverFeeds("<html></html>", "https://x.pl/").length, 0);
+});
+ok("strona „Kanały RSS” jednostki: link /ra/rss albo odgadnięty z /opo/sitemap", () => {
+  assert.deepEqual(discoverRssPages('<a href="/ra/rss">RSS</a>', "https://mazowiecka.policja.gov.pl/"), ["https://mazowiecka.policja.gov.pl/ra/rss"]);
+  assert.deepEqual(discoverRssPages('<a href="/opo/sitemap">Mapa</a>', "https://opole.policja.gov.pl/"), ["https://opole.policja.gov.pl/opo/rss"]);
+  assert.deepEqual(discoverRssPages("<p>nic</p>", "https://x.pl/"), []);
 });
 const HTML = `<ul><li><img src="a.jpg"><div>08.10.2026</div><a href="https://www.gov.pl/web/premier/szybka-reakcja-rzadu-na-przemoc-w-szkolach">Szybka reakcja rządu na przemoc w szkołach</a></li>
 <li><span>06.10.2026</span><a href="/web/rcb/komunikat-w-sprawie-pogody">Komunikat w sprawie pogody na weekend</a></li>

@@ -44,7 +44,7 @@ NEWS_FILE="$DATA_DIR/news.json"; NEWS_NEW=0
 if [ ! -f "$BASE/news.checked" ] || [ "$(( $(date +%s) - $(stat -c %Y "$BASE/news.checked") ))" -gt 840 ]; then
   touch "$BASE/news.checked"
   NEWS_OLD="$(node -e 'try{const j=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));console.log(require("crypto").createHash("sha1").update(JSON.stringify(j.items)).digest("hex"))}catch{console.log("")}' "$NEWS_FILE")"
-  if NEWS_OUT="$NEWS_FILE" NEWS_REPORT_OUT="$DATA_DIR/news-report.json" timeout 100 node news-sync.mjs | tail -n 30; then
+  if NEWS_CACHE_FILE="$BASE/news-feeds.json" NEWS_OUT="$NEWS_FILE" NEWS_REPORT_OUT="$DATA_DIR/news-report.json" timeout 100 node news-sync.mjs | tail -n 30; then
     NEWS_CUR="$(node -e 'try{const j=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));console.log(require("crypto").createHash("sha1").update(JSON.stringify(j.items)).digest("hex"))}catch{console.log("")}' "$NEWS_FILE")"
     [ "$NEWS_CUR" != "$NEWS_OLD" ] && NEWS_NEW=1
   fi
