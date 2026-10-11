@@ -1,6 +1,7 @@
 // EGIDA – logika „Ważne w regionie”: parsery RSS i list gov.pl, filtr słów kluczowych, deduplikacja. Czysta, bez sieci (testy: scripts/test-v17.mjs).
 // Zasada: tylko oficjalne, zaufane źródła (Policja, MEN, RCB, urzędy wojewódzkie, kuratoria). Nic nie piszemy od siebie, nic nie omijamy.
 import { XMLParser } from "fast-xml-parser";
+import { dedupeSimilar } from "../js/similar.js";
 import { mentionsRegion, nationalThreat, regionsMentioned } from "./news-places.mjs";
 
 export const LIMITS = { perSource: 15, total: 200, maxAgeDays: 14, titleChars: 200, summaryChars: 280 };
@@ -170,7 +171,10 @@ export function mergeItems(lists, nowMs) {
     const k = titleKey(it.title), cur = byTitle.get(k);
     if (!cur || rank(it) < rank(cur)) byTitle.set(k, it); // przy tej samej wiadomości wygrywa źródło oficjalne z regionu
   }
-  return [...byTitle.values()].filter((x) => nowMs - new Date(x.date).getTime() <= LIMITS.maxAgeDays * 864e5 || (x.until && new Date(x.until).getTime() >= nowMs)).sort((a, b) => b.date.localeCompare(a.date)).slice(0, LIMITS.total);
+  const pref = [...byTitle.values()].sort((a, b) => rank(a) - rank(b) || b.date.localeCompare(a.date)); // ta sama sprawa innymi słowami: zostaje źródło oficjalne, potem nowsze
+  const keepIds = new Set(); // podobne tytuły porównujemy w obrębie jednego regionu (ta sama sprawa w dwóch województwach to dwa różne wpisy)
+  for (const reg of new Set(pref.map((x) => x.region))) for (const x of dedupeSimilar(pref.filter((y) => y.region === reg && y.kind !== "gddkia"), (y) => y.title, { share: 0.75, minTokens: 4 })) keepIds.add(x.id);
+  return pref.filter((x) => x.kind === "gddkia" || keepIds.has(x.id)).filter((x) => nowMs - new Date(x.date).getTime() <= LIMITS.maxAgeDays * 864e5 || (x.until && new Date(x.until).getTime() >= nowMs)).sort((a, b) => b.date.localeCompare(a.date)).slice(0, LIMITS.total);
 }
 
 // ---------- GDDKiA: oficjalny plik XML z utrudnieniami na drogach krajowych ----------

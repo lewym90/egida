@@ -87,3 +87,9 @@ Alerty poziomu 2 z torem po weryfikacji formatu NEPTUN, zatwierdzenie treści (`
 - Rozgłośnie bez kanału RSS (Wrocław, Bydgoszcz/Toruń PiK, Kraków, Poznań, Katowice) są czytane ze stron (wzorzec adresów artykułów, robots.txt respektowany). Datą wpisu jest pierwsze zobaczenie go przez serwer (`news-seen.json`).
 - Radio Białystok zabrania pobierania, Radio Zachód straciło domenę, a Mazowsze nie ma regionalnej rozgłośni: te województwa mają Urząd Wojewódzki. Urzędy wojewódzkie dodano dla wszystkich 16 województw.
 - Filtr mediów: „zamach na premiera” nie jest już mylony z premierą teatralną.
+
+## Wersja 22: ta sama wiadomość nigdy dwa razy
+- `js/similar.js`: rozpoznawanie tej samej sprawy podanej innymi słowami (rdzenie 5 liter, udział wspólnych słów).
+- Komunikaty RSO: podobne komunikaty z tego samego województwa (do 10 dni różnicy) są jedną pozycją „N komunikatów” (np. „Ćwiczenie Syrena” i „Ćwiczenia Syrena-26”).
+- Wiadomości: ta sama sprawa z kilku źródeł pokazuje się raz, wygrywa źródło oficjalne; to samo robi serwer w `news.json`.
+- RKO: ocena oddechu do 10 s (2–3 spokojne oddechy u dorosłego, co najmniej 2 u dziecka, oddech agonalny = brak oddechu), pełne puszczenie klatki między uciśnięciami. Metronom 100/min z precyzyjnym odmierzaniem czasu; dioda świeci przy ucisku i gaśnie przy puszczaniu; sygnał jako plik audio (działa przy włączonym trybie cichym iPhone'a).

@@ -4,6 +4,7 @@ import {
 } from "./content.js";
 import { analyze, statusOf, summarize, compose } from "./classify.js";
 import { APP_VERSION, APP_BUILD } from "./version.js";
+import { storyTokens, sameStory } from "./similar.js";
 import { emptyPlan, normalizePlan, normalizePlaces, importState } from "./personal.js";
 import { renderEmergency, initEmergency, renderPlan, initPlan, renderPlaces, initPlaces, renderPrivacy, shareText, shareNote, printSheet, planPrintHtml, packPrintHtml, guidePrintHtml } from "./screens2.js";
 import { renderMapHtml, initMapScreen, destroyScreens } from "./mapscreen.js";
@@ -351,7 +352,14 @@ function groupAlerts(list) {
     if (!map.has(k)) map.set(k, []);
     map.get(k).push(a);
   }
-  const groups = [...map.values()].map((items) => {
+  // Ten sam komunikat podany innymi słowami (np. „Ćwiczenie Syrena” i „Ćwiczenia Syrena-26”) łączymy w jedną pozycję: w tym samym województwie, w ciągu 10 dni.
+  const merged = [];
+  for (const items of [...map.values()].sort((x, y) => Math.max(...y.map((i) => Date.parse(i.published) || 0)) - Math.max(...x.map((i) => Date.parse(i.published) || 0)))) {
+    const txt = `${items[0].title} ${items[0].body || ""}`, tk = storyTokens(txt);
+    const into = merged.find((m) => m.vw === items[0].voivodeship && Math.abs((Date.parse(m.items[0].published) || 0) - (Date.parse(items[0].published) || 0)) <= 10 * 864e5 && sameStory(m.tk, tk, { share: 0.5, minTokens: 5 }));
+    if (into) into.items.push(...items); else merged.push({ items: [...items], vw: items[0].voivodeship, tk });
+  }
+  const groups = merged.map(({ items }) => {
     items.sort((x, y) => (y.published || "").localeCompare(x.published || ""));
     return { items, prio: Math.min(...items.map(prioOf)), date: items[0].published || "" };
   });
@@ -469,20 +477,45 @@ function screenCoRobic(id) {
 }
 
 let metro = null;
-function stopMetro() { if (metro) { clearInterval(metro.t); try { metro.ctx?.close(); } catch { /* */ } metro = null; } }
+function stopMetro() {
+  if (metro) { clearTimeout(metro.t); metro.stopped = true; try { metro.ctx?.close(); } catch { /* */ } metro = null; }
+  $("#pulse")?.classList.remove("on"); const ph = $("#phase"); if (ph) ph.textContent = "";
+}
+/* Krótki sygnał jako plik WAV zbudowany w pamięci. Odtwarzany jak zwykłe audio, więc działa też na iPhonie z włączonym trybem cichym (Web Audio jest tam wyciszane). */
+let beepUrl = null;
+function beepSrc() {
+  if (beepUrl) return beepUrl;
+  const rate = 22050, n = Math.round(rate * 0.07), buf = new ArrayBuffer(44 + n * 2), v = new DataView(buf);
+  const w = (o, t) => { for (let i = 0; i < t.length; i++) v.setUint8(o + i, t.charCodeAt(i)); };
+  w(0, "RIFF"); v.setUint32(4, 36 + n * 2, true); w(8, "WAVE"); w(12, "fmt "); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+  v.setUint32(24, rate, true); v.setUint32(28, rate * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true); w(36, "data"); v.setUint32(40, n * 2, true);
+  for (let i = 0; i < n; i++) { const env = Math.min(1, i / 120, (n - i) / 300); v.setInt16(44 + i * 2, Math.round(Math.sin((2 * Math.PI * 880 * i) / rate) * 0.6 * env * 32767), true); }
+  beepUrl = URL.createObjectURL(new Blob([buf], { type: "audio/wav" }));
+  return beepUrl;
+}
 function startMetro() {
   stopMetro();
-  const bpm = FIRST_AID.rko.bpm;
-  let ctx = null;
-  try { ctx = new (window.AudioContext || window.webkitAudioContext)(); } catch { /* brak audio */ }
-  const pulse = $("#pulse");
-  const tick = () => {
-    pulse?.classList.add("on"); setTimeout(() => pulse?.classList.remove("on"), 90);
-    if (ctx) { const o = ctx.createOscillator(), g = ctx.createGain(); o.frequency.value = 880; g.gain.value = 0.2; o.connect(g); g.connect(ctx.destination); o.start(); o.stop(ctx.currentTime + 0.06); }
-    if (navigator.vibrate) navigator.vibrate(30);
+  const bpm = FIRST_AID.rko.bpm, period = 60000 / bpm;
+  let ctx = null, pool = [], pi = 0, useAudioEl = true;
+  try { pool = [new Audio(beepSrc()), new Audio(beepSrc())]; pool.forEach((a) => { a.preload = "auto"; a.volume = 1; }); } catch { useAudioEl = false; }
+  try { ctx = new (window.AudioContext || window.webkitAudioContext)(); ctx.resume?.(); } catch { /* brak audio */ }
+  const pulse = $("#pulse"), phase = $("#phase");
+  const beep = () => {
+    if (useAudioEl) {
+      const a = pool[pi++ % pool.length]; try { a.currentTime = 0; const pr = a.play(); if (pr && pr.catch) pr.catch(() => { useAudioEl = false; }); return; } catch { useAudioEl = false; }
+    }
+    if (ctx) { try { const o = ctx.createOscillator(), g = ctx.createGain(); o.frequency.value = 880; g.gain.value = 0.3; o.connect(g); g.connect(ctx.destination); o.start(); o.stop(ctx.currentTime + 0.07); } catch { /* */ } }
   };
-  tick();
-  metro = { t: setInterval(tick, 60000 / bpm), ctx };
+  const m = { stopped: false, t: null, ctx };
+  const t0 = performance.now(); let k = 0;
+  const tick = () => {
+    if (m.stopped) return;
+    pulse?.classList.add("on"); if (phase) phase.textContent = "UCISKAJ";
+    beep(); if (navigator.vibrate) navigator.vibrate(30);
+    setTimeout(() => { if (!m.stopped) { pulse?.classList.remove("on"); if (phase) phase.textContent = "PUŚĆ CAŁKOWICIE"; } }, period / 2); // dioda świeci przy ucisku i gaśnie przy puszczaniu
+    k++; m.t = setTimeout(tick, Math.max(0, t0 + k * period - performance.now())); // bez narastającego opóźnienia
+  };
+  metro = m; tick();
 }
 function screenPierwszaPomoc() {
   const R = FIRST_AID.rko;
@@ -491,8 +524,8 @@ function screenPierwszaPomoc() {
   const others = groupBy(FIRST_AID.others, acc).map((o) => `<h3 class="grp">${esc(o.g)}</h3><div class="card flat">${o.list.join("")}</div>`).join("");
   return `<div class="hero"><h1>Pierwsza pomoc</h1><p>Działa bez internetu.</p></div>
   <section class="rko"><h2>Nie oddycha? Rozpocznij RKO</h2>
-  <div class="row" style="margin:12px 0"><span class="pulse" id="pulse"></span><div><div class="bpm">~${R.bpm}<span style="font-size:1rem"> /min</span></div><div>uciśnięć na minutę</div></div></div>
-  <button class="btn" id="metroBtn" aria-pressed="false">Włącz rytm</button></section>
+  <div class="row" style="margin:12px 0"><span class="pulse" id="pulse"></span><div><div class="bpm">~${R.bpm}<span style="font-size:1rem"> /min</span></div><div>uciśnięć na minutę</div><div id="phase" style="font-weight:800;letter-spacing:.04em;min-height:1.4em"></div></div></div>
+  <button class="btn" id="metroBtn" aria-pressed="false">Włącz rytm</button><p class="small" style="margin:8px 0 0;opacity:.9">Dioda świeci, gdy uciskasz, i gaśnie, gdy puszczasz klatkę. Rytm 100/min (dopuszczalne 100–120) zostawia czas na pełne puszczenie. Brak dźwięku? Wyłącz tryb cichy i podgłośnij telefon. Wibracja nie działa na iPhonie.</p></section>
   <div class="card"><ol style="list-style:none;padding:0;margin:0">${steps}</ol>
   <a class="btn112" style="justify-content:center;min-height:52px;width:100%;margin-top:10px" href="tel:112">${I.phone}Zadzwoń 112</a></div>
   <h2 style="margin-top:20px">Inne sytuacje</h2>${others}${reviewLine(FIRST_AID)}`;

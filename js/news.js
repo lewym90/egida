@@ -25,12 +25,22 @@ export function newsFresh(feed, nowMs = Date.now()) {
   return Number.isFinite(t) && nowMs - t <= NEWS_STALE_H * 36e5;
 }
 
+import { dedupeSimilar } from "./similar.js";
+const NEWS_RANK = (it) => (it.kind === "media" ? 2 : it.region === "mixed" ? 1 : 0);
+/** Ta sama wiadomość od kilku źródeł (inne słowa) pokazuje się raz: wygrywa źródło oficjalne, potem nowsze. */
+export function dedupeNews(list) {
+  const pref = [...list].sort((a, b) => NEWS_RANK(a) - NEWS_RANK(b) || String(b.date).localeCompare(String(a.date)));
+  const keep = new Set(dedupeSimilar(pref, (x) => x.title, { share: 0.75, minTokens: 4 }));
+  return list.filter((x) => keep.has(x));
+}
+
 /** Wpisy dla województwa użytkownika + ogólnopolskie (bez województwa: wszystkie, także „mixed”). opts: {max, onlyRegion, onlyAll} */
 export function newsForRegion(feed, regionId, opts = {}) {
   if (!feed) return [];
   let l = feed.items.filter((x) => x.kind !== "gddkia"); // utrudnienia drogowe GDDKiA mają własne miejsce: „Dobrze wiedzieć” na Pulpicie
   if (opts.onlyAll) l = l.filter((x) => x.region === "all");
   else if (regionId) l = l.filter((x) => (opts.onlyRegion ? x.region === regionId : x.region === regionId || x.region === "all"));
+  l = dedupeNews(l);
   return opts.max ? l.slice(0, opts.max) : l;
 }
 

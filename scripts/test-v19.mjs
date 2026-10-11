@@ -16,6 +16,13 @@ ok("pierwsza pomoc: unikalne id, grupy, kroki", () => {
   for (const o of FIRST_AID.others) { assert.ok(o.g && o.t, o.id); assert.ok(o.steps.length >= 3, o.id); for (const s of o.steps) assert.ok(s.trim().length > 10, o.id); }
   assert.equal(FIRST_AID.reviewed, null, "nowa treść medyczna nie może udawać zatwierdzonej");
 });
+ok("RKO: ocena oddechu do 10 s, oddech agonalny, pełne puszczenie klatki, rytm 100–120", () => {
+  const adult = FIRST_AID.rko.steps.map((x) => x.d).join(" ");
+  assert.match(adult, /10 sekund/); assert.match(adult, /agonaln/); assert.match(adult, /całkowicie zwolnij nacisk/); assert.match(adult, /2–3 spokojne/);
+  const kid = FIRST_AID.others.find((o) => o.id === "rko-dziecko").steps.join(" ");
+  assert.match(kid, /10 sekund/); assert.match(kid, /co najmniej 2/); assert.match(kid, /całkowicie zwolnij nacisk/);
+  assert.ok(FIRST_AID.rko.bpm >= 100 && FIRST_AID.rko.bpm <= 120);
+});
 ok("poradnik: nowe tematy i grupy", () => {
   const ids = WHAT_TO_DO.items.map((x) => x.id);
   assert.equal(new Set(ids).size, ids.length);
@@ -52,6 +59,6 @@ ok("logo: pliki istnieją i są w SHELL, stare SVG usunięte, wersja podbita", (
   const sw = fs.readFileSync(path.join(root, "sw.js"), "utf8");
   assert.match(sw, /icons\/logo\.png/); assert.match(sw, /icons\/favicon\.png/);
   assert.ok(!/icon\.svg|maskable\.svg/.test(sw + fs.readFileSync(path.join(root, "index.html"), "utf8") + fs.readFileSync(path.join(root, "manifest.webmanifest"), "utf8")));
-  assert.equal(APP_VERSION, "v21"); assert.match(sw, /egida-v21/);
+  assert.equal(APP_VERSION, "v22"); assert.match(sw, /egida-v22/);
 });
 console.log(`OK: ${n} grup testów v19 przeszło`);
