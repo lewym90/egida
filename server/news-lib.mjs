@@ -1,6 +1,7 @@
 // EGIDA – logika „Ważne w regionie”: parsery RSS i list gov.pl, filtr słów kluczowych, deduplikacja. Czysta, bez sieci (testy: scripts/test-v17.mjs).
 // Zasada: tylko oficjalne, zaufane źródła (Policja, MEN, RCB, urzędy wojewódzkie, kuratoria). Nic nie piszemy od siebie, nic nie omijamy.
 import { XMLParser } from "fast-xml-parser";
+import { mentionsRegion } from "./news-places.mjs";
 
 export const LIMITS = { perSource: 15, total: 200, maxAgeDays: 14, titleChars: 200, summaryChars: 280 };
 
@@ -42,7 +43,12 @@ export function parseRss(xml) {
   for (const it of arr(j?.rss?.channel?.item)) {
     const title = stripTags(txt(it.title)), url = safeHttps(stripTags(txt(it.link)));
     if (!title || !url) continue;
-    out.push({ title, url, date: toIso(txt(it.pubDate) || txt(it.date)), summary: stripTags(txt(it.description)) });
+    out.push({ title, url, date: toIso(txt(it.pubDate) || txt(it.date) || txt(it["dc:date"])), summary: stripTags(txt(it.description)), cats: arr(it.category).map((c) => stripTags(txt(c))).join(" ") });
+  }
+  for (const it of arr(j?.["rdf:RDF"]?.item)) { // RSS 1.0 (RDF), np. Radio Szczecin
+    const title = stripTags(txt(it.title)), url = safeHttps(stripTags(txt(it.link)));
+    if (!title || !url) continue;
+    out.push({ title, url, date: toIso(txt(it["dc:date"]) || txt(it.pubDate)), summary: stripTags(txt(it.description)), cats: "" });
   }
   for (const it of arr(j?.feed?.entry)) {
     const l = arr(it.link).find((x) => x?.["@_rel"] !== "self") || arr(it.link)[0];
@@ -112,6 +118,8 @@ export function toItem(raw, src, nowMs) {
   const t = new Date(raw.date).getTime(), active = raw.until && new Date(raw.until).getTime() >= nowMs;
   if (!Number.isFinite(t) || t > nowMs + 36e5 || (!active && nowMs - t > LIMITS.maxAgeDays * 864e5)) return null; // za stare albo z przyszłości
   if (!passesFilter(src.filter, raw.title, raw.summary)) return null;
+  // Media: wpis musi dotyczyć województwa rozgłośni (tytuł lub kategorie wskazują miejscowość/region), inaczej to wiadomość z kraju lub ze świata.
+  if (src.kind === "media" && !mentionsRegion(`${raw.title} ${raw.cats || ""}`, src.region)) return null;
   const id = raw.key ? `gddkia/${raw.key}` : raw.url.replace(/^https:\/\/(www\.)?/, "").replace(/[?#].*$/, "");
   return { id, title: clip(raw.title, LIMITS.titleChars), summary: src.kind === "media" ? "" : clip(raw.summary || "", LIMITS.summaryChars), url: raw.url, date: new Date(t).toISOString(), source: src.label, region: raw.region || src.region, kind: src.kind, ...(active ? { until: raw.until } : {}) };
 }

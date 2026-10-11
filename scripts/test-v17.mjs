@@ -1,5 +1,6 @@
 // Testy v17: „Ważne w regionie” – parsery RSS/HTML, filtry, deduplikacja (serwer) i logika aplikacji (js/news.js). Dane SZTUCZNE.
 import assert from "node:assert/strict";
+import { mentionsRegion } from "../server/news-places.mjs";
 import { passesMedia, robotsAllows, parseGddkia, warsawToMs, parseRss, parseHtmlList, discoverFeeds, discoverRssPages, passesFilter, toItem, mergeItems, safeHttps } from "../server/news-lib.mjs";
 import { SOURCES } from "../server/news-sources.mjs";
 import { roadsForRegion, newsForRegion, newsFresh, ageLabel, normalizeNews, NEWS_STALE_H } from "../js/news.js";
@@ -117,9 +118,23 @@ ok("media: poważne zdarzenia tak, sport/kultura/rozmowy nie", () => {
 });
 ok("media: wpis z radia ma etykietę kind=media, bez streszczenia i z regionem rozgłośni", () => {
   const src = SOURCES.find((x) => x.id === "radio-lubelskie");
-  const it = toItem({ title: "Dachowanie samochodu na S12. Zablokowany prawy pas ruchu", url: "https://radio.lublin.pl/a", date: "2026-10-11T09:14:00Z", summary: "Treść, której nie pokazujemy" }, src, NOW);
+  const it = toItem({ title: "Dachowanie samochodu na S12 pod Lublinem. Zablokowany prawy pas ruchu", url: "https://radio.lublin.pl/a", date: "2026-10-11T09:14:00Z", summary: "Treść, której nie pokazujemy" }, src, NOW);
   assert.equal(it.kind, "media"); assert.equal(it.summary, ""); assert.equal(it.region, "lubelskie"); assert.equal(it.source, "Radio Lublin");
-  assert.equal(SOURCES.filter((x) => x.kind === "media").length, 15);
+  assert.equal(SOURCES.filter((x) => x.kind === "media").length, 11);
+});
+ok("media: wpis spoza województwa rozgłośni odpada (Dżibuti nie leży na Podkarpaciu)", () => {
+  const src = SOURCES.find((x) => x.id === "radio-podkarpackie");
+  const mk = (title, cats = "") => toItem({ title, url: "https://radio.rzeszow.pl/" + title.length, date: "2026-10-11T09:14:00Z", summary: "", cats }, src, NOW);
+  assert.equal(mk("Katastrofa statku z migrantami. Co najmniej 139 osób nie żyje"), null);
+  assert.equal(mk("Policja zatrzymała mężczyznę podejrzanego o planowanie ataku na Donalda Tuska"), null);
+  assert.ok(mk("Pożar hali w Mielcu. Ewakuowano pracowników"));
+  assert.ok(mk("Wypadek na trasie. Zginęła kobieta", "Rzeszów Wiadomości"));
+  assert.ok(mentionsRegion("Pożar w Radomsku", "lodzkie")); assert.ok(!mentionsRegion("Pożar w Radomsku", "mazowieckie"));
+  assert.ok(!mentionsRegion("Łódź nie miała okrętu, a my mamy brzeg i koło", "wielkopolskie"));
+});
+ok("RSS 1.0 (RDF) jest czytany", () => {
+  const r = parseRss(`<?xml version="1.0"?><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns="http://purl.org/rss/1.0/" xmlns:dc="http://purl.org/dc/elements/1.1/"><item><title>Pożar w Szczecinie</title><link>https://radioszczecin.pl/a</link><dc:date>2026-10-11T09:00:00+02:00</dc:date></item></rdf:RDF>`);
+  assert.equal(r.length, 1); assert.ok(r[0].date.startsWith("2026-10-11T07:00"));
 });
 ok("robots.txt: Disallow dla * blokuje, Allow doprecyzowuje, brak pliku = wolno", () => {
   assert.equal(robotsAllows("User-agent: *\nDisallow: /", "/feed/"), false);

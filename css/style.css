@@ -53,7 +53,8 @@ button,select,input{font:inherit;color:inherit}
 .region{order:3;flex:1 1 100%;max-width:none}
 .fab112{position:fixed;right:14px;bottom:calc(78px + env(safe-area-inset-bottom));z-index:40;min-width:56px;height:56px;padding:0 16px;border-radius:999px;background:var(--danger);color:#fff;display:flex;align-items:center;justify-content:center;gap:6px;text-decoration:none;font-family:var(--font-h);font-weight:800;font-size:1rem;box-shadow:0 4px 14px rgba(179,38,30,.35)}
 .brand{display:flex;align-items:center;gap:9px;text-decoration:none;color:var(--text);min-width:0}
-.brand svg{flex:none}
+.brand svg,.brand .logo{flex:none}
+.brand .logo{height:34px;width:auto}
 .wordmark{font-family:var(--font-h);font-weight:800;letter-spacing:.22em;font-size:1.0625rem;color:var(--text)}
 .tagline{display:block;font-size:.6875rem;letter-spacing:.02em;color:var(--muted);font-family:var(--font-b);font-weight:600}
 .spacer{flex:1}
@@ -360,3 +361,4 @@ input[type="search"].sel{-webkit-appearance:none;appearance:none;width:100%;font
 .smore2{display:inline-flex;align-items:center;gap:4px;min-height:44px;font-weight:700;color:var(--brand-ink)}
 .badge.media{background:var(--note);color:var(--text-card);border:1px solid var(--line);padding:1px 8px;margin-right:2px}
 .goodtoknow .gall{display:flex;align-items:center;gap:6px;min-height:44px}
+h3.grp{margin:18px 2px 8px;font-family:var(--font-h);font-size:.95rem;color:var(--muted,#667);text-transform:uppercase;letter-spacing:.04em}

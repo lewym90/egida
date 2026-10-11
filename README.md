@@ -70,3 +70,11 @@ Alerty poziomu 2 z torem po weryfikacji formatu NEPTUN, zatwierdzenie treści (`
 - Utrudnienia na drogach krajowych (GDDKiA, oficjalny plik XML: zdarzenia i zamknięcia) pokazują się w bloku „Dobrze wiedzieć” na Pulpicie dla Twojego województwa, nie na liście wiadomości.
 - Doniesienia medialne: po jednej regionalnej rozgłośni publicznej na województwo (`server/news-sources.mjs`, lista RADIO). Tylko tytuł + link, oznaczone „doniesienie medialne”, filtr: poważne zdarzenia (bez sportu, kultury i rozmów). Serwer czyta robots.txt rozgłośni i pomija źródło, jeśli zabrania pobierania. Które rozgłośnie działają, widać w `news-report.json`.
 - Wiadomości z kraju, z komend wojewódzkich i z mediów są deduplikowane po tytule (wygrywa źródło oficjalne).
+
+## Wersja 19: logo, filtr lokalizacji doniesień, rozbudowa treści
+- Logo: zielona tarcza z literą „E” (ikony PWA, favicon, nagłówek, ekran powitalny).
+- Doniesienia medialne z rozgłośni radiowych są filtrowane po lokalizacji (`server/news-places.mjs`): tytuł musi dotyczyć wskazanego województwa.
+- Pierwsza pomoc: ok. 35 instrukcji w pięciu grupach (zagrożenie życia, nagłe choroby, urazy, zatrucia i środowisko, gdy system nie działa).
+- Poradnik „Co robić”: 24 instrukcje w trzech grupach (zagrożenia, brak prądu i awarie, informacje i oszustwa).
+- Plecak: dłuższe listy, nowa zakładka „Rodzina” (plan rodzinny). Treść robocza (`reviewed: null`) do zatwierdzenia merytorycznego.
+- `npm test` obejmuje `scripts/test-v19.mjs`.

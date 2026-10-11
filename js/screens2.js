@@ -52,7 +52,7 @@ export function planPrintHtml(plan, E) {
 }
 export function packPrintHtml(state, E) {
   const sec = (t, arr) => `<h2>${t}</h2><ul class="chk">${arr.map((x) => `<li>${state.checked?.[x.id] ? "☑" : "☐"} <b>${E(x.t)}</b> <span class="pmuted">${E(x.d)}</span></li>`).join("")}</ul>`;
-  return sec("Na start: pięć rzeczy", PLECAK.start) + sec("Gdy masz czas", PLECAK.later) + sec("Zapas domowy na min. 3 dni", PLECAK.zapas) + sec("Dokumenty i informacje", PLECAK.dokumenty) + `<p class="pmuted">${E(PLECAK.note)}</p>`;
+  return sec("Na start: pięć rzeczy", PLECAK.start) + sec("Gdy masz czas", PLECAK.later) + sec("Zapas domowy na min. 3 dni", PLECAK.zapas) + sec("Dokumenty i informacje", PLECAK.dokumenty) + sec("Plan rodzinny", PLECAK.rodzina) + `<p class="pmuted">${E(PLECAK.note)}</p>`;
 }
 export function guidePrintHtml(E) {
   const R = FIRST_AID.rko;

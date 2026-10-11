@@ -40,7 +40,7 @@ const I = {
   send: ic('<path d="M21 3L3 10.5l6.5 2.5L12 20z"/><path d="M21 3L9.5 13"/>'),
   ext: ic('<path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 01-1 1H5a1 1 0 01-1-1V7a1 1 0 011-1h5"/>', 16),
 };
-const LOGO = `<svg width="34" height="34" viewBox="0 0 512 512" aria-hidden="true"><rect width="512" height="512" rx="112" fill="#0B6B63"/><path d="M256 92l140 52v104c0 86-58 142-140 172-82-30-140-86-140-172V144z" fill="none" stroke="#fff" stroke-width="28" stroke-linejoin="round"/><circle cx="256" cy="240" r="42" fill="none" stroke="#fff" stroke-width="26"/></svg>`;
+const LOGO = `<img class="logo" src="icons/logo.png" width="27" height="34" alt="" aria-hidden="true">`;
 
 /* ---------- stan (tylko w urządzeniu) ---------- */
 const KEY = "egida.v1";
@@ -445,12 +445,18 @@ function screenSoon(t, d) {
   return `<div class="hero"><h1>${t}</h1></div><div class="card"><span class="badge soon">Wkrótce</span><p>${d}</p><a class="btn" href="#/pulpit">Wróć na pulpit</a></div>`;
 }
 
+function groupBy(arr, fn) {
+  const out = [];
+  for (const x of arr) { const g = x.g || ""; let e = out.find((o) => o.g === g); if (!e) out.push((e = { g, list: [] })); e.list.push(fn(x)); }
+  return out;
+}
 function screenPoradnik() {
-  const items = WHAT_TO_DO.items.map((x) => `<a class="check" style="text-decoration:none;color:inherit;cursor:pointer" href="#/co-robic/${x.id}"><span><b>${esc(x.t)}</b><br><span class="muted small">${esc(x.d)}</span></span></a>`).join("");
+  const row = (x) => `<a class="check" style="text-decoration:none;color:inherit;cursor:pointer" href="#/co-robic/${x.id}"><span><b>${esc(x.t)}</b><br><span class="muted small">${esc(x.d)}</span></span></a>`;
+  const items = groupBy(WHAT_TO_DO.items, row).map((o) => `<h3 class="grp">${esc(o.g)}</h3><div class="card flat">${o.list.join("")}</div>`).join("");
   return `<div class="hero"><h1>Poradnik</h1><p>Krótkie instrukcje, które działają także bez internetu.</p></div>
   <a class="tile" style="flex-direction:row;align-items:center;margin-bottom:12px" href="#/zagrozenie"><span class="ti t-red">${I.alert}</span><b>Tryb zagrożenia: 112, schron, 3 kroki</b></a>
   <a class="tile" style="flex-direction:row;align-items:center" href="#/pierwsza-pomoc"><span class="ti">${I.heart}</span><b>Pierwsza pomoc, w tym resuscytacja (RKO)</b></a>
-  <h2 style="margin-top:20px">Co robić, gdy…</h2><div class="card flat">${items}</div>
+  <h2 style="margin-top:20px">Co robić, gdy…</h2>${items}
   <a class="tile" style="flex-direction:row;align-items:center;margin-top:12px" href="#/test"><span class="ti">${I.test}</span><b>Test gotowości (2 minuty)</b></a>
   <button class="btn" id="printGuide" style="margin-top:12px">Drukuj instrukcje (pierwsza pomoc i „Co robić”)</button>`;
 }
@@ -481,14 +487,15 @@ function startMetro() {
 function screenPierwszaPomoc() {
   const R = FIRST_AID.rko;
   const steps = R.steps.map((s, i) => `<li style="display:flex;gap:12px;margin:.8rem 0"><span class="dot done" style="flex:none">${i + 1}</span><span><b>${esc(s.t)}</b><br>${esc(s.d)}</span></li>`).join("");
-  const others = FIRST_AID.others.map((o) => `<details class="acc"><summary>${esc(o.t)}<span class="muted">${I.chev}</span></summary><div class="body"><ol>${o.steps.map((s) => `<li>${esc(s)}</li>`).join("")}</ol></div></details>`).join("");
+  const acc = (o) => `<details class="acc"><summary>${esc(o.t)}<span class="muted">${I.chev}</span></summary><div class="body"><ol>${o.steps.map((s) => `<li>${esc(s)}</li>`).join("")}</ol></div></details>`;
+  const others = groupBy(FIRST_AID.others, acc).map((o) => `<h3 class="grp">${esc(o.g)}</h3><div class="card flat">${o.list.join("")}</div>`).join("");
   return `<div class="hero"><h1>Pierwsza pomoc</h1><p>Działa bez internetu.</p></div>
   <section class="rko"><h2>Nie oddycha? Rozpocznij RKO</h2>
   <div class="row" style="margin:12px 0"><span class="pulse" id="pulse"></span><div><div class="bpm">~${R.bpm}<span style="font-size:1rem"> /min</span></div><div>uciśnięć na minutę</div></div></div>
   <button class="btn" id="metroBtn" aria-pressed="false">Włącz rytm</button></section>
   <div class="card"><ol style="list-style:none;padding:0;margin:0">${steps}</ol>
   <a class="btn112" style="justify-content:center;min-height:52px;width:100%;margin-top:10px" href="tel:112">${I.phone}Zadzwoń 112</a></div>
-  <h2 style="margin-top:20px">Inne sytuacje</h2><div class="card flat">${others}</div>${reviewLine(FIRST_AID)}`;
+  <h2 style="margin-top:20px">Inne sytuacje</h2>${others}${reviewLine(FIRST_AID)}`;
 }
 
 let plecakTab = "plecak";
@@ -497,13 +504,15 @@ function checkRow(x) {
 }
 function screenPlecak() {
   const n = plecakDone(), total = PLECAK.start.length, pct = Math.round((n / total) * 100);
-  const tabs = [["plecak", "Plecak"], ["zapas", "Zapas domowy"], ["dokumenty", "Dokumenty"]].map(([k, t]) => `<button class="chip" data-ptab="${k}" aria-pressed="${plecakTab === k}">${t}</button>`).join("");
+  const tabs = [["plecak", "Plecak"], ["zapas", "Zapas domowy"], ["dokumenty", "Dokumenty"], ["rodzina", "Rodzina"]].map(([k, t]) => `<button class="chip" data-ptab="${k}" aria-pressed="${plecakTab === k}">${t}</button>`).join("");
   let body;
   if (plecakTab === "plecak") {
     body = `<h2>Na start: pięć rzeczy</h2><div class="card flat" style="margin-top:8px">${PLECAK.start.map(checkRow).join("")}</div>
     <h2 style="margin-top:20px">Gdy masz czas</h2><div class="card flat" style="margin-top:8px">${PLECAK.later.map(checkRow).join("")}</div>`;
   } else if (plecakTab === "zapas") {
     body = `<h2>Zapas domowy na min. 3 dni</h2><div class="card flat" style="margin-top:8px">${PLECAK.zapas.map(checkRow).join("")}</div>`;
+  } else if (plecakTab === "rodzina") {
+    body = `<h2>Plan rodzinny</h2><p class="muted small" style="margin:4px 0 0">Ustalcie to wspólnie, zanim coś się wydarzy.</p><div class="card flat" style="margin-top:8px">${PLECAK.rodzina.map(checkRow).join("")}</div>`;
   } else {
     body = `<h2>Dokumenty i informacje</h2><div class="card flat" style="margin-top:8px">${PLECAK.dokumenty.map(checkRow).join("")}</div>`;
   }

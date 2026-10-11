@@ -18,18 +18,14 @@ const KWP_NAME = { dolnoslaskie: "Policja Dolnośląska", "kujawsko-pomorskie": 
   "warminsko-mazurskie": "Policja Warmińsko-Mazurska", wielkopolskie: "Policja Wielkopolska", zachodniopomorskie: "Policja Zachodniopomorska" };
 
 const RADIO = [
-  ["dolnoslaskie", "Polskie Radio Wrocław", "https://radiowroclaw.pl/feed/"],
   ["lubelskie", "Radio Lublin", "https://radio.lublin.pl/feed/"], // (sprawdzony)
   ["lodzkie", "Radio Łódź", "https://radiolodz.pl/feed/"], // (sprawdzony)
-  ["malopolskie", "Radio Kraków", "https://radiokrakow.pl/feed/"],
-  ["opolskie", "Radio Opole", "https://radio.opole.pl/feed/"],
+  ["opolskie", "Radio Opole", "https://radio.opole.pl/12,0,rss"],
   ["podkarpackie", "Polskie Radio Rzeszów", "https://www.radio.rzeszow.pl/feed/"], // (sprawdzony)
-  ["podlaskie", "Polskie Radio Białystok", "https://radio.bialystok.pl/feed/"],
   ["pomorskie", "Radio Gdańsk", "https://radiogdansk.pl/feed/"], // (sprawdzony)
   ["slaskie", "Polskie Radio Katowice", "https://www.radio.katowice.pl/feed/"],
   ["swietokrzyskie", "Radio Kielce", "https://radiokielce.pl/feed/"], // (sprawdzony)
   ["warminsko-mazurskie", "Polskie Radio Olsztyn", "https://www.radio.olsztyn.pl/feed/"],
-  ["wielkopolskie", "Polskie Radio Poznań", "https://radiopoznan.fm/feed/"],
   ["zachodniopomorskie", "Radio Szczecin", "https://radioszczecin.pl/rss/rss.php"], // (sprawdzony)
   ["lubuskie", "Radio Zachód", "https://radiozachod.pl/feed/"],
   ["mazowieckie", "Radio dla Ciebie", "https://radiodlaciebie.pl/feed/"],
@@ -48,7 +44,8 @@ export const SOURCES = [
     // Mazowsze: adres sprawdzony ręcznie, używany też, gdyby wyszukiwanie zawiodło.
     htmlFallback: HTML_FALLBACK[region], urls: region === "mazowieckie" ? ["https://mazowiecka.policja.gov.pl/dokumenty/rss/271-rss-o-1488.rss"] : undefined })),
   // Doniesienia medialne: regionalne rozgłośnie publiczne (Polskie Radio), po jednej na województwo. Region wynika z samej rozgłośni.
-  // Adresy oznaczone „(sprawdzony)” odpowiedziały jako RSS przy ręcznym sprawdzeniu; pozostałe to kandydaci – o ich działaniu decyduje news-report.json.
+  // Adresy oznaczone „(sprawdzony)” odpowiedziały jako RSS przy sprawdzeniu; pozostałe to kandydaci – o ich działaniu decyduje news-report.json.
+// Bez źródła radiowego (nie znaleziono publicznego kanału RSS): dolnośląskie, małopolskie, podlaskie, wielkopolskie, kujawsko-pomorskie.
   // Serwer czyta robots.txt rozgłośni i pomija źródło, jeśli zabrania pobierania.
   ...RADIO.map(([region, label, url]) => ({ id: "radio-" + region, label, region, kind: "media", filter: "media", urls: [url] })),
   // Urzędy wojewódzkie i kuratoria (sprawdzone z serwera: HTTP 200)

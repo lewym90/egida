@@ -1,5 +1,5 @@
 // Service worker: offline dla treści (powłoka aplikacji z cache), komunikaty zawsze najpierw z sieci.
-const VERSION = "egida-v18";
+const VERSION = "egida-v19";
 const SHELL = [
   "./", "index.html", "manifest.webmanifest", "css/style.css",
   "js/app.js", "js/content.js", "js/config.js",
@@ -7,7 +7,7 @@ const SHELL = [
   "js/sheltersscreen.js", "js/classify.js", "js/poland-border.js", "js/demo.js",
   "js/version.js", "js/regions.js", "js/regions-data.js", "js/personal.js", "js/screens2.js", "js/polish.js", "js/ua-shade.js", "js/ua-oblasts.js", "js/news.js",
   "js/vendor/leaflet/leaflet.js", "js/vendor/leaflet/leaflet.css",
-  "icons/icon.svg", "icons/icon-192.png", "icons/icon-512.png", "icons/apple-touch-icon.png",
+  "icons/favicon.png", "icons/logo.png", "icons/icon-192.png", "icons/icon-512.png", "icons/apple-touch-icon.png",
   "fonts/manrope-latin-500-normal.woff2", "fonts/manrope-latin-700-normal.woff2", "fonts/manrope-latin-800-normal.woff2",
   "fonts/manrope-latin-ext-500-normal.woff2", "fonts/manrope-latin-ext-700-normal.woff2", "fonts/manrope-latin-ext-800-normal.woff2",
   "fonts/source-sans-3-latin-400-normal.woff2", "fonts/source-sans-3-latin-600-normal.woff2", "fonts/source-sans-3-latin-700-normal.woff2",
