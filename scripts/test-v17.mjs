@@ -77,7 +77,7 @@ ok("safeHttps", () => { assert.equal(safeHttps("http://a.pl"), null); assert.equ
 ok("źródła: 16 jednostek Policji, wszystkie id województw istnieją, adresy https", () => {
   const ids = new Set(VOIVODESHIPS.map((v) => v.id));
   assert.equal(SOURCES.filter((s) => s.id.startsWith("kwp-")).length, 16);
-  for (const s of SOURCES) { assert.ok(s.region === "all" || ids.has(s.region), s.id); assert.ok(["rss", "html"].includes(s.kind)); for (const u of [...(s.urls || []), s.discover].filter(Boolean)) assert.ok(u.startsWith("https://"), u); }
+  for (const s of SOURCES) { assert.ok(s.region === "all" || s.region === "mixed" || ids.has(s.region), s.id); assert.ok(["rss", "html"].includes(s.kind)); for (const u of [...(s.urls || []), s.discover].filter(Boolean)) assert.ok(u.startsWith("https://"), u); }
   assert.equal(new Set(SOURCES.map((s) => s.id)).size, SOURCES.length);
 });
 
@@ -87,18 +87,21 @@ const FEED = { generatedAt: "2026-10-11T09:50:00Z", items: [
   { id: "2", title: "Lubelskie 1", url: "https://a/2", date: "2026-10-11T07:00:00Z", source: "Policja Lubelska", region: "lubelskie", summary: "" },
   { id: "3", title: "Cała Polska", url: "https://a/3", date: "2026-10-10T07:00:00Z", source: "MEN", region: "all", summary: "" },
   { id: "4", title: "x", url: "javascript:alert(1)", date: "2026-10-10T07:00:00Z", source: "zły", region: "all" },
+  { id: "6", title: "Portal krajowy", url: "https://a/6", date: "2026-10-10T05:00:00Z", source: "Policja (portal krajowy)", region: "mixed" },
   { id: "5", title: "Nieznane woj.", url: "https://a/5", date: "2026-10-10T06:00:00Z", source: "s", region: "marsjanskie" },
 ] };
 ok("normalizeNews: odrzuca niebezpieczne adresy i nieznane województwa", () => {
   const f = normalizeNews(FEED);
-  assert.deepEqual(f.items.map((x) => x.id), ["1", "2", "3"]);
+  assert.deepEqual(f.items.map((x) => x.id), ["1", "2", "3", "6"]);
   assert.equal(normalizeNews(null), null); assert.equal(normalizeNews({ items: "x" }), null);
 });
 ok("newsForRegion: województwo użytkownika + ogólnopolskie; bez regionu – wszystko", () => {
   const f = normalizeNews(FEED);
   assert.deepEqual(newsForRegion(f, "mazowieckie").map((x) => x.id), ["1", "3"]);
   assert.deepEqual(newsForRegion(f, "lubelskie").map((x) => x.id), ["2", "3"]);
-  assert.equal(newsForRegion(f, null).length, 3);
+  assert.equal(newsForRegion(f, null).length, 4); // „Wszystkie regiony” zawiera też portal krajowy
+  assert.ok(!newsForRegion(f, "mazowieckie").some((x) => x.region === "mixed"), "portal krajowy nie trafia do Mojego województwa");
+  assert.ok(!newsForRegion(f, null, { onlyAll: true }).some((x) => x.region === "mixed"));
   assert.equal(newsForRegion(f, "mazowieckie", { max: 1 }).length, 1);
   assert.deepEqual(newsForRegion(f, "mazowieckie", { onlyRegion: true }).map((x) => x.id), ["1"]);
 });

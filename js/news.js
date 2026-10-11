@@ -12,7 +12,7 @@ export function normalizeNews(raw) {
   for (const x of raw.items) {
     if (!x || typeof x !== "object") continue;
     const title = String(x.title || "").trim().slice(0, 240), url = String(x.url || ""), t = Date.parse(x.date);
-    const region = x.region === "all" || IDS.has(x.region) ? x.region : null;
+    const region = x.region === "all" || x.region === "mixed" || IDS.has(x.region) ? x.region : null; // „mixed” = portal krajowy bez ustalonego regionu
     if (!title || !httpsOnly(url) || !Number.isFinite(t) || !region) continue;
     items.push({ id: String(x.id || url).slice(0, 200), title, summary: String(x.summary || "").slice(0, 300), url, date: new Date(t).toISOString(), source: String(x.source || "").slice(0, 80), region });
   }
@@ -25,7 +25,7 @@ export function newsFresh(feed, nowMs = Date.now()) {
   return Number.isFinite(t) && nowMs - t <= NEWS_STALE_H * 36e5;
 }
 
-/** Wpisy dla województwa użytkownika + ogólnopolskie (bez województwa: wszystkie). opts: {max, onlyRegion, onlyAll} */
+/** Wpisy dla województwa użytkownika + ogólnopolskie (bez województwa: wszystkie, także „mixed”). opts: {max, onlyRegion, onlyAll} */
 export function newsForRegion(feed, regionId, opts = {}) {
   if (!feed) return [];
   let l = feed.items;

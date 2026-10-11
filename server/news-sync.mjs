@@ -39,7 +39,11 @@ async function runSource(src) {
           const html = await get(src.discover);
           let found = discoverFeeds(html, src.discover);
           if (!found.length) for (const pg of discoverRssPages(html, src.discover)) { // strona „Kanały RSS” jednostki
-            try { found = discoverFeeds(await get(pg), pg); } catch (e) { rep.discoverError = String(e.message || e); }
+            try {
+              const pageHtml = await get(pg);
+              found = discoverFeeds(pageHtml, pg);
+              (rep.rssPages ||= []).push({ url: pg, bytes: pageHtml.length, rssHrefs: [...pageHtml.matchAll(/href\s*=\s*["']([^"']*rss[^"']*)["']/gi)].map((m) => m[1]).slice(0, 8) }); // diagnostyka: jak naprawdę wyglądają linki
+            } catch (e) { rep.discoverError = String(e.message || e); }
             if (found.length) break;
           }
           found = found.slice(0, 3);
@@ -47,7 +51,7 @@ async function runSource(src) {
           if (found.length) { urls = found; cache[src.id] = found; }
         } catch (e) { rep.discoverError = String(e.message || e); }
       }
-      if (!urls.length) throw new Error(rep.discoverError || "nie znaleziono kanału RSS na stronie");
+      if (!urls.length && !src.htmlFallback) throw new Error(rep.discoverError || "nie znaleziono kanału RSS na stronie");
     }
     for (const u of urls) {
       try {
@@ -57,6 +61,10 @@ async function runSource(src) {
         raws.push(...items);
         if (items.length) break; // pierwszy działający adres wystarcza
       } catch (e) { rep.urls.push({ url: u, error: String(e.message || e) }); }
+    }
+    if (!raws.length && src.htmlFallback) { // zapasowo: lista „Aktualności” ze strony jednostki
+      try { const items = parseHtmlList(await get(src.htmlFallback), src.htmlFallback); rep.urls.push({ url: src.htmlFallback, status: 200, items: items.length, fallback: true }); raws.push(...items); }
+      catch (e) { rep.urls.push({ url: src.htmlFallback, error: String(e.message || e), fallback: true }); }
     }
     rep.fetched = raws.length;
     rep.ok = rep.urls.some((x) => x.status === 200 && x.items > 0);
