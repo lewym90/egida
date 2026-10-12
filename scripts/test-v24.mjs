@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import { ThreatStore, normalizeThreat, parseTrail, estimateNow, buildView } from "../js/neptun.js";
 import { haversineKm } from "../js/geo.js";
-import { parseRss } from "../server/news-lib.mjs";
+import { parseRss, passesFilter } from "../server/news-lib.mjs";
 import { SOURCES } from "../server/news-sources.mjs";
 let n = 0;
 const ok = (name, fn) => { try { fn(); } catch (e) { e.message = `[${name}] ${e.message}`; throw e; } n++; };
@@ -52,8 +52,14 @@ ok("RSS: adresy względne w pliku (Radio Opole) są rozwiązywane względem kana
   const r = parseRss(xml); assert.equal(r.length, 1); assert.equal(r[0].url, "https://radio.opole.pl/100,925163,pozar-w-opolu");
 });
 ok("źródła: Radio ZET i TVP Info mają wyszukiwanie kanału, Polskie Radio 24 usunięte (robots.txt)", () => {
-  for (const id of ["media-radiozet", "media-tvpinfo"]) assert.ok(SOURCES.find((x) => x.id === id)?.discover, id);
+  
   assert.ok(!SOURCES.find((x) => x.id === "media-polskieradio24"));
   assert.ok(SOURCES.find((x) => x.id === "kwpsp-slaskie").urls.some((u) => u.endsWith("/wiadomosci")));
+});
+ok("filtry: „burza po wyborach”, remonty, sądy i nagrody odpadają; prawdziwe zdarzenia zostają", () => {
+  for (const t of ["Prawica świętuje, jest kontra rządzących. Burza po wyborach w Krakowie", "Kolejne skrzyżowanie w Opolu do remontu. Będą utrudnienia", "Wyrok w sprawie śmiertelnego wypadku na DK16. Kierowca skazany", "Atak drona, ranni funkcjonariusze. Kontrterroryści rywalizowali na Pomorzu", "Jak reagować w sytuacji zagrożenia? W Olsztynie odbędzie się Forum Bezpieczeństwa"]) assert.equal(passesFilter("media", t), false, t);
+  for (const t of ["Burza z gradem nad Lublinem. Strażacy wypompowują wodę", "Burze z piorunami nad Mazowszem. Ostrzeżenie IMGW", "Tragiczny wypadek w Gdyni. Nie żyją dwie osoby", "Atak nożem w szkole w Warszawie. Trzy osoby ranne", "Nowe informacje ws. zamachu na Donalda Tuska"]) assert.equal(passesFilter("media", t), true, t);
+  for (const t of ["500 mln zł na rozwój polskich technologii kosmicznych. Powstaje Vinci Space Tech Fund", "Nowe inwestycje i współpraca przemysłowa dla bezpieczeństwa Bałtyku", "Uroczyste zakończenie studiów podyplomowych dla kadry Państwowej Straży Pożarnej", "Wystartowała Kampania Dzieciństwo bez Przemocy", "Komunikat dla mediów - zapowiedź briefingu"]) assert.equal(passesFilter("safety", t), false, t);
+  for (const t of ["Ostrzeżenie IMGW przed silnym wiatrem w województwie lubelskim", "Czarny alert drogowy – tragiczny karambol na obwodnicy Zawiercia", "Ponad 100 mld zł na ochronę ludności i obronę cywilną", "MSWiA publikuje instrukcję reagowania podczas zagrożenia atakiem z powietrza"]) assert.equal(passesFilter("safety", t), true, t);
 });
 console.log(`OK: ${n} grup testów v24 przeszło`);

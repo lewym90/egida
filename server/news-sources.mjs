@@ -22,9 +22,8 @@ const NATIONAL = [
   ["polsatnews", "Polsat News", ["https://www.polsatnews.pl/rss/polska.xml"]],
   ["tvn24", "TVN24", ["https://tvn24.pl/najnowsze.xml", "https://tvn24.pl/polska.xml"]],
   ["rmf24", "RMF24", ["https://www.rmf24.pl/fakty/polska/feed", "https://www.rmf24.pl/feed"]],
-  ["radiozet", "Radio ZET", ["https://wiadomosci.radiozet.pl/rss"], "https://wiadomosci.radiozet.pl/"], // adres kanału serwer wyszukuje na stronie głównej (link rel=alternate)
   ["interia", "Interia", ["https://wydarzenia.interia.pl/feed", "https://wydarzenia.interia.pl/polska/feed"]],
-  ["tvpinfo", "TVP Info", ["https://www.tvp.info/feed"], "https://www.tvp.info/"],
+  // Radio ZET i TVP Info: nie znaleziono działającego, jawnego kanału RSS – pominięte (można dodać, gdy adres będzie znany).
   // Polskie Radio 24: robots.txt zabrania pobierania – pomijamy.
   ["info112", "Info112", ["https://info112.pl/feed/"]],
 ];
@@ -49,7 +48,7 @@ export const SOURCES = [
   // Ogólnopolskie (sprawdzone z serwera EGIDA: HTTP 200)
   // Portal policja.pl zbiera wiadomości ze WSZYSTKICH regionów, więc nie wiemy, którego dotyczą: region „mixed” = pokazujemy tylko w zakresie „Wszystkie regiony”.
   { id: "policja-pl", label: "Policja (portal krajowy)", region: "mixed", kind: "rss", filter: "safety", urls: ["https://policja.pl/dokumenty/rss/1-rss-1.rss"] },
-  { id: "rcb", label: "Rządowe Centrum Bezpieczeństwa", region: "all", kind: "html", filter: "all", urls: ["https://www.gov.pl/web/rcb/wiadomosci", "https://www.gov.pl/web/rcb"] },
+  { id: "rcb", label: "Rządowe Centrum Bezpieczeństwa", region: "all", kind: "html", filter: "safety", urls: ["https://www.gov.pl/web/rcb/wiadomosci", "https://www.gov.pl/web/rcb"] },
   { id: "men", label: "Ministerstwo Edukacji Narodowej", region: "all", kind: "html", filter: "school", urls: ["https://www.gov.pl/web/edukacja/wiadomosci", "https://www.gov.pl/web/edukacja"] },
   // Drogi krajowe: oficjalny plik XML GDDKiA (zdarzenia i zamknięcia dróg, z województwem). Źródło: Generalna Dyrekcja Dróg Krajowych i Autostrad.
   { id: "gddkia", label: "GDDKiA (drogi krajowe)", region: "all", kind: "gddkia", filter: "all", noCap: true, urls: ["https://www.archiwum.gddkia.gov.pl/dane/zima_html/utrdane.xml"] },

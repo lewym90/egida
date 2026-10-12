@@ -29,7 +29,7 @@ ok("Lublin112: wpis z Lublina → lubelskie; wiadomość z kraju odpada; zamach 
   assert.equal(mk("media-lublin112", "Zatrzymano mężczyznę, który planował zamach na Donalda Tuska. Groźby dotyczyły też szefa MON", "Kraj, zamach").region, "all");
 });
 ok("źródła: portale krajowe, Lublin112 i 16 komend PSP są na liście, wszystkie z jawnym adresem https", () => {
-  for (const id of ["media-polsatnews", "media-tvn24", "media-rmf24", "media-radiozet", "media-interia", "media-tvpinfo", "media-info112", "media-lublin112"]) assert.ok(S(id), id);
+  for (const id of ["media-polsatnews", "media-tvn24", "media-rmf24", "media-interia", "media-info112", "media-lublin112"]) assert.ok(S(id), id);
   const psp = SOURCES.filter((x) => x.id.startsWith("kwpsp-")); assert.equal(psp.length, 16);
   for (const s of SOURCES) for (const u of s.urls || []) assert.ok(/^https:\/\//.test(u), s.id + " " + u);
   assert.equal(new Set(SOURCES.map((x) => x.id)).size, SOURCES.length);

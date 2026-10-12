@@ -12,10 +12,15 @@ const SAFETY = [
   "falszyw", "dezinformac", "fejk", "nieprawdziw", "oszust", "wyludz", "podszyw", "komunikat", "apel ", "apelu", "apeluj", "bezpieczen", "ludnosci", "obron cywiln",
   "schron", "dron", "rakiet", "wybuch", "pozar", "powodz", "wichur", "burz", "nawalnic", "upal", "gololed", "smog", "skazeni", "awari", "brak pradu",
   "cyberatak", "cyberbezp", "przemoc", "agresj", "amunicj", "materialy wybuchow", "arsenal",
+  "kryzysow", "bezpieczn", "wypadk", "karambol", "tragiczn", "zgin", "nie zyj", "zabojstw", "napad", "porwan", "zaginion",
 ];
 // Dla szkół i kuratoriów: tylko wpisy o bezpieczeństwie (bez planów lekcji, konkursów itp.).
 const SCHOOL_SAFETY = ["bezpiecz", "zagroz", "grozb", "alarm", "ewakuac", "przemoc", "atak", "komunikat", "apel ", "apelu", "apeluj", "ostrzez", "cyber", "policj", "ochron", "dezinformac", "falszyw", "wstrzyman", "zawiesz"];
 
+// Źródła oficjalne (filtr „safety” i „school”): wpisy o inwestycjach, szkoleniach, nagrodach itp. nie są komunikatami o bezpieczeństwie.
+const OFFICIAL_DENY_HARD = ["remont", "uroczyst", "studi", "podyplom", "wyroznien", "briefing", "zapowiedz", "nabor", "ubezpiecze", "targ", "poleco", "szczepie", "nagrod", "jubileusz", "konkurs", "absolwent", "stypendi", "dziecinstwo bez przemocy", "wspieramy dziecinstwo", "kosmiczn", "energetycz"];
+const OFFICIAL_DENY_SOFT = ["technologi", "wspolprac", "inwestycj", "mln zl", "mld zl", "konferencj", "armii"];
+const CIVIL = ["ochron ludnosci", "ochrony ludnosci", "ochrone ludnosci", "obron cywiln", "obrone cywiln", "schron", "alarm", "ostrzez", "ewakuac", "komunikat"];
 const fold = (s) => String(s || "").toLowerCase().replace(/ł/g, "l").normalize("NFD").replace(/[̀-ͯ]/g, "");
 const matches = (text, words) => { const t = fold(text); return words.some((w) => new RegExp("(^|[^a-z0-9])" + fold(w)).test(t)); }; // dopasowanie od początku wyrazu
 
@@ -24,6 +29,8 @@ export function passesFilter(mode, title, summary = "") {
   if (mode === "all") return true;
   if (mode === "media") return passesMedia(title); // tylko tytuł
   const text = `${title} ${summary}`;
+  if (matches(title, OFFICIAL_DENY_HARD)) return false;
+  if (matches(title, OFFICIAL_DENY_SOFT) && !matches(title, CIVIL)) return false;
   if (mode === "school") return matches(text, SCHOOL_SAFETY);
   return matches(text, SAFETY);
 }
@@ -234,7 +241,10 @@ const MEDIA_SAFETY = ["alarm", "bomb", "ewakuac", "zagroz", "ostrzez", "grozb", 
   "burz", "tornado", "gololed", "skazeni", "katastrof", "nie zyje", "nie zyja", "zgin", "smiertel", "ranni", "ranny", "rannych", "strzelani", "nozown", "atak", "zamach", "dron", "rakiet", "syren",
   "zabojstw", "morderstw", "napad", "porwan", "zaginion", "brak pradu", "brak wody", "przerw w dostaw", "awari", "zatruc", "epidemi"];
 const MEDIA_DENY = ["mecz", "liga", "ligi", "turniej", "puchar", "zawodnik", "zawodnicz", "pilkarz", "pilkark", "siatkar", "koszykar", "reprezentacj", "wyscig", "koncert", "festiwal", "wystaw", "premiera", "premiery",
-  "kino", "teatr", "spektakl", "konkurs", "rocznic", "jubileusz", "horoskop", "rozmowa", "reportaz", "podcast", "felieton", "wideo", "quiz", "gosc", "wywiad", "ekspert", "pogoda na", "targi", "zwyciez", "pokonal", "przegral"];
+  "kino", "teatr", "spektakl", "konkurs", "rocznic", "jubileusz", "horoskop", "rozmowa", "reportaz", "podcast", "felieton", "wideo", "quiz", "gosc", "wywiad", "ekspert", "pogoda na", "targi", "zwyciez", "pokonal", "przegral",
+  // polityka i „burze” w przenośni, sądy, imprezy, remonty: nie dotyczą bezpieczeństwa
+  "wybor", "koalicj", "prawic", "lewic", "opozycj", "sondaz", "sejm", "posel", "poslank", "burza po", "burza wokol", "burza medialn", "burza polityczn", "burza w sieci", "burza w internecie",
+  "wyrok", "skazan", "biegl", "sad podja", "zajal sie sad", "forum", "rywaliz", "zawody", "remont"];
 /** Filtr mediów: tytuł musi zawierać słowo o zagrożeniu/poważnym zdarzeniu i nie zawierać słów ze sportu, kultury i rozmów. */
 export function passesMedia(title) { return matches(title, MEDIA_SAFETY) && (!matches(title, MEDIA_DENY) || nationalThreat(title)); } // „zamach na premiera” nie jest premierą teatralną
 

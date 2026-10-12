@@ -106,3 +106,9 @@ Alerty poziomu 2 z torem po weryfikacji formatu NEPTUN, zatwierdzenie treści (`
 - Na telefonie przewija się panel aplikacji (`.shell`), a nie cała strona, więc nie da się już „wyciągnąć” pustego obszaru pod dolnym paskiem (iOS odbijał stronę razem z paskiem). Na komputerze bez zmian; wydruk bez zmian.
 - **Mapa obiektów (NEPTUN): ślad i szacunek.** Obok ostatniej zgłoszonej pozycji rysujemy przebytą drogę (punkty z API i z kolejnych odczytów, godzina po dotknięciu kropki). Dla dronów z kursem, ale bez prędkości, pokazujemy osobny znacznik „≈ teraz (szacunek)”: ostatnie zgłoszenie przesunięte wzdłuż kursu o typową prędkość (dron 180 km/h, rozpoznawczy 120 km/h), tylko dla zgłoszeń od 30 s do 10 min, bez rakiet i bomb. Szacunek służy wyłącznie do wyświetlania; oceny i powiadomienia go nie używają.
 - **Źródła wiadomości:** Radio Opole (adresy względne w RSS), wyszukiwanie kanału na stronach Radia ZET i TVP Info, rezerwowe adresy KW PSP (np. Katowice `/wiadomosci`), usunięty Polskie Radio 24 (robots.txt zabrania pobierania).
+
+## Wersja 25: ostrzejsze filtry wiadomości
+- Odpadają „burze” w przenośni (np. „burza po wyborach”), polityka (wybory, koalicje, sondaże), wyroki i procesy, zawody, fora, remonty. Prawdziwe burze i zdarzenia zostają.
+- Źródła oficjalne: odpadają inwestycje, nagrody, szkolenia akademickie, briefingi, kampanie społeczne, technologie kosmiczne i energetyczne (chyba że dotyczą ochrony ludności, schronów, ostrzeżeń). RCB używa filtra bezpieczeństwa zamiast „wszystko”.
+- Radio ZET i TVP Info usunięte (brak jawnego kanału RSS).
+- Do filtra bezpieczeństwa doszły: kryzys, wypadek, karambol, zabójstwo, napad, porwanie, zaginięcie.
