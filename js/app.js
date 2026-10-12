@@ -260,6 +260,11 @@ function installHtml(withDismiss) {
 const installHint = () => (state.installDismissed ? "" : installHtml(true));
 window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); installEvt = e; const r = parse().route; if (state.onboarded && (r === "pulpit" || r === "ustawienia")) render(); });
 window.addEventListener("appinstalled", () => { installEvt = null; if (state.onboarded) render(); });
+// iPhone: po odświeżeniu / powrocie do aplikacji Safari bywa, że okno jest „przewinięte” i dolny pasek wisi w połowie ekranu – wracamy na górę i wymuszamy przeliczenie układu.
+{ const fixView = () => { try { if (window.scrollY || window.scrollX) window.scrollTo(0, 0); const d = document.documentElement; d.style.minHeight = "0"; void d.offsetHeight; d.style.minHeight = ""; } catch { /* */ } };
+  for (const ev of ["pageshow", "resize", "orientationchange"]) window.addEventListener(ev, fixView);
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) fixView(); });
+  window.visualViewport?.addEventListener("resize", fixView); fixView(); }
 
 /* ---------- tryb „na wypadek braku internetu” ---------- */
 const fmtWhen = (iso) => { const d = new Date(iso); return isNaN(d) ? "" : d.toLocaleString("pl-PL", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }); };

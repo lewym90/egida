@@ -6,7 +6,7 @@ import { offlineCenters, downloadOffline, offlineSummary } from "../js/offline.j
 import { overpassQueryTile, medicalTiles } from "../js/medical.js";
 import { POLAND_RING } from "../js/poland-border.js";
 import { pointInRing, distToRingKm } from "../js/geo.js";
-import { parseAed, parseHospitals, loadMedicalDb, unpackAed, unpackHospital, overpassQueryAed, overpassQueryHospitals } from "../js/medical.js";
+import { parseAed, parseHospitals, loadMedicalDb, unpackAed, unpackHospital, overpassQueryAed, overpassQueryHospitals, NONAME } from "../js/medical.js";
 import { FIRST_AID, WHAT_TO_DO, PLECAK, EMERGENCY, PRIVACY } from "../js/content.js";
 let n = 0;
 const ok = async (name, fn) => { await fn(); n++; console.log("  ok", name); };
@@ -95,7 +95,7 @@ await ok("AED i szpitale z OSM: parsowanie (martwe wpisy, poza Polską, bez nazw
   const h = parseHospitals({ elements: els }).map(unpackHospital);
   assert.equal(h.length, 2);
   assert.equal(h[0].sor, true); assert.equal(h[0].phone, "+48 12 345 67 89"); assert.equal(h[0].osmUrl, "https://www.openstreetmap.org/way/5");
-  assert.equal(h[1].name, "Szpital (bez nazwy)"); assert.equal(h[1].sor, false); assert.equal(h[1].phone, "");
+  assert.equal(h[1].name, NONAME); assert.equal(h[1].sor, false); assert.equal(h[1].phone, "");
   assert.match(overpassQueryAed(), /emergency"="defibrillator/); assert.match(overpassQueryHospitals(), /amenity"="hospital/);
 });
 await ok("AED i szpitale: pobieranie, kopia w telefonie przy braku sieci, zły format", async () => {

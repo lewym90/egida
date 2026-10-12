@@ -46,7 +46,7 @@ ok("gazetter: „walczą” i „z łodzi” nie są miejscowościami, Łódź i
 });
 ok("telefon: przewija się panel .shell, strona jest zablokowana (dolny pasek nie odbija się z treścią)", () => {
   const css = readFileSync(new URL("../css/style.css", import.meta.url), "utf8");
-  assert.ok(/@media \(max-width:959px\)\{html,body\{height:100%;overflow:hidden;overscroll-behavior:none\}\.shell\{[^}]*overflow-y:auto/.test(css));
+  assert.ok(/@media \(max-width:959px\)\{html,body\{height:100%;overflow:hidden;overscroll-behavior:none\}(?:body\{[^}]*\})?\.shell\{[^}]*overflow-y:auto/.test(css));
   assert.ok(/@media print\{html,body\{height:auto!important/.test(css));
 });
 console.log(`OK: ${n} grup testów v23 przeszło`);

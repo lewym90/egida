@@ -3,6 +3,8 @@
 // Telefon pobiera gotowe pliki (nie pyta OSM o nic) i trzyma kopię na wypadek braku internetu. Dane © współtwórcy OpenStreetMap, ODbL.
 // Pozycje w plikach to kompaktowe wiersze (tablice), żeby plik z ok. 15 tys. defibrylatorów był mały.
 
+import { haversineKm } from "./geo.js";
+
 const clean = (v, max = 160) => (typeof v === "string" ? v.replace(/[\u0000-\u001f\u007f]+/g, " ").trim().slice(0, max) : "");
 const r5 = (x) => Math.round(x * 1e5) / 1e5;
 const TYPE_LETTER = { node: "n", way: "w", relation: "r" };
@@ -45,9 +47,10 @@ export function parseAed(json) {
     const p = posOf(e); if (!okPos(p)) continue;
     const id = idOf(e); if (seen.has(id)) continue; seen.add(id);
     const acc = clean(t.access, 20).toLowerCase();
-    const name = clean(t.name, 80) || (t.operator ? `AED – ${clean(t.operator, 60)}` : "Defibrylator AED");
-    const where = clean(t["defibrillator:location:pl"] || t["defibrillator:location"] || t["description:pl"] || t.description || t.note || "", 200);
-    out.push([id, r5(p.lat), r5(p.lon), name, where, ACCESS[acc] || "", clean(t.opening_hours, 80), addrOf(t), dateOf(t), t.indoor === "yes" ? 1 : 0]);
+    const operator = clean(t.operator || t["operator:short"] || "", 60);
+    const name = clean(t.name || t["name:pl"] || "", 80) || (operator ? `AED – ${operator}` : "Defibrylator AED");
+    const where = clean(t["defibrillator:location:pl"] || t["defibrillator:location"] || t["description:pl"] || t.description || t["location:pl"] || t.note || "", 200);
+    out.push([id, r5(p.lat), r5(p.lon), name, where, ACCESS[acc] || "", clean(t.opening_hours, 80), addrOf(t), dateOf(t), t.indoor === "yes" ? 1 : 0, operator, clean(t.level, 12), ""]);
   }
   return out;
 }
@@ -60,9 +63,49 @@ export function parseHospitals(json) {
     if (t.amenity !== "hospital" || isDead(t)) continue;
     const p = posOf(e); if (!okPos(p)) continue;
     const id = idOf(e); if (seen.has(id)) continue; seen.add(id);
-    out.push([id, r5(p.lat), r5(p.lon), clean(t.name, 100) || "Szpital (bez nazwy)", t.emergency === "yes" ? 1 : 0, addrOf(t), phoneOf(t)]);
+    const name = clean(t.name || t["name:pl"] || t.official_name || t.short_name || t.alt_name || t.loc_name || "", 100) || (t.operator ? `Szpital – ${clean(t.operator, 70)}` : "");
+    out.push([id, r5(p.lat), r5(p.lon), name, t.emergency === "yes" ? 1 : 0, addrOf(t), phoneOf(t)]);
   }
   return out;
+}
+
+const NONAME_OLD = "Szpital (bez nazwy)"; export const NONAME = "Szpital (brak nazwy w OpenStreetMap)";
+const normName = (n) => n.toLowerCase().replace(/[^a-ząćęłńóśźż0-9]+/g, " ").trim();
+/**
+ * Porządkuje szpitale: wpis bez nazwy dostaje adres jako nazwę; budynek bez nazwy i adresu tuż obok nazwanego szpitala
+ * (to zwykle część tego samego kompleksu) jest pomijany; ten sam szpital wpisany kilka razy (< 600 m) zostaje raz – z najpełniejszymi danymi.
+ * Działa i na serwerze, i w telefonie (starsze pliki też zostaną uporządkowane).
+ */
+export function tidyHospitalRows(rows) {
+  const named = rows.filter((r) => r[3] && r[3] !== NONAME_OLD && r[3] !== NONAME);
+  const score = (r) => (r[4] ? 4 : 0) + (r[6] ? 2 : 0) + (r[5] ? 1 : 0);
+  const kept = [];
+  for (const r of rows) {
+    const x = r.slice();
+    if (!x[3] || x[3] === NONAME_OLD || x[3] === NONAME) {
+      if (x[5]) x[3] = `Szpital, ${x[5]}`;
+      else if (named.some((n) => haversineKm({ lat: n[1], lon: n[2] }, { lat: x[1], lon: x[2] }) < 0.4)) continue;
+      else x[3] = NONAME;
+    }
+    kept.push(x);
+  }
+  const out = [];
+  for (const x of kept.sort((a, b) => score(b) - score(a))) {
+    const key = normName(x[3]);
+    if (out.some((y) => normName(y[3]) === key && haversineKm({ lat: y[1], lon: y[2] }, { lat: x[1], lon: x[2] }) < 0.6)) continue;
+    out.push(x);
+  }
+  return out.sort((a, b) => (a[0] < b[0] ? -1 : 1));
+}
+/** Dopisuje do defibrylatorów (pole 12) najbliższy nazwany szpital w promieniu 250 m – informacja „w pobliżu”, nie „na terenie”. */
+export function addNearHospital(aedRows, hospRows, maxKm = 0.25) {
+  const hs = hospRows.filter((h) => h[3] && h[3] !== NONAME && h[3] !== NONAME_OLD && !h[3].startsWith("Szpital,"));
+  for (const a of aedRows) {
+    let best = null, bd = maxKm;
+    for (const h of hs) { if (Math.abs(h[1] - a[1]) > 0.0035) continue; const d = haversineKm({ lat: h[1], lon: h[2] }, { lat: a[1], lon: a[2] }); if (d < bd) { bd = d; best = h; } }
+    a[12] = best ? `${best[3]} (ok. ${Math.max(10, Math.round((bd * 1000) / 10) * 10)} m)` : "";
+  }
+  return aedRows;
 }
 
 const osmUrl = (id) => (LETTER_TYPE[id[0]] && /^\d+$/.test(id.slice(1)) ? `https://www.openstreetmap.org/${LETTER_TYPE[id[0]]}/${id.slice(1)}` : "");
@@ -70,10 +113,10 @@ const goodPos = (r) => Array.isArray(r) && Number.isFinite(r[1]) && Number.isFin
 
 /** Wiersz → obiekt w formacie używanym na ekranie (jak schrony: id, lat, lon, name, how, access, hours, addr, osmUrl, src). */
 export function unpackAed(r) {
-  return { id: String(r[0]), lat: r[1], lon: r[2], name: clean(r[3], 80) || "Defibrylator AED", how: clean(r[4], 200), access: clean(r[5], 40), hours: clean(r[6], 80), addr: clean(r[7], 100), checked: clean(r[8], 12), indoor: r[9] === 1, kind: "aed", src: "osm", osmUrl: osmUrl(String(r[0])) };
+  return { id: String(r[0]), lat: r[1], lon: r[2], name: clean(r[3], 80) || "Defibrylator AED", how: clean(r[4], 200), access: clean(r[5], 40), hours: clean(r[6], 80), addr: clean(r[7], 100), checked: clean(r[8], 12), indoor: r[9] === 1, operator: clean(r[10], 60), level: clean(r[11], 12), near: clean(r[12], 120), kind: "aed", src: "osm", osmUrl: osmUrl(String(r[0])) };
 }
 export function unpackHospital(r) {
-  return { id: String(r[0]), lat: r[1], lon: r[2], name: clean(r[3], 100) || "Szpital", sor: r[4] === 1, addr: clean(r[5], 100), phone: clean(r[6], 30), how: "", kind: "szpital", src: "osm", osmUrl: osmUrl(String(r[0])) };
+  return { id: String(r[0]), lat: r[1], lon: r[2], name: clean(r[3], 100) || NONAME, sor: r[4] === 1, addr: clean(r[5], 100), phone: clean(r[6], 30), how: "", kind: "szpital", src: "osm", osmUrl: osmUrl(String(r[0])) };
 }
 
 /**
@@ -82,7 +125,7 @@ export function unpackHospital(r) {
  */
 export async function loadMedicalDb(kind, url, storage = globalThis.localStorage, fetchImpl = (...a) => fetch(...a)) {
   const key = kind === "aed" ? AED_CACHE : HOSP_CACHE, unpack = kind === "aed" ? unpackAed : unpackHospital;
-  const build = (j) => { const items = j.rows.filter(goodPos).map(unpack); return { at: clean(j.at, 40), count: items.length, items }; };
+  const build = (j) => { const good = j.rows.filter(goodPos), items = (kind === "aed" ? good : tidyHospitalRows(good)).map(unpack); return { at: clean(j.at, 40), count: items.length, items }; };
   if (url) {
     try {
       const r = await fetchImpl(url + (url.includes("?") ? "&" : "?") + "t=" + Math.floor(Date.now() / 3600000), { signal: AbortSignal.timeout(30000) });

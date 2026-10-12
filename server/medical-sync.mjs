@@ -7,7 +7,8 @@
 // Dane: © współtwórcy OpenStreetMap, licencja ODbL. Błąd (niepełne pobranie) nie nadpisuje poprzednich plików.
 import { writeFileSync, renameSync } from "node:fs";
 import { join } from "node:path";
-import { overpassQueryTile, medicalTiles, parseAed, parseHospitals } from "../js/medical.js";
+import { readFileSync } from "node:fs";
+import { overpassQueryTile, medicalTiles, parseAed, parseHospitals, tidyHospitalRows, addNearHospital } from "../js/medical.js";
 import { POLAND_RING } from "../js/poland-border.js";
 import { pointInRing, distToRingKm } from "../js/geo.js";
 
@@ -60,7 +61,9 @@ for (const job of JOBS) {
   let failedTiles = 0;
   console.log(`== ${job.label}`);
   for (const [i, t] of tiles.entries()) { console.log(`kafelek ${i + 1}/${tiles.length}`); if (!(await fetchTile(t))) failedTiles++; }
-  const list = [...rows.values()].filter(inPoland);
+  let list = [...rows.values()].filter(inPoland);
+  if (job.what === "hospitals") list = tidyHospitalRows(list);
+  if (job.what === "aed") { try { addNearHospital(list, JSON.parse(readFileSync(join(DIR, "hospitals.json"), "utf8")).rows); } catch { /* brak szpitali – pole „w pobliżu” zostaje puste */ } }
   console.log(`Razem w Polsce: ${job.label} ${list.length}; nieudane kafelki: ${failedTiles}`);
   if (dump) { console.log(JSON.stringify(list.slice(0, 2))); continue; }
   // niepełne pobranie albo podejrzanie mało wyników: nie nadpisuj dobrego pliku

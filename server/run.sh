@@ -35,7 +35,7 @@ if [ ! -f "$SH_FILE" ] || [ "$(( $(date +%s) - $(stat -c %Y "$SH_FILE") ))" -gt 
 fi
 # Raz na dobę defibrylatory (AED) i szpitale z OpenStreetMap → aed.json, hospitals.json. Trwa kilka minut (16 zapytań z przerwami),
 # więc działa w tle i zwalnia blokadę – komunikaty nie czekają. Pliki trafią na gałąź data przy najbliższej publikacji (≤ 25 min).
-MED_STAMP="$BASE/medical.checked"
+MED_STAMP="$BASE/medical.v27.checked"
 if [ ! -f "$MED_STAMP" ] || [ "$(( $(date +%s) - $(stat -c %Y "$MED_STAMP") ))" -gt 86400 ]; then
   touch "$MED_STAMP"
   ( DATA_DIR="$DATA_DIR" timeout 1500 node medical-sync.mjs >> "$BASE/medical.log" 2>&1 || touch -d "-18 hours" "$MED_STAMP" ) 9>&- &

@@ -6,7 +6,7 @@ import { fmtKmPl } from "./neptun.js";
 import { DEMO_USER } from "./demo.js";
 import { PSP_URL, nearest, withDistance, walkMin, dirUrl, makeShelter, loadShelterDb, loadPspAround, loadPspNearest, makePspCache, mergeSources } from "./shelters.js";
 import { haversineKm } from "./geo.js";
-import { loadMedicalDb } from "./medical.js";
+import { loadMedicalDb, NONAME as NONAME_HOSP } from "./medical.js";
 
 const RADIUS_KM = 50, SHOW = 5; // szukamy w promieniu 50 km, na liście pokazujemy 5 najbliższych
 import { esc, loadLeaflet, baseLayer, shelterIcon, getUser, locate, setActive, destroyScreens, fmtDt } from "./mapscreen.js";
@@ -37,9 +37,10 @@ export function renderSheltersHtml(ctx, { demo = false, mode = "schrony" } = {})
   if (!MODES.includes(mode)) mode = "schrony";
   return `<div class="hero"><div class="row" style="align-items:flex-start"><div style="flex:1"><h1>Pomoc w pobliżu</h1><p>Schrony, defibrylatory AED i szpitale najbliżej Twojej lokalizacji.</p></div>${demo ? `<span class="badge unofficial">Dane przykładowe</span>` : ""}</div></div>
   ${demo ? `<div class="demo-banner"><b>TRYB DEMONSTRACYJNY – DANE WYMYŚLONE.</b> Ten ekran pokazuje, jak będzie wyglądała lista schronów. Obiekty są sztuczne i nie istnieją. <a href="#/schrony">Wyjdź z trybu demo</a></div>` : ""}
-  <div id="shGate" class="card" hidden><h2>Gdzie jesteś?</h2><p class="muted small">Żeby pokazać najbliższe miejsca, potrzebna jest Twoja pozycja. Zostaje w tym telefonie i nigdzie nie jest wysyłana. Możesz też dotknąć mapy poniżej i wskazać miejsce ręcznie.</p>
+  <div id="shGate" class="card" hidden><h2>Gdzie jesteś?</h2><p class="muted small">Żeby pokazać najbliższe miejsca, potrzebna jest Twoja pozycja. Zostaje w tym telefonie i nigdzie nie jest wysyłana. Możesz też wskazać miejsce ręcznie przyciskiem „Wskaż moją pozycję na mapie”.</p>
     <button class="btn primary" id="shLocate">${ctx.I.pin}Użyj mojej pozycji</button><p id="shLocMsg" class="muted small" aria-live="polite"></p></div>
   <div class="row" id="shChips" style="flex-wrap:wrap;margin:10px 0" role="group" aria-label="Filtr listy">${FILTERS.map(([k, n]) => `<button class="chip" data-f="${k}" aria-pressed="${k === mode}">${n}</button>`).join("")}</div>
+  ${demo ? "" : `<button class="btn sm" id="shManual" aria-pressed="false" style="margin-bottom:8px">Wskaż moją pozycję na mapie</button>`}
   <div id="shMap" class="map map-sm" role="region" aria-label="Mapa najbliższych miejsc pomocy. Te same obiekty są wypisane w liście poniżej."><p class="muted" style="padding:12px">Ładuję mapę…</p></div>
   <p id="shTileMsg" class="note warn" hidden role="status"></p>
   <p id="shMapHint" class="muted small" aria-live="polite" style="margin:6px 2px"></p>
@@ -93,10 +94,21 @@ export function initSheltersScreen(ctx, { demo = false, mode = "schrony" } = {})
 
   const dist = (s) => `<b class="shdist">${esc(fmtDist(s.distKm))}${s.kind === "szpital" && s.distKm > 3 ? "" : ` · ${walkMin(s.distKm)} min pieszo`}</b>`;
   const howTitle = (s) => (s.kind === "aed" ? "Gdzie jest" : "Jak wejść");
-  const howBox = (s) => s.how ? `<div class="howbox" id="how-${esc(s.id)}"><b>${howTitle(s)}</b><p>${esc(s.how)}</p><p class="src">Źródło opisu: ${esc(srcLabel(s))}</p></div>` : "";
+  const aedBox = (s) => {
+    const ctxl = [s.addr && `Adres: ${esc(s.addr)}`, s.operator && `Właściciel / operator: ${esc(s.operator)}`, s.level && `Piętro / poziom: ${esc(s.level)}`, s.near && `W pobliżu: ${esc(s.near)}`].filter(Boolean);
+    const where = s.how ? `<p><b>${esc(s.how)}</b></p>` : `<p class="note warn" style="margin:6px 0"><b>Brak opisu miejsca w OpenStreetMap.</b> Nie wiadomo, w którym miejscu obiektu jest urządzenie. Dojdź do punktu na mapie i szukaj przy wejściu lub w korytarzu; w razie wątpliwości dzwoń pod 112.</p>`;
+    const none = !s.how && !ctxl.length ? `<p class="small">Brak też nazwy obiektu i adresu – kieruj się punktem na mapie.</p>` : "";
+    return `<div class="howbox" id="how-${esc(s.id)}"><b>Gdzie jest</b>${where}${ctxl.length ? `<p class="small">${ctxl.join("<br>")}</p>` : ""}${none}<p class="src">Opis wpisała społeczność OpenStreetMap; może być niepełny lub nieaktualny.</p></div>`;
+  };
+  const hospBox = (s) => {
+    const noName = s.name === NONAME_HOSP, noAddr = !s.addr;
+    if (!noName && !noAddr) return "";
+    return `<div class="howbox" id="how-${esc(s.id)}"><p class="note warn" style="margin:6px 0">${noName ? "<b>W OpenStreetMap ten szpital nie ma nazwy.</b> " : ""}${noAddr ? "Brak adresu w OpenStreetMap – kieruj się punktem na mapie. " : ""}W zagrożeniu życia dzwoń pod 112 – dyspozytor wskaże właściwy szpital.</p></div>`;
+  };
+  const howBox = (s) => s.kind === "aed" ? aedBox(s) : s.kind === "szpital" ? hospBox(s) : s.how ? `<div class="howbox" id="how-${esc(s.id)}"><b>${howTitle(s)}</b><p>${esc(s.how)}</p><p class="src">Źródło opisu: ${esc(srcLabel(s))}</p></div>` : "";
   const meta = (s) => [s.mine ? "zapisane w telefonie" : "", s.indoor && "wewnątrz budynku", s.checked && `sprawdzono: ${esc(s.checked)}`, s.phone && `tel. <a href="tel:${esc(s.phone.replace(/[^\d+]/g, ""))}">${esc(s.phone)}</a>`, s.capacity && `ok. ${esc(s.capacity)} osób`, s.level && `poziom ${esc(s.level)}`, s.access && `dostęp: ${esc(s.access)}`, s.hours && `godziny: ${esc(s.hours)}`, s.addr && esc(s.addr)].filter(Boolean).join(" · ");
   const btns = (s, feat) => `<div class="shbtns"><a class="btn primary sm" href="${esc(dirUrl(s, "walking"))}" target="_blank" rel="noopener noreferrer">Pieszo</a><a class="btn primary sm" href="${esc(dirUrl(s, "driving"))}" target="_blank" rel="noopener noreferrer">Autem</a>${
-    s.how ? `<button class="btn sm howbtn" data-how="${esc(s.id)}" aria-expanded="${feat || openHow.has(s.id)}">${howTitle(s)}</button>` : (s.kind === "aed" || s.kind === "szpital") ? "" : `<span class="btn sm disabled" aria-disabled="true">Brak opisu wejścia</span>`}${s.mine ? `<button class="btn sm" data-del="${esc(s.id)}" aria-label="Usuń miejsce ${esc(s.name)}">Usuń</button>` : ""}</div>`;
+    s.how && s.kind !== "aed" ? `<button class="btn sm howbtn" data-how="${esc(s.id)}" aria-expanded="${feat || openHow.has(s.id)}">${howTitle(s)}</button>` : (s.kind === "aed" || s.kind === "szpital") ? "" : `<span class="btn sm disabled" aria-disabled="true">Brak opisu wejścia</span>`}${s.mine ? `<button class="btn sm" data-del="${esc(s.id)}" aria-label="Usuń miejsce ${esc(s.name)}">Usuń</button>` : ""}</div>`;
   const kindBadge = (s) => `<span class="badge ${s.mine || s.sor ? "ok" : "soon"}">${kindLabel(s)}</span>`;
 
   const draw = () => {
@@ -128,7 +140,7 @@ export function initSheltersScreen(ctx, { demo = false, mode = "schrony" } = {})
     $("shFeat").innerHTML = feat ? `<article class="shfeat" aria-label="Najbliższe miejsce"><div class="row"><span class="badge ok">Najbliższy</span><span class="spacer"></span>${dist(feat)}</div>
       <h2 style="margin:8px 0 2px">${esc(feat.name)}</h2><p class="muted small" style="margin:0 0 8px">${kindBadge(feat)} ${meta(feat)}</p>${howBox(feat)}${btns(feat, true)}</article>` : "";
     $("shList").innerHTML = rest.map((s) => `<li class="shitem"><div class="row"><b style="font-family:var(--font-h)">${esc(s.name)}</b><span class="spacer"></span>${dist(s)}</div>
-      <p class="muted small" style="margin:2px 0 6px">${kindBadge(s)} ${meta(s)}</p><div id="hw-${esc(s.id)}" ${openHow.has(s.id) ? "" : "hidden"}>${howBox(s)}</div>${btns(s, false)}</li>`).join("");
+      <p class="muted small" style="margin:2px 0 6px">${kindBadge(s)} ${meta(s)}</p><div id="hw-${esc(s.id)}" ${openHow.has(s.id) || s.kind === "aed" || s.kind === "szpital" ? "" : "hidden"}>${howBox(s)}</div>${btns(s, false)}</li>`).join("");
     const parts = [];
     if (pspIdx) parts.push(`Rejestr Punktów Schronienia (MSWiA / PSP): ${esc(String(pspIdx.count))} punktów w Polsce${pspIdx.builtAt ? `, stan z ${esc(fmtDt(pspIdx.builtAt))}` : ""}`);
     if (db?.count) parts.push(`OpenStreetMap: ${esc(String(db.count))} wpisów, niezweryfikowane${db.stale ? " (kopia z telefonu)" : ""}`);
@@ -143,31 +155,44 @@ export function initSheltersScreen(ctx, { demo = false, mode = "schrony" } = {})
   };
 
   /* ---- mapa ---- */
-  const popup = (s) => `<div class="pop"><b>${esc(s.name)}</b><br><span class="small muted">${esc(kindLabel(s))}${s.distKm != null ? " · " + esc(fmtDist(s.distKm)) : ""}</span>${s.access ? `<br><span class="small">Dostępność: ${esc(s.access)}</span>` : ""}${s.kind === "aed" && s.how ? `<br><span class="small">Gdzie: ${esc(s.how)}</span>` : ""}<p class="small" style="margin:6px 0"><a href="${esc(dirUrl(s, "walking"))}" target="_blank" rel="noopener noreferrer">Trasa pieszo</a> · <a href="${esc(dirUrl(s, "driving"))}" target="_blank" rel="noopener noreferrer">Autem</a></p></div>`;
+  const popup = (s) => `<div class="pop"><b>${esc(s.name)}</b><br><span class="small muted">${[s.name === kindLabel(s) ? "" : esc(kindLabel(s)), s.distKm != null ? esc(fmtDist(s.distKm)) : ""].filter(Boolean).join(" · ")}</span>${s.access ? `<br><span class="small">Dostępność: ${esc(s.access)}</span>` : ""}${s.kind === "aed" ? `<br><span class="small">Gdzie: ${s.how ? esc(s.how) : "brak opisu w OpenStreetMap"}</span>${s.addr ? `<br><span class="small">${esc(s.addr)}</span>` : ""}` : ""}${s.kind === "szpital" ? `<br><span class="small">${s.addr ? esc(s.addr) : "brak adresu w OpenStreetMap"}</span>${s.phone ? `<br><span class="small">tel. ${esc(s.phone)}</span>` : ""}` : ""}<p class="small" style="margin:6px 0"><a href="${esc(dirUrl(s, "walking"))}" target="_blank" rel="noopener noreferrer">Trasa pieszo</a> · <a href="${esc(dirUrl(s, "driving"))}" target="_blank" rel="noopener noreferrer">Autem</a></p></div>`;
   // Rysujemy WSZYSTKIE punkty widoczne na mapie (od zoomu 12), a nie tylko najbliższe z listy.
+  // Znaczniki są utrzymywane „różnicowo” (po id): nie czyścimy ich przy każdym odświeżeniu, bo to zamykało otwartą etykietę (popup).
+  const marks = new Map(); let marksFilter = null, userMark = null;
+  const makeMark = (x) => {
+    const o = { bubblingMouseEvents: false };
+    if (x.kind === "aed") return L.circleMarker([x.lat, x.lon], { ...o, renderer: canvas, radius: 9, color: "#fff", weight: 2, fillColor: "#C62828", fillOpacity: 1 });
+    if (x.kind === "szpital") return L.marker([x.lat, x.lon], { icon: hospitalIcon(L, x.sor), keyboard: false, bubblingMouseEvents: false });
+    if (x.mine || x.src === "osm" || x.src === "demo") return L.marker([x.lat, x.lon], { icon: shelterIcon(L, !!x.mine), keyboard: false, bubblingMouseEvents: false });
+    return L.circleMarker([x.lat, x.lon], { ...o, renderer: canvas, radius: 8, color: "#fff", weight: 2, fillColor: "#2A4DA0", fillOpacity: 1 });
+  };
   const drawMap = () => {
     if (!map || !L || dead) return;
-    gMarks.clearLayers(); gUser.clearLayers();
-    if (pos) L.circleMarker([pos.lat, pos.lon], { radius: 8, color: "#fff", weight: 3, fillColor: "#2A4DA0", fillOpacity: 1 }).bindTooltip(demo ? "Ty (demo)" : "Ty", { direction: "top" }).addTo(gUser);
+    if (pos) { if (userMark) userMark.setLatLng([pos.lat, pos.lon]); else userMark = L.circleMarker([pos.lat, pos.lon], { radius: 8, color: "#fff", weight: 3, fillColor: "#2A4DA0", fillOpacity: 1, interactive: false }).addTo(gUser); }
+    else if (userMark) { gUser.clearLayers(); userMark = null; }
     const hint = $("shMapHint");
     const minZ = filter === "szpitale" ? 8 : 12;
+    if (marksFilter !== filter) { gMarks.clearLayers(); marks.clear(); marksFilter = filter; }
+    const want = new Map();
     if (map.getZoom() < minZ) { if (hint) hint.textContent = filter === "szpitale" ? "Przybliż mapę, aby zobaczyć szpitale. Lista poniżej pokazuje najbliższe od Ciebie." : filter === "aed" ? "Przybliż mapę (zoom 12 lub więcej), aby zobaczyć defibrylatory. Lista poniżej pokazuje najbliższe od Ciebie." : "Przybliż mapę (zoom 12 lub więcej), aby zobaczyć punkty schronienia. Lista poniżej pokazuje najbliższe od Ciebie."; }
     else {
       if (hint) hint.textContent = "";
       const bounds = map.getBounds().pad(0.1);
       const base = pos ? withDistance(all(), pos) : all().map((x) => ({ ...x, distKm: null }));
-      let n = 0;
       for (const x of base) {
-        if (!bounds.contains([x.lat, x.lon])) continue;
-        if (n >= 1500) break;
-        n++;
-        if (x.kind === "aed") L.circleMarker([x.lat, x.lon], { renderer: canvas, radius: 8, color: "#fff", weight: 2, fillColor: "#C62828", fillOpacity: 1 }).bindPopup(popup(x)).addTo(gMarks);
-        else if (x.kind === "szpital") L.marker([x.lat, x.lon], { icon: hospitalIcon(L, x.sor), keyboard: false }).bindPopup(popup(x)).addTo(gMarks);
-        else if (x.mine || x.src === "osm" || x.src === "demo") L.marker([x.lat, x.lon], { icon: shelterIcon(L, !!x.mine), keyboard: false }).bindPopup(popup(x)).addTo(gMarks);
-        else L.circleMarker([x.lat, x.lon], { renderer: canvas, radius: 7, color: "#fff", weight: 2, fillColor: "#2A4DA0", fillOpacity: 1 }).bindPopup(popup(x)).addTo(gMarks);
+        if (want.size >= 1500) break;
+        if (bounds.contains([x.lat, x.lon])) want.set(x.id, x);
       }
     }
-    $("shMap").dataset.markers = String(map.getZoom() < minZ ? 0 : gMarks.getLayers().length);
+    for (const [id, m] of marks) if (!want.has(id) && !m.isPopupOpen?.()) { gMarks.removeLayer(m); marks.delete(id); }
+    for (const [id, x] of want) {
+      let m = marks.get(id);
+      if (m) { m._egx = x; continue; }
+      m = makeMark(x); m._egx = x;
+      m.bindPopup(() => popup(m._egx), { autoPanPadding: [30, 30] }).addTo(gMarks);
+      marks.set(id, m);
+    }
+    $("shMap").dataset.markers = String(want.size);
     if (pos && needFit && (isMed() ? medState[filter] !== "loading" && medState[filter] !== "idle" : pspState !== "loading")) {
       needFit = false;
       const close = filter === "szpitale" ? 15 : 3;
@@ -207,7 +232,8 @@ export function initSheltersScreen(ctx, { demo = false, mode = "schrony" } = {})
     setLive();
   };
   const setLive = () => { const el = $("shLive"); if (!el) return; el.textContent = demo ? "" : manualPos ? "Miejsce wskazane ręcznie. Wybierz „Użyj mojej pozycji”, aby lista śledziła Cię na żywo." : liveOn ? "● Na żywo: lista odświeża się, gdy się przemieszczasz." : ""; };
-  let liveOn = false, stopWatch = null, lastTick = 0;
+  let liveOn = false, stopWatch = null, lastTick = 0, manualPick = false;
+  const setManualPick = (on) => { manualPick = on; const b = $("shManual"); if (b) { b.textContent = on ? "Dotknij mapy tam, gdzie jesteś (anuluj)" : "Wskaż moją pozycję na mapie"; b.setAttribute("aria-pressed", String(on)); } const h = $("shMapHint"); if (h && on) h.textContent = "Dotknij mapy w miejscu, w którym jesteś."; };
   const startWatch = () => {
     stopWatch?.(); liveOn = true; manualPos = false; let first = true;
     stopWatch = locate((p) => {
@@ -219,7 +245,7 @@ export function initSheltersScreen(ctx, { demo = false, mode = "schrony" } = {})
       $("shLocMsg").textContent = "";
       setPos(p, false, wasFirst);
       if (wasFirst && map) map.setView([p.lat, p.lon], 15, { animate: false });
-    }, () => { liveOn = false; setLive(); if (!dead) $("shLocMsg").textContent = "Nie udało się ustalić pozycji. Dotknij mapy poniżej, aby wskazać miejsce ręcznie."; }, true);
+    }, () => { liveOn = false; setLive(); if (!dead) $("shLocMsg").textContent = "Nie udało się ustalić pozycji. Użyj przycisku „Wskaż moją pozycję na mapie” i dotknij mapy."; }, true);
     cleanups.push(() => stopWatch?.());
     setLive();
   };
@@ -238,7 +264,8 @@ export function initSheltersScreen(ctx, { demo = false, mode = "schrony" } = {})
     map.on("click", (e) => {
       const p = { lat: e.latlng.lat, lon: e.latlng.lng };
       if ($("addBox").open) { setPick(p); return; }
-      if (!demo) { stopWatch?.(); liveOn = false; setPos({ ...p, accKm: 0 }, true); }
+      // Dotknięcie mapy NIE przesuwa już Twojej pozycji (tylko przesuwa mapę). Ręczny wybór: przycisk „Wskaż moją pozycję na mapie”.
+      if (!demo && manualPick) { setManualPick(false); stopWatch?.(); liveOn = false; setPos({ ...p, accKm: 0 }, true); }
     });
     draw();
   }).catch((e) => { console.error("EGIDA mapa schronów:", e); if (!dead) $("shMap").innerHTML = `<p class="note warn" style="margin:12px">Nie udało się załadować mapy. Lista działa bez niej.</p>`; });
@@ -262,6 +289,7 @@ export function initSheltersScreen(ctx, { demo = false, mode = "schrony" } = {})
   /* ---- pozycja ---- */
   const doLocate = (silent) => { if (!silent) $("shLocMsg").textContent = "Ustalam pozycję…"; startWatch(); };
   $("shLocate").addEventListener("click", () => doLocate(false));
+  $("shManual")?.addEventListener("click", () => setManualPick(!manualPick));
   if (!demo && (pos || st().consent?.gps)) startWatch();
 
   /* ---- dodawanie własnego miejsca ---- */
