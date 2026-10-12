@@ -90,6 +90,11 @@ assert.equal(evaluate({ pushAgeMin: WD.pushMin + 1, remoteAgeMin: 10 }).problem,
 assert.equal(evaluate({ pushAgeMin: 5, remoteAgeMin: WD.remoteMin + 1 }).problem, true, "aplikacja widzi stare dane (np. nieudany push)");
 assert.equal(evaluate({ pushAgeMin: 5, remoteAgeMin: null }).problem, false, "brak odpowiedzi GitHuba sam w sobie nie jest alarmem serwera");
 assert.equal(evaluate({ pushAgeMin: null, remoteAgeMin: null }).problem, true, "serwer nigdy nie opublikował danych");
+assert.equal(evaluate({ pushAgeMin: 5, remoteAgeMin: 10, newsAgeMin: 30, newsSources: 72, newsOk: 72 }).problem, false, "wiadomości w normie");
+assert.equal(evaluate({ pushAgeMin: 5, remoteAgeMin: 10, newsAgeMin: WD.newsMin + 1 }).problem, true, "stary news.json");
+assert.equal(evaluate({ pushAgeMin: 5, remoteAgeMin: 10, newsSources: 72, newsOk: 30 }).problem, true, "większość źródeł wiadomości nie odpowiada");
+assert.equal(evaluate({ pushAgeMin: 5, remoteAgeMin: 10, newsSources: 72, newsOk: 60 }).problem, false, "kilka błędnych źródeł to jeszcze nie awaria");
+assert.equal(evaluate({ pushAgeMin: 5, remoteAgeMin: 10, newsAgeMin: null }).problem, false, "brak odpowiedzi GitHuba nie jest alarmem serwera");
 let w = decide(false, {}, NOW); assert.equal(w.action, "none");
 w = decide(true, w.state, NOW); assert.equal(w.action, "down", "pierwszy alarm");
 w = decide(true, w.state, NOW + 36e5); assert.equal(w.action, "none", "bez powtarzania co 10 min");

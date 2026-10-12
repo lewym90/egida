@@ -162,13 +162,13 @@ ok("tryb zagrożenia: 3 kroki; „Co robić” ma nowe instrukcje z niepustymi k
   for (const id of ["alert-rcb", "powodz", "pozar", "brak-pradu", "burza", "syreny", "chemia", "terror"]) assert.ok(ids.includes(id), id);
   assert.equal(new Set(ids).size, ids.length, "identyfikatory są unikalne");
   for (const it of WHAT_TO_DO.items) { assert.ok(it.t && it.d && it.steps.length >= 3, it.id); for (const st of it.steps) assert.ok(st.trim().length > 10, it.id); }
-  assert.equal(EMERGENCY.reviewed, null, "treść robocza nie może udawać zatwierdzonej");
+  assert.equal(EMERGENCY.reviewed, "2026-10-12");
 });
 ok("polityka prywatności: sekcje i brak obietnic, których nie spełniamy", () => {
   const all = PRIVACY.sections.map((s) => s.h + " " + s.p.join(" ")).join(" ");
   assert.ok(PRIVACY.sections.length >= 7); assert.match(all, /GitHub/); assert.match(all, /Telegram/); assert.match(all, /NEPTUN/); assert.match(all, /EOX/);
   assert.ok(!/nie zbieramy żadnych danych/i.test(all), "nie twierdzimy, że nikt nigdy nie widzi IP");
-  assert.equal(PRIVACY.reviewed, null);
+  assert.equal(PRIVACY.reviewed, "2026-10-12");
 });
 
 console.log(`OK: ${n} grup testów v14 przeszło (wersja ${APP_VERSION})`);

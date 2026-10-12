@@ -23,7 +23,10 @@ const NATIONAL = [
   ["tvn24", "TVN24", ["https://tvn24.pl/najnowsze.xml", "https://tvn24.pl/polska.xml"]],
   ["rmf24", "RMF24", ["https://www.rmf24.pl/fakty/polska/feed", "https://www.rmf24.pl/feed"]],
   ["interia", "Interia", ["https://wydarzenia.interia.pl/feed", "https://wydarzenia.interia.pl/polska/feed"]],
-  // Radio ZET i TVP Info: nie znaleziono działającego, jawnego kanału RSS – pominięte (można dodać, gdy adres będzie znany).
+  // Radio ZET i TVP Info: adresy RSS podał użytkownik (12.10.2026). Działanie i zgodność z robots.txt sprawdza serwer przy każdym przebiegu
+  // (news-report.json); źródło odrzucone przez robots.txt lub błąd HTTP jest po prostu pomijane.
+  ["radiozet", "Radio ZET", ["https://player.radiozet.pl/externals/xml/radio-zet-wiadomosci.xml"]],
+  ["tvpinfo", "TVP Info", ["https://www.tvp.info/informacje?xslt=tvp-info/news/rss.xslt"]],
   // Polskie Radio 24: robots.txt zabrania pobierania – pomijamy.
   ["info112", "Info112", ["https://info112.pl/feed/"]],
 ];

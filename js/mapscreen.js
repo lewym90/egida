@@ -136,7 +136,7 @@ export function renderMapHtml(ctx, { demo = false, diag = false } = {}) {
   ${official}
   <div class="chips" role="group" aria-label="Podkład mapy">${chips}</div>
   <div class="card" style="padding:4px 16px">
-    <label class="switch"><input type="checkbox" id="lyShelters" ${lay.shelters !== false ? "checked" : ""}><span><b>Schrony i ukrycia</b><span class="muted small">Punkty schronienia z Rejestru PSP oraz Twoje zapisane miejsca. Widoczne po przybliżeniu mapy. Lista z czasem dojścia jest w zakładce Schrony.</span><span id="shHint" class="muted small" aria-live="polite"></span></span></label>
+    <label class="switch"><input type="checkbox" id="lyShelters" ${lay.shelters !== false ? "checked" : ""}><span><b>Schrony i ukrycia</b><span class="muted small">Punkty schronienia z Rejestru PSP oraz Twoje zapisane miejsca. Widoczne po przybliżeniu mapy. Lista z czasem dojścia jest w zakładce W pobliżu.</span><span id="shHint" class="muted small" aria-live="polite"></span></span></label>
     ${nepEnabled() ? `<label class="switch"><input type="checkbox" id="lyNeptun" ${nepOn ? "checked" : ""} ${demo ? "disabled" : ""}><span><b>Obiekty znad Ukrainy <span class="badge unofficial">nieoficjalne · beta</span></b><span class="muted small">Drony i rakiety w pobliżu granicy wg NEPTUN. Domyślnie włączone (możesz wyłączyć tutaj lub w Ustawieniach). Przeglądarka łączy się bezpośrednio z neptun.in.ua, a serwis widzi Twój adres IP.</span></span></label>` : ""}
   </div>
   <div id="nepConsent" class="card" hidden role="dialog" aria-label="Zgoda na połączenie z NEPTUN">
@@ -443,7 +443,7 @@ export function initMapScreen(ctx, { demo = false, diag = false } = {}) {
     cleanups.push(() => { clearInterval(timer); if (pending) clearTimeout(pending); });
   }).catch((e) => {
     console.error("EGIDA mapa:", e);
-    if (!dead && root) root.innerHTML = `<p class="note warn" style="margin:16px">Nie udało się załadować mapy (brak internetu?). Schrony zapisane w telefonie znajdziesz w zakładce Schrony.</p>`;
+    if (!dead && root) root.innerHTML = `<p class="note warn" style="margin:16px">Nie udało się załadować mapy (brak internetu?). Schrony zapisane w telefonie znajdziesz w zakładce W pobliżu.</p>`;
   });
   return screen;
 }

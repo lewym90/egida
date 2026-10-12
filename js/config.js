@@ -15,8 +15,9 @@ export const CONFIG = {
   staleAfterMin: 90,
   // Publiczne kanały Telegram na województwo, np. { mazowieckie: "https://t.me/egida_mazowieckie" }.
   telegram: tgLinks,
-  // Licznik GoatCounter: adres endpointu, np. "https://twojkod.goatcounter.com/count". Puste = brak licznika.
-  goatcounter: "",
+  // Licznik odwiedzin GoatCounter (zawsze włączony, bez pytania o zgodę; zlicza tylko otwarcia strony): adres endpointu,
+  // np. "https://twojkod.goatcounter.com/count". Puste = nic nie jest zliczane, dopóki nie wpiszesz adresu.
+  goatcounter: "https://egida.goatcounter.com/count",
   // Link kontaktowy do zgłaszania błędów (np. t.me/... lub mailto:). Puste = ukryte.
   contactUrl: "",
   // Podkłady mapy. Adresy można zmienić bez ruszania kodu aplikacji; atrybucje są OBOWIĄZKOWE (wymagają ich licencje).
@@ -42,4 +43,7 @@ export const CONFIG = {
   // Rejestr Punktów Schronienia (MSWiA / PSP), podzielony na kafelki przez serwer EGIDA (server/psp-sync.mjs).
   pspUrl: "https://raw.githubusercontent.com/lewym90/egida/data/psp/",
   sheltersUrl: "https://raw.githubusercontent.com/lewym90/egida/data/shelters.json",
+  // Defibrylatory (AED) i szpitale z OpenStreetMap, odświeżane raz na dobę przez serwer EGIDA (gałąź data).
+  aedUrl: "https://raw.githubusercontent.com/lewym90/egida/data/aed.json",
+  hospitalsUrl: "https://raw.githubusercontent.com/lewym90/egida/data/hospitals.json",
 };

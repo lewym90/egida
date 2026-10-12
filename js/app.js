@@ -9,6 +9,8 @@ import { emptyPlan, normalizePlan, normalizePlaces, importState } from "./person
 import { renderEmergency, initEmergency, renderPlan, initPlan, renderPlaces, initPlaces, renderPrivacy, shareText, shareNote, printSheet, planPrintHtml, packPrintHtml, guidePrintHtml } from "./screens2.js";
 import { renderMapHtml, initMapScreen, destroyScreens } from "./mapscreen.js";
 import { renderSheltersHtml, initSheltersScreen } from "./sheltersscreen.js";
+import { makePspCache } from "./shelters.js";
+import { offlineCenters, downloadOffline, offlineSummary } from "./offline.js";
 import { normalizeNews, newsFresh, newsForRegion, roadsForRegion, ROADS_LINK, ageLabel } from "./news.js";
 
 /* ---------- pomocnicze ---------- */
@@ -53,6 +55,8 @@ const defaults = () => ({
   places: [], // ważne miejsca: dom, praca, rodzina (tylko w urządzeniu)
   shelters: [], // „Moje miejsca schronienia” (tylko w urządzeniu)
   map: { base: "map", layers: { shelters: true, neptun: true } },
+  offline: null, // { at, centers, points, failed, shelterDb } – ostatnie pobranie danych na wypadek braku internetu
+  installDismissed: null, // data, kiedy użytkownik zamknął podpowiedź „Dodaj do ekranu początkowego”
   mig: {}, // znaczniki jednorazowych migracji ustawień
   checked: {},
   test: null, // {answers:{}, score, at}
@@ -186,9 +190,9 @@ const topbar = () => `<header class="topbar">
 const NAV = [
   { h: "#/pulpit", k: "pulpit", t: "Pulpit", i: I.home },
   { h: "#/alerty", k: "alerty", t: "Alerty", i: I.bell },
-  { h: "#/mapa", k: "mapa", t: "Mapa", i: I.map },
+  { h: "#/mapa", k: "mapa", t: "Zagrożenia", i: I.map },
   { h: "#/poradnik", k: "poradnik", t: "Poradnik", i: I.book },
-  { h: "#/schrony", k: "schrony", t: "Schrony", i: I.shield },
+  { h: "#/schrony", k: "schrony", t: "W pobliżu", i: I.shield },
 ];
 const TABS = [...NAV, { h: "#/wiecej", k: "wiecej", t: "Więcej", i: I.more }];
 const MORE = [
@@ -209,7 +213,7 @@ const SIDE = [
   { h: "#/wazne", k: "wazne", t: "Wiadomości z regionu i kraju", i: I.bell },
   { h: "#/telegram", k: "telegram", t: "Powiadomienia Telegram", i: I.send },
   { h: "#/mapa", k: "mapa", t: "Mapa zagrożeń", i: I.map },
-  { h: "#/schrony", k: "schrony", t: "Schrony i ukrycia", i: I.shield },
+  { h: "#/schrony", k: "schrony", t: "Pomoc w pobliżu", i: I.shield },
   { h: "#/poradnik", k: "poradnik", t: "Co robić", i: I.list },
   { h: "#/pierwsza-pomoc", k: "pierwsza-pomoc", t: "Pierwsza pomoc", i: I.heart },
   { h: "#/plecak", k: "plecak", t: "Plecak i zapasy", i: I.bag },
@@ -232,7 +236,61 @@ function shell(route, inner) {
   <nav class="tabbar" aria-label="Menu dolne">${tabs}</nav></div>`;
 }
 const back = (h, t = "Wstecz") => `<a class="back" href="${h}">${I.back}${t}</a>`;
-const reviewLine = (m) => `<p class="src">Źródło: ${esc(m.source)}. Ostatni przegląd: ${m.reviewed ? esc(m.reviewed) : "<b>oczekuje na zatwierdzenie</b>"}.</p>`;
+const reviewLine = (m) => `<p class="src">Źródło: ${esc(m.source)}. Ostatni przegląd: ${esc(m.reviewed)}.</p>`;
+
+/* ---------- podpowiedź: dodaj do ekranu początkowego ---------- */
+const isStandalone = () => { try { return matchMedia("(display-mode: standalone)").matches || navigator.standalone === true; } catch { return false; } };
+const mobileOS = () => {
+  const ua = navigator.userAgent || "";
+  if (/iPhone|iPad|iPod/i.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1)) return "ios";
+  return /Android/i.test(ua) ? "android" : null;
+};
+let installEvt = null; // zdarzenie „beforeinstallprompt” (Chrome na Androidzie)
+function installHtml(withDismiss) {
+  const os = mobileOS();
+  if (!os || isStandalone()) return "";
+  const how = os === "ios"
+    ? "Dotknij ikony <b>Udostępnij</b> (kwadrat ze strzałką w górę), potem wybierz <b>„Do ekranu początkowego”</b>."
+    : installEvt ? "Dotknij przycisku poniżej." : "W menu przeglądarki (trzy kropki) wybierz <b>„Zainstaluj aplikację”</b> albo <b>„Dodaj do ekranu głównego”</b>.";
+  const btns = `${os === "android" && installEvt ? '<button class="btn primary" id="installBtn">Zainstaluj aplikację</button>' : ""}${withDismiss ? '<button class="btn" id="installLater">Nie teraz</button>' : ""}`;
+  return `<div class="card" id="installCard"><h2>Dodaj EGIDĘ do ekranu telefonu</h2>
+  <p>Otworzy się na całym ekranie, jak zwykła aplikacja, i łatwiej ją znaleźć w razie potrzeby.${os === "ios" ? " Na iPhonie zapisane dane (plan rodziny, pobrane schrony) zostają wtedy dłużej niż przy otwieraniu strony w przeglądarce." : ""}</p>
+  <p class="muted small">${how}</p>${btns ? `<div class="grid2" style="margin-top:10px">${btns}</div>` : ""}</div>`;
+}
+const installHint = () => (state.installDismissed ? "" : installHtml(true));
+window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); installEvt = e; const r = parse().route; if (state.onboarded && (r === "pulpit" || r === "ustawienia")) render(); });
+window.addEventListener("appinstalled", () => { installEvt = null; if (state.onboarded) render(); });
+
+/* ---------- tryb „na wypadek braku internetu” ---------- */
+const fmtWhen = (iso) => { const d = new Date(iso); return isNaN(d) ? "" : d.toLocaleString("pl-PL", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }); };
+function offlineCardHtml() {
+  const o = state.offline, np = (state.places || []).length, ns = (state.shelters || []).length;
+  const last = o?.at ? `Ostatnie pobranie: ${esc(fmtWhen(o.at))}. Zapisano ${esc(offlineSummary(o))}` : "Jeszcze nic nie pobrano.";
+  return `<div class="card" id="offlineCard"><h2>Na wypadek braku internetu</h2>
+  <p>Zapisz w telefonie schrony z okolic Twoich miejsc, listę defibrylatorów (AED) i szpitali w Polsce oraz ostatnie komunikaty i wiadomości. Potem lista najbliższych miejsc pomocy, instrukcje i plan rodziny działają bez internetu (GPS działa bez sieci). Tło mapy nadal wymaga internetu.</p>
+  <p class="muted small">Pobierzemy okolice: Twojej pozycji (gdy zezwolisz na lokalizację w Ustawieniach), Ważnych miejsc (${np}) i Twoich schronów (${ns}); gdy ich nie ma, okolice środka Twojego województwa. To zwykle kilka MB (defibrylatory i szpitale ok. 1–2 MB), najlepiej przez Wi-Fi. Nic nie jest wysyłane na serwer. Powtórz po dodaniu nowych miejsc albo przed wyjazdem.</p>
+  <button class="btn primary" id="offlineBtn" style="margin-top:6px">Pobierz dane na wypadek braku internetu</button>
+  <p id="offlineMsg" class="small" role="status" aria-live="polite" style="margin-top:8px">${last}</p></div>`;
+}
+async function runOffline(btn) {
+  const msg = $("#offlineMsg"); if (!msg) return;
+  btn.disabled = true; msg.style.color = "";
+  try {
+    try { await navigator.storage?.persist?.(); } catch { /* przeglądarka może odmówić – to nie błąd */ }
+    let gps = null;
+    if (state.consent.gps && navigator.geolocation) gps = await new Promise((res) => navigator.geolocation.getCurrentPosition((p) => res({ lat: p.coords.latitude, lon: p.coords.longitude }), () => res(null), { timeout: 8000, maximumAge: 600000 }));
+    const vv = VOIVODESHIPS.find((v) => v.id === state.region);
+    const centers = offlineCenters({ gps, places: state.places || [], shelters: state.shelters || [], regionCenter: vv ? { lat: vv.lat, lon: vv.lon } : null });
+    if (!centers.length) { msg.textContent = "Najpierw wybierz województwo w Ustawieniach albo dodaj Ważne miejsce (dom, praca, rodzina)."; return; }
+    const r = await downloadOffline({ centers, pspUrl: CONFIG.pspUrl, sheltersUrl: CONFIG.sheltersUrl, aedUrl: CONFIG.aedUrl, hospitalsUrl: CONFIG.hospitalsUrl, cache: makePspCache(CONFIG.pspUrl),
+      onProgress: ({ done, total, label }) => { msg.textContent = `Pobieranie ${Math.min(done + 1, total)} z ${total}${label ? ": " + label : ""}…`; } });
+    await Promise.allSettled([loadAlerts(), loadNews()]);
+    if (r.failed && !r.points && !r.shelterDb && !r.aed && !r.hospitals) { msg.style.color = "var(--danger-ink)"; msg.textContent = "Nie udało się pobrać danych. Sprawdź połączenie i spróbuj ponownie."; return; }
+    state.offline = { at: r.at, centers: r.centers, points: r.points, failed: r.failed, shelterDb: r.shelterDb, aed: r.aed, hospitals: r.hospitals }; save();
+    msg.textContent = `${r.failed ? "Pobrano częściowo. " : "Gotowe. "}Zapisano ${offlineSummary(r)}`;
+  } catch { msg.style.color = "var(--danger-ink)"; msg.textContent = "Nie udało się pobrać danych. Sprawdź połączenie i spróbuj ponownie."; }
+  finally { btn.disabled = false; }
+}
 
 /* ---------- gotowość ---------- */
 const plecakDone = () => PLECAK.start.filter((x) => state.checked[x.id]).length;
@@ -255,9 +313,8 @@ function screenStart() {
   <p>Darmowa, nieoficjalna aplikacja: ostrzeżenia dla Twojego województwa, pierwsza pomoc, plecak i plan na kryzys. Bez reklam, bez konta, bez sprzedaży danych.</p></div>
   <div class="card"><h2>Twoje wybory</h2><p class="muted small">Wszystko jest dobrowolne. Aplikacja działa także bez żadnej zgody.</p>
   <label class="switch"><input type="checkbox" id="cGps" ${c.gps ? "checked" : ""}><span><b>Lokalizacja (GPS)</b><span class="muted small">Po co: ustawimy województwo, żeby pokazywać tylko Twoje komunikaty. Gdzie trafia: pozycja zostaje w telefonie i nie jest nigdzie wysyłana. Zamiast tego możesz wybrać województwo ręcznie.</span></span></label>
-  <label class="switch"><input type="checkbox" disabled><span><b>Powiadomienia w aplikacji <span class="badge soon">wkrótce</span></b><span class="muted small">Na razie ostrzeżenia dla województwa wysyłamy przez publiczne kanały Telegram (link znajdziesz w Ustawieniach). Powiadomienia nie przebijają trybu „Nie przeszkadzać” i nie zastępują syren ani Alertu RCB.</span></span></label>
   <label class="switch"><input type="checkbox" id="cNeptun" ${c.neptun ? "checked" : ""}><span><b>Obiekty znad Ukrainy na mapie <span class="badge unofficial">nieoficjalne · beta</span></b><span class="muted small">Po co: na mapie zobaczysz drony i rakiety w pobliżu granicy wg serwisu NEPTUN. Gdzie trafia: przeglądarka łączy się wtedy bezpośrednio z neptun.in.ua, który widzi Twój adres IP. To nieoficjalne dane, mogą być spóźnione lub błędne i nie zastępują syren ani Alertu RCB. Możesz wyłączyć tutaj i później w Ustawieniach.</span></span></label>
-  <label class="switch"><input type="checkbox" id="cCounter" ${c.counter ? "checked" : ""}><span><b>Anonimowy licznik odwiedzin</b><span class="muted small">Zlicza wejścia na stronę, bez cookies i bez identyfikatorów. Pomaga ocenić, czy aplikacja jest potrzebna. Wyłączona domyślnie – możesz włączyć lub wyłączyć w Ustawieniach.</span></span></label></div>
+  <p class="muted small" style="margin-top:8px">Strona zlicza wyłącznie to, ile razy została otwarta: bez cookies, bez identyfikatorów i bez zapisywania adresu IP.</p></div>
   <div class="card"><div class="field"><label for="startRegion"><b>Województwo (ręcznie)</b></label>
   <select class="sel" id="startRegion"><option value="">Wybiorę później</option>${VOIVODESHIPS.map((v) => `<option value="${v.id}" ${state.region === v.id ? "selected" : ""}>${esc(v.name)}</option>`).join("")}</select></div></div>
   ${legal()}
@@ -336,8 +393,9 @@ function screenPulpit() {
   return `<div class="hero"><h1>Pulpit</h1></div>${status}${newsCardHtml()}
   <div class="card ready"><div class="row" style="gap:16px">${ring(r.pct)}<div style="flex:1"><h2 style="margin:0">Twoja gotowość</h2><p class="muted small" style="margin:2px 0 0">Trzy małe kroki, żeby poczuć się pewniej.</p></div></div>
   <ul class="steps stepsnav">${steps}</ul></div>
-  <div class="grid2 grid-d grid4">${tile("#/schrony", "t-green", I.pin, "Schrony blisko", nm != null ? `Najbliżej: ${nm} min pieszo` : "Najbliższe punkty schronienia")}${tile("#/pierwsza-pomoc", "t-red", I.heart, "Pierwsza pomoc", "Krok po kroku, offline")}${tile("#/plecak", "t-blue", I.bag, "Plecak i zapasy", "Zestaw na 72 godziny")}${tile("#/plan-rodziny", "t-amber", I.users, "Plan rodziny", "Kontakty i miejsce spotkania")}</div>
+  <div class="grid2 grid-d grid4">${tile("#/schrony", "t-green", I.pin, "Pomoc w pobliżu", nm != null ? `Schron: ${nm} min pieszo · AED · szpitale` : "Schrony, AED, szpitale")}${tile("#/pierwsza-pomoc", "t-red", I.heart, "Pierwsza pomoc", "Krok po kroku, offline")}${tile("#/plecak", "t-blue", I.bag, "Plecak i zapasy", "Zestaw na 72 godziny")}${tile("#/plan-rodziny", "t-amber", I.users, "Plan rodziny", "Kontakty i miejsce spotkania")}</div>
   <div class="grid2 grid-d" style="margin-top:12px"><a class="tile" style="flex-direction:row;align-items:center" href="#/poradnik"><span class="ti t-green">${I.list}</span><b>Co robić, gdy…</b></a><a class="tile" style="flex-direction:row;align-items:center" href="#/telegram"><span class="ti t-blue">${I.send}</span><b>Powiadomienia Telegram dla Twojego województwa</b></a></div>
+  ${installHint()}
 `;
 }
 
@@ -527,7 +585,8 @@ function screenPierwszaPomoc() {
   <div class="row" style="margin:12px 0"><span class="pulse" id="pulse"></span><div><div class="bpm">~${R.bpm}<span style="font-size:1rem"> /min</span></div><div>uciśnięć na minutę</div><div id="phase" style="font-weight:800;letter-spacing:.04em;min-height:1.4em"></div></div></div>
   <button class="btn" id="metroBtn" aria-pressed="false">Włącz rytm</button><p class="small" style="margin:8px 0 0;opacity:.9">Dioda świeci, gdy uciskasz, i gaśnie, gdy puszczasz klatkę. Rytm 100/min (dopuszczalne 100–120) zostawia czas na pełne puszczenie. Brak dźwięku? Wyłącz tryb cichy i podgłośnij telefon. Wibracja nie działa na iPhonie.</p></section>
   <div class="card"><ol style="list-style:none;padding:0;margin:0">${steps}</ol>
-  <a class="btn112" style="justify-content:center;min-height:52px;width:100%;margin-top:10px" href="tel:112">${I.phone}Zadzwoń 112</a></div>
+  <a class="btn112" style="justify-content:center;min-height:52px;width:100%;margin-top:10px" href="tel:112">${I.phone}Zadzwoń 112</a>
+  <a class="btn" style="width:100%;margin-top:10px" href="#/schrony/aed">${I.pin}Znajdź najbliższy defibrylator (AED)</a></div>
   <h2 style="margin-top:20px">Inne sytuacje</h2>${others}${reviewLine(FIRST_AID)}`;
 }
 
@@ -554,7 +613,7 @@ function screenPlecak() {
   <div class="chips" role="group" aria-label="Sekcje">${tabs}</div>${body}
   <div class="note" style="margin-top:12px">${esc(PLECAK.note)}</div>
   <button class="btn" id="printPack" style="margin-top:12px">Drukuj listę plecaka i zapasów</button>
-  <p class="src">Źródło: ${esc(PLECAK.source)}. Każdy domownik, także dziecko, ma własny plecak. Zaznaczenia zapisują się tylko w tym urządzeniu. Ostatni przegląd: ${PLECAK.reviewed ? esc(PLECAK.reviewed) : "<b>oczekuje na zatwierdzenie</b>"}.</p>`;
+  <p class="src">Źródło: ${esc(PLECAK.source)}. Każdy domownik, także dziecko, ma własny plecak. Zaznaczenia zapisują się tylko w tym urządzeniu. Ostatni przegląd: ${esc(PLECAK.reviewed)}.</p>`;
 }
 
 let testAnswers = {};
@@ -592,17 +651,19 @@ function screenUstawienia() {
   <select class="sel" id="setRegion"><option value="">— wybierz —</option>${VOIVODESHIPS.map((v) => `<option value="${v.id}" ${state.region === v.id ? "selected" : ""}>${esc(v.name)}</option>`).join("")}</select></div>
   ${borderNote()}
   <button class="btn" id="useGps" style="margin-top:10px">${I.pin}Użyj lokalizacji GPS</button><p class="muted small">Pozycja jest używana tylko w Twoim telefonie, do wskazania województwa na podstawie uproszczonych granic. Nie jest wysyłana na serwer.</p>
-  <label class="switch"><input type="checkbox" id="setGps" ${c.gps ? "checked" : ""}><span><b>Pozwalam używać lokalizacji na ekranie Schrony</b><span class="muted small">Gdy włączone, lista najbliższych schronów ustala Twoją pozycję od razu po wejściu na ekran (przeglądarka nadal może zapytać o zgodę).</span></span></label></div>
+  <label class="switch"><input type="checkbox" id="setGps" ${c.gps ? "checked" : ""}><span><b>Pozwalam używać lokalizacji na ekranie Pomoc w pobliżu</b><span class="muted small">Gdy włączone, lista najbliższych miejsc (schrony, AED, szpitale) ustala Twoją pozycję od razu po wejściu na ekran (przeglądarka nadal może zapytać o zgodę).</span></span></label></div>
   <div class="card"><h2>Twoje przygotowania</h2><div class="col" style="margin-top:8px"><a class="btn" href="#/plan-rodziny">${I.users}Plan rodziny i karty ICE</a><a class="btn" href="#/miejsca">${I.pin}Ważne miejsca: dom, praca, rodzina</a></div></div>
   <div class="card"><h2>Powiadomienia</h2>${tg ? `<p>Kanał Telegram dla Twojego województwa:</p><a class="btn primary" href="${esc(tg)}" target="_blank" rel="noopener noreferrer">Otwórz kanał Telegram ${I.ext}</a>` : `<p class="muted">Kanał Telegram dla Twojego województwa jest w przygotowaniu. Powiadomienia nie przebijają trybu „Nie przeszkadzać” i nie zastępują syren ani Alertu RCB.</p>`}<p style="margin-top:10px"><a href="#/telegram">Jak działają powiadomienia Telegram i lista kanałów</a></p></div>
   <div class="card"><h2>Prywatność</h2>
-  <label class="switch"><input type="checkbox" id="setCounter" ${c.counter ? "checked" : ""}><span><b>Anonimowy licznik odwiedzin</b><span class="muted small">Bez cookies i identyfikatorów. ${CONFIG.goatcounter ? "" : "(Licznik nie jest jeszcze skonfigurowany, więc nic nie jest zliczane.)"}</span></span></label>
+  <p class="muted small">Strona zlicza wyłącznie to, ile razy została otwarta: bez cookies, bez identyfikatorów i bez zapisywania adresu IP.</p>
   ${CONFIG.neptun?.enabled === false ? "" : `<label class="switch"><input type="checkbox" id="setNeptun" ${c.neptun ? "checked" : ""}><span><b>Obiekty znad Ukrainy na mapie (NEPTUN) <span class="badge unofficial">nieoficjalne · beta</span></b><span class="muted small">Domyślnie włączone. Na ekranie Mapa przeglądarka łączy się bezpośrednio z neptun.in.ua, a serwis widzi Twój adres IP. To nieoficjalne dane, mogą być spóźnione lub błędne. Wyłączysz to tutaj.</span></span></label>`}
   <p style="margin-top:6px"><a href="#/prywatnosc">Polityka prywatności</a></p></div>
   <div class="card"><h2>Wygląd</h2><div class="grid2" style="margin-top:8px"><div class="field"><label for="setFs" class="muted small">Rozmiar tekstu</label><select class="sel" id="setFs">${opt("normal", state.fs, "Normalny")}${opt("large", state.fs, "Duży")}${opt("xlarge", state.fs, "Bardzo duży")}</select></div>
   <div class="field"><label for="setContrast" class="muted small">Kontrast</label><select class="sel" id="setContrast">${opt("normal", state.contrast, "Normalny")}${opt("high", state.contrast, "Wysoki")}</select></div></div></div>
   <div class="card"><h2>Twoje dane</h2><p class="muted">Wszystko, co ustawisz, jest tylko w tym urządzeniu: województwo, plecak, plan rodziny, karty ICE, ważne miejsca.</p><div class="grid2"><button class="btn" id="exportData">Pobierz dane</button><button class="btn" id="wipeData">Usuń dane</button></div>
   <button class="btn" id="importBtn" style="margin-top:12px">Wczytaj dane z pliku</button><input type="file" id="importFile" accept="application/json,.json" hidden><p id="importMsg" class="small" role="status" aria-live="polite"></p></div>
+  ${offlineCardHtml()}
+  ${installHtml(false)}
   <div class="card"><h2>Aplikacja</h2><p class="muted small">Jeśli widzisz starą wersję albo coś się nie odświeża, dotknij poniższego przycisku. Wyczyści pamięć podręczną aplikacji i wczyta najnowszą wersję (Twoje dane zostają).</p><button class="btn" id="refreshApp">Odśwież aplikację</button></div>
   <a class="btn" href="#/zrodla">Źródła i licencje</a>
   ${CONFIG.contactUrl ? `<a class="btn" style="margin-top:10px" href="${esc(safeUrl(CONFIG.contactUrl))}" target="_blank" rel="noopener noreferrer">Zgłoś błąd</a>` : ""}
@@ -628,7 +689,7 @@ function render() {
     case "alerty": inner = screenAlerty(); break;
     case "wazne": inner = screenWazne(); break;
     case "mapa": inner = screenMapa(arg); break;
-    case "schrony": inner = renderSheltersHtml(geoCtx, { demo: arg === "demo" }); break;
+    case "schrony": inner = renderSheltersHtml(geoCtx, { demo: arg === "demo", mode: arg }); break;
     case "plan-rodziny": inner = renderPlan(geoCtx); break;
     case "zagrozenie": inner = renderEmergency(geoCtx); break;
     case "miejsca": inner = renderPlaces(geoCtx); break;
@@ -646,12 +707,12 @@ function render() {
   }
   app.innerHTML = shell(route, inner);
   if (route === "mapa") initMapScreen(geoCtx, { demo: arg === "demo", diag: arg === "diag" });
-  else if (route === "schrony") initSheltersScreen(geoCtx, { demo: arg === "demo" });
+  else if (route === "schrony") initSheltersScreen(geoCtx, { demo: arg === "demo", mode: arg });
   else if (route === "plan-rodziny") initPlan(geoCtx);
   else if (route === "zagrozenie") initEmergency(geoCtx);
   else if (route === "miejsca") initPlaces(geoCtx);
   else if (route === "ustawienia") showSwVersion();
-  const titles = { wazne: "Wiadomości", pulpit: "Pulpit", alerty: "Alerty", mapa: "Mapa", poradnik: "Poradnik", plecak: "Plecak", "pierwsza-pomoc": "Pierwsza pomoc", test: "Test gotowości", ustawienia: "Ustawienia", zrodla: "Źródła", telegram: "Powiadomienia Telegram", schrony: "Schrony", "plan-rodziny": "Plan rodziny", zagrozenie: "Tryb zagrożenia", miejsca: "Ważne miejsca", prywatnosc: "Polityka prywatności", wiecej: "Więcej" };
+  const titles = { wazne: "Wiadomości", pulpit: "Pulpit", alerty: "Alerty", mapa: "Mapa zagrożeń", poradnik: "Poradnik", plecak: "Plecak", "pierwsza-pomoc": "Pierwsza pomoc", test: "Test gotowości", ustawienia: "Ustawienia", zrodla: "Źródła", telegram: "Powiadomienia Telegram", schrony: "Pomoc w pobliżu", "plan-rodziny": "Plan rodziny", zagrozenie: "Tryb zagrożenia", miejsca: "Ważne miejsca", prywatnosc: "Polityka prywatności", wiecej: "Więcej" };
   document.title = `EGIDA – ${titles[route] || "Pulpit"}`;
   window.scrollTo(0, 0); { const sh = document.querySelector(".shell"); if (sh) sh.scrollTop = 0; }
 }
@@ -708,7 +769,7 @@ function alertShareText(a) {
 
 /* ---------- licznik ---------- */
 function applyCounter() {
-  if (!CONFIG.goatcounter || !state.consent.counter || document.getElementById("gc")) return;
+  if (!CONFIG.goatcounter || document.getElementById("gc")) return;
   const s = document.createElement("script");
   s.id = "gc"; s.async = true; s.src = "https://gc.zgo.at/count.js"; s.dataset.goatcounter = CONFIG.goatcounter;
   document.head.appendChild(s);
@@ -722,13 +783,11 @@ document.addEventListener("change", (e) => {
     state.region = t.value; state.regionSource = "manual"; state.regionNear = null; save(); render();
   } else if (t.id === "startRegion") { state.region = t.value || null; state.regionSource = "manual"; state.regionNear = null; save(); }
   else if (t.id === "cGps") state.consent.gps = t.checked;
-  else if (t.id === "cCounter") { state.consent.counter = t.checked; save(); }
   else if (t.id === "cNeptun") { state.consent.neptun = t.checked; if (state.map?.layers) state.map.layers.neptun = t.checked; save(); }
   else if (t.id === "cAck") { state.consent.ack = t.checked; save(); $("#goStart").disabled = !t.checked; }
   else if (t.id === "setRegion") { state.region = t.value || null; state.regionSource = "manual"; state.regionNear = null; save(); render(); }
   else if (t.id === "setGps") { state.consent.gps = t.checked; save(); }
   else if (t.id === "importFile") importFromFile(t);
-  else if (t.id === "setCounter") { state.consent.counter = t.checked; save(); applyCounter(); }
   else if (t.id === "setNeptun") { state.consent.neptun = t.checked; if (state.map?.layers) state.map.layers.neptun = t.checked; save(); }
   else if (t.id === "setFs") { state.fs = t.value; save(); applyPrefs(); }
   else if (t.id === "setContrast") { state.contrast = t.value; save(); applyPrefs(); }
@@ -738,7 +797,6 @@ document.addEventListener("change", (e) => {
 document.addEventListener("input", (e) => {
   if (e.target.id === "alertQ") { alertQuery = e.target.value; const l = $("#alertList"); if (l) l.innerHTML = alertListHtml(); }
 });
-const DRAFT = "Wersja robocza: treść oczekuje na zatwierdzenie merytoryczne.";
 async function importFromFile(input) {
   const msg = $("#importMsg"), f = input.files?.[0]; input.value = "";
   if (!f || !msg) return;
@@ -754,6 +812,9 @@ async function importFromFile(input) {
 }
 document.addEventListener("click", (e) => {
   const b = e.target.closest("button"); if (!b) return;
+  if (b.id === "installBtn" && installEvt) { const ev = installEvt; installEvt = null; try { ev.prompt(); } catch { /* */ } render(); return; }
+  if (b.id === "offlineBtn") { runOffline(b); return; }
+  if (b.id === "installLater") { state.installDismissed = new Date().toISOString().slice(0, 10); save(); render(); return; }
   if (b.id === "goStart") {
     state.onboarded = true; save(); applyCounter();
     if (state.consent.gps && !state.region) useGps(render); else render();
@@ -765,8 +826,8 @@ document.addEventListener("click", (e) => {
       if (r === "copied" && lab) { lab.textContent = "Skopiowano"; setTimeout(() => { lab.textContent = "Udostępnij"; }, 2500); }
       else if (r === "failed") alert(shareNote(r));
     });
-  } else if (b.id === "printGuide") printSheet("Instrukcje: pierwsza pomoc i co robić", guidePrintHtml(esc), FIRST_AID.reviewed && WHAT_TO_DO.reviewed ? "" : DRAFT);
-  else if (b.id === "printPack") printSheet("Plecak i zapasy", packPrintHtml(state, esc), PLECAK.reviewed ? "" : DRAFT);
+  } else if (b.id === "printGuide") printSheet("Instrukcje: pierwsza pomoc i co robić", guidePrintHtml(esc));
+  else if (b.id === "printPack") printSheet("Plecak i zapasy", packPrintHtml(state, esc));
   else if (b.id === "importBtn") $("#importFile")?.click();
   else if (b.id === "refreshApp") { b.disabled = true; b.textContent = "Odświeżam…"; refreshApp(); }
   else if (b.dataset.newsscope) { newsScope = b.dataset.newsscope; render(); }

@@ -120,7 +120,7 @@ ok("media: wpis z radia ma etykietę kind=media, bez streszczenia i z regionem r
   const src = SOURCES.find((x) => x.id === "radio-lubelskie");
   const it = toItem({ title: "Dachowanie samochodu na S12 pod Lublinem. Zablokowany prawy pas ruchu", url: "https://radio.lublin.pl/a", date: "2026-10-11T09:14:00Z", summary: "Treść, której nie pokazujemy" }, src, NOW);
   assert.equal(it.kind, "media"); assert.equal(it.summary, ""); assert.equal(it.region, "lubelskie"); assert.equal(it.source, "Radio Lublin");
-  assert.equal(SOURCES.filter((x) => x.kind === "media").length, 19);
+  assert.equal(SOURCES.filter((x) => x.kind === "media").length, 21);
 });
 ok("media: wpis spoza województwa rozgłośni odpada (Dżibuti nie leży na Podkarpaciu)", () => {
   const src = SOURCES.find((x) => x.id === "radio-podkarpackie");

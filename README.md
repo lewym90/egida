@@ -4,7 +4,7 @@ Darmowa, nieoficjalna aplikacja PWA (bez reklam, konta i sprzedaży danych). Opi
 
 ## Co jest w tej wersji (etap 1 / MVP)
 Start i zgody · Pulpit z wyborem województwa · Alerty (z gałęzi `data`, odświeżanej przez serwer) · Poradnik „Co robić” · Pierwsza pomoc z metronomem RKO · Plecak i zapasy · Test gotowości · Ustawienia · Źródła i licencje · tryb offline (service worker) · wersja na komputer.
-**Jeszcze nie ma:** Mapy, Schronów, NEPTUN, Planu rodziny, push z PWA (patrz „Etap 2” poniżej).
+**Jeszcze nie ma:** Mapy, Schronów, NEPTUN, Planu rodziny (patrz „Etap 2” poniżej). Powiadomienia w aplikacji (push) NIE powstaną: ostrzeżenia idą tylko przez Telegram.
 
 ## Uruchomienie lokalne
 ```bash
@@ -32,8 +32,8 @@ Bez tokenu skrypt działa „na sucho”: zapisuje dane, niczego nie wysyła. Pr
 - Brak świeżych danych ⇒ aplikacja NIE pokazuje „brak komunikatów”, tylko „Brak aktualnych danych” (próg: `staleAfterMin` w `js/config.js`).
 - Komunikaty z zewnątrz są zawsze escapowane; adresy inne niż http(s) są odrzucane.
 - Czcionki hostowane lokalnie (nic nie jest ładowane z Google).
-- Licznik (GoatCounter) wyłączony domyślnie i bez adresu w `config.js` nic nie zlicza.
-- Treści (`js/content.js`) mają pole `reviewed: null` do czasu merytorycznego zatwierdzenia. `node scripts/check-content.mjs --strict` blokuje publikację bez daty przeglądu – włącz `--strict` w workflow przed premierą.
+- Licznik odwiedzin (GoatCounter) jest zawsze włączony i nie pyta o zgodę (zlicza tylko otwarcia strony; bez cookies, identyfikatorów i zapisywania IP). Bez adresu w `goatcounter` w `js/config.js` nic nie zlicza.
+- Treści (`js/content.js`) mają pole `reviewed` z datą ostatniego przeglądu (12.10.2026). `node scripts/check-content.mjs --strict` blokuje publikację bez daty lub z datą starszą niż 12 miesięcy. Przy zmianie treści ustaw nową datę.
 
 ## Etap 2 (jest): mapa, schrony, obiekty przy granicy
 - **Mapa** (`#/mapa`): Leaflet 1.9.4 (lokalnie, ładowany dopiero na tym ekranie). Podkłady: OSM, OpenTopoMap (teren), EOX Sentinel-2 (satelita) – adresy w `js/config.js` (`tiles`). Domyślny OSM nadaje się tylko do małego ruchu – przed premierą wymień na własnego dostawcę.
@@ -50,7 +50,6 @@ Bez tokenu skrypt działa „na sucho”: zapisuje dane, niczego nie wysyła. Pr
 - **Satelita**: EOX z `referrerPolicy: "no-referrer"`; diagnostyka kafelków: `#/mapa/diag`.
 - **Telegram wg wagi** (`server/tg-policy.mjs`): wysyła zagrożenia, ostrzeżenia i odwołania; podgląd bez wysyłki: `node server/poll.mjs --preview-tg 24`; stary tryb: `TELEGRAM_POLICY=legacy`.
 - **Strażnik** (`server/watchdog.mjs`): alarm na Telegram przy awarii pobierania komunikatów. `node server/tg-admin-id.mjs` pokazuje `ADMIN_CHAT_ID` (po wpisaniu w `.env`), `bash server/install.sh --watchdog-cron` włącza (co 10 min), `--watchdog-uncron` wyłącza, `node server/watchdog.mjs --status` pokazuje stan. Nie wykryje awarii całego VPS (potrzebny monitoring zewnętrzny).
-- Nowe treści (tryb zagrożenia, polityka prywatności, instrukcje) mają `reviewed: null` – wymagają zatwierdzenia; polityka prywatności – przeglądu prawnego.
 
 ## Wersja 16: czas dotarcia, cieniowanie obwodów, raport typów NEPTUN
 - **Szacowanie prędkości** (`estimateMotion`, `ThreatStore.trackMotion` w `js/neptun.js`): NEPTUN nie podaje prędkości, więc aplikacja liczy ją z przesunięcia kolejnych potwierdzonych pozycji (dokładność ≤ 6 km, przesunięcie ≥ 3 km i większe od niepewności pozycji, kierunek zgodny z kursem ±50°). Wynik jest oznaczony „(szacunek)” i służy tylko do wyświetlania toru oraz „do granicy Polski w tym tempie ok. N min”. Nie wszczyna alarmu i nie wpływa na powiadomienia Telegram (obserwator na serwerze nie trzyma historii pozycji).
@@ -76,7 +75,7 @@ Alerty poziomu 2 z torem po weryfikacji formatu NEPTUN, zatwierdzenie treści (`
 - Doniesienia medialne z rozgłośni radiowych są filtrowane po lokalizacji (`server/news-places.mjs`): tytuł musi dotyczyć wskazanego województwa.
 - Pierwsza pomoc: ok. 35 instrukcji w pięciu grupach (zagrożenie życia, nagłe choroby, urazy, zatrucia i środowisko, gdy system nie działa).
 - Poradnik „Co robić”: 24 instrukcje w trzech grupach (zagrożenia, brak prądu i awarie, informacje i oszustwa).
-- Plecak: dłuższe listy, nowa zakładka „Rodzina” (plan rodzinny). Treść robocza (`reviewed: null`) do zatwierdzenia merytorycznego.
+- Plecak: dłuższe listy, nowa zakładka „Rodzina” (plan rodzinny).
 - `npm test` obejmuje `scripts/test-v19.mjs`.
 
 ## Wersja 20: zagrożenia ogólnopolskie i poprawione źródła radiowe
@@ -112,3 +111,11 @@ Alerty poziomu 2 z torem po weryfikacji formatu NEPTUN, zatwierdzenie treści (`
 - Źródła oficjalne: odpadają inwestycje, nagrody, szkolenia akademickie, briefingi, kampanie społeczne, technologie kosmiczne i energetyczne (chyba że dotyczą ochrony ludności, schronów, ostrzeżeń). RCB używa filtra bezpieczeństwa zamiast „wszystko”.
 - Radio ZET i TVP Info usunięte (brak jawnego kanału RSS).
 - Do filtra bezpieczeństwa doszły: kryzys, wypadek, karambol, zabójstwo, napad, porwanie, zaginięcie.
+
+## Wersja 26
+- Treści (pierwsza pomoc, Co robić, plecak, tryb zagrożenia, polityka prywatności) mają datę przeglądu 12.10.2026; usunięto komunikaty „oczekuje na zatwierdzenie” i „wersja robocza”.
+- Licznik odwiedzin zawsze włączony (bez przełączników i bez pytania o zgodę); kod GoatCounter „egida” jest wpisany w `goatcounter` w `js/config.js`.
+- **Nowe nazwy zakładek:** „Mapa” → **Zagrożenia** (ekran „Mapa zagrożeń”), „Schrony” → **W pobliżu** (ekran „Pomoc w pobliżu”). Adresy `#/mapa` i `#/schrony` bez zmian.
+- **Pomoc w pobliżu:** filtry **Schrony**, **Moje miejsca**, **Defibrylatory AED**, **Szpitale** (zamiast „Wszystkie / Z opisem wejścia / Moje miejsca / Do 10 min”). Adresy `#/schrony/aed` i `#/schrony/szpitale` otwierają od razu dany filtr (linki z ekranu Pierwsza pomoc i Trybu zagrożenia). Lista z odległością i czasem dojścia, opis miejsca w budynku (np. „przy recepcji”), dostępność, godziny, data kontroli, telefon szpitala; mapa z oznaczeniami (AED czerwone kropki od zoomu 12, szpitale fioletowy znacznik od zoomu 8).
+- **Dane AED i szpitali:** `server/medical-sync.mjs` (wywoływany z `run.sh` raz na dobę, osobny od schronów) pobiera z OpenStreetMap (Overpass) `emergency=defibrillator` i `amenity=hospital` w Polsce i zapisuje `aed.json` oraz `hospitals.json` (kompaktowe wiersze) na gałęzi `data`. Ochrona przed pustą odpowiedzią (min. 500 AED, 100 szpitali) – wtedy zostaje poprzedni plik. Wspólny kod: `js/medical.js`. Telefon pobiera pliki dopiero po wejściu w dany filtr; tryb offline zapisuje je w telefonie. Ostrzeżenia: dane społeczności, niezweryfikowane; przy zatrzymaniu krążenia najpierw 112; kolejki SOR na pacjent.gov.pl.
+- Pulpit: kafelek „Schrony blisko” → „Pomoc w pobliżu” (ta sama pozycja i wygląd).

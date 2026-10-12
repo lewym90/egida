@@ -6,6 +6,8 @@ set -euo pipefail
 cd "$DATA_DIR"
 git add alerts.json
 [ -f shelters.json ] && git add shelters.json
+[ -f aed.json ] && git add aed.json
+[ -f hospitals.json ] && git add hospitals.json
 [ -f neptun-schema.json ] && git add neptun-schema.json
 [ -f neptun-seen.json ] && git add neptun-seen.json
 [ -f news.json ] && git add news.json

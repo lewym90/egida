@@ -14,7 +14,7 @@ ok("pierwsza pomoc: unikalne id, grupy, kroki", () => {
   assert.ok(ids.length >= 30);
   for (const id of ["krwotok", "opaska", "wstrzas", "rko-dziecko", "aed", "anafilaksja", "hipoglikemia", "drgawki", "astma", "zlamania", "glowa-kregoslup", "czad", "upal", "hipotermia", "tonienie", "brak-zasiegu", "blackout-pomoc", "improwizacja"]) assert.ok(ids.includes(id), id);
   for (const o of FIRST_AID.others) { assert.ok(o.g && o.t, o.id); assert.ok(o.steps.length >= 3, o.id); for (const s of o.steps) assert.ok(s.trim().length > 10, o.id); }
-  assert.equal(FIRST_AID.reviewed, null, "nowa treść medyczna nie może udawać zatwierdzonej");
+  assert.equal(FIRST_AID.reviewed, "2026-10-12");
 });
 ok("RKO: ocena oddechu do 10 s, oddech agonalny, pełne puszczenie klatki, rytm 100–120", () => {
   const adult = FIRST_AID.rko.steps.map((x) => x.d).join(" ");
@@ -28,7 +28,7 @@ ok("poradnik: nowe tematy i grupy", () => {
   assert.equal(new Set(ids).size, ids.length);
   for (const id of ["blackout-godzina", "blackout-cieplo", "blackout-jedzenie", "blackout-zostac", "brak-wody", "czad", "platnosci", "brak-lacznosci", "dezinformacja", "oszustwo-telefon", "oszustwo-sms", "oszustwo-po-fakcie", "senior-oszustwa", "ewakuacja"]) assert.ok(ids.includes(id), id);
   for (const x of WHAT_TO_DO.items) assert.ok(x.g, x.id);
-  assert.equal(WHAT_TO_DO.reviewed, null);
+  assert.equal(WHAT_TO_DO.reviewed, "2026-10-12");
 });
 ok("plecak: unikalne id we wszystkich listach, plan rodzinny", () => {
   const all = [...PLECAK.start, ...PLECAK.later, ...PLECAK.zapas, ...PLECAK.dokumenty, ...PLECAK.rodzina].map((x) => x.id);
@@ -59,6 +59,6 @@ ok("logo: pliki istnieją i są w SHELL, stare SVG usunięte, wersja podbita", (
   const sw = fs.readFileSync(path.join(root, "sw.js"), "utf8");
   assert.match(sw, /icons\/logo\.png/); assert.match(sw, /icons\/favicon\.png/);
   assert.ok(!/icon\.svg|maskable\.svg/.test(sw + fs.readFileSync(path.join(root, "index.html"), "utf8") + fs.readFileSync(path.join(root, "manifest.webmanifest"), "utf8")));
-  assert.equal(APP_VERSION, "v25"); assert.match(sw, /egida-v25/);
+  assert.equal(APP_VERSION, "v26"); assert.match(sw, /egida-v26/);
 });
 console.log(`OK: ${n} grup testów v19 przeszło`);

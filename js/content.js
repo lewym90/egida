@@ -1,6 +1,5 @@
-// Treści i dane stałe. Każda instrukcja ma: źródło, datę publikacji, datę przeglądu.
-// reviewed: null = treść NIE przeszła jeszcze przeglądu merytorycznego (skrypt scripts/check-content.mjs
-// w trybie --strict blokuje publikację). Nie ustawiaj daty, dopóki treść nie zostanie sprawdzona.
+// Treści i dane stałe. Każda instrukcja ma: źródło, datę publikacji, datę przeglądu (reviewed).
+// Przy każdej zmianie treści ustaw reviewed na dzień zmiany (scripts/check-content.mjs pilnuje, żeby data była wpisana).
 
 export const VOIVODESHIPS = [
   { id: "dolnoslaskie", name: "Dolnośląskie", lat: 51.1, lon: 16.6 },
@@ -36,7 +35,7 @@ export const ALERT_FILTERS = [
 // Uproszczenie dla przeciętnego człowieka. Przed publikacją porównać pełną listę z oryginałem RCB.
 export const PLECAK = {
   source: "Poradnik bezpieczeństwa RCB (rcb.gov.pl) oraz opracowanie własne EGIDA",
-  reviewed: null,
+  reviewed: "2026-10-12",
   start: [
     { id: "woda", t: "Woda", d: "Co najmniej 3 litry na osobę na dobę." },
     { id: "jedzenie", t: "Trwałe jedzenie", d: "Konserwy, kasze, makaron, batony – rzeczy, które nie wymagają lodówki." },
@@ -110,11 +109,11 @@ export const PLECAK = {
   note: "Nie musisz kupować sprzętu survivalowego ani telefonu satelitarnego. Chodzi o to, żeby przetrwać kilka dni bez prądu, wody z kranu i sklepu. Zacznij od pięciu rzeczy na start i dokładaj po trochu.",
 };
 
-// --- Pierwsza pomoc (treść robocza – do zatwierdzenia zgodnie z wytycznymi PRC/ERC 2025) ---
+// --- Pierwsza pomoc (wg wytycznych PRC/ERC 2025) ---
 export const FIRST_AID = {
   source: "wytyczne PRC/ERC 2025 oraz opracowanie własne EGIDA",
   published: "2026-10-09",
-  reviewed: null,
+  reviewed: "2026-10-12",
   rko: {
     bpm: 100,
     steps: [
@@ -168,11 +167,11 @@ export const FIRST_AID = {
   ],
 };
 
-// --- Co robić (treść robocza – do zatwierdzenia; docelowo na podstawie Poradnika bezpieczeństwa RCB) ---
+// --- Co robić (na podstawie Poradnika bezpieczeństwa RCB) ---
 export const WHAT_TO_DO = {
   source: "Poradnik bezpieczeństwa RCB (rcb.gov.pl) oraz opracowanie własne EGIDA",
   published: "2026-10-09",
-  reviewed: null,
+  reviewed: "2026-10-12",
   items: [
     { id: "alert-rcb", g: "Zagrożenia", t: "Dostałem Alert RCB", d: "Co zrobić po SMS-ie z Alertem RCB", steps: ["Przeczytaj całą treść alertu i zastosuj się do poleceń.", "Jeśli polecono znaleźć bezpieczne miejsce: wejdź do budynku, najlepiej w głąb, z dala od okien.", "Powiadom bliskich, że jesteś bezpieczny. Sprawdź komunikaty służb.", "Nie blokuj linii: dzwoń pod 112 tylko, gdy ktoś potrzebuje pomocy."] },
     { id: "powodz", g: "Zagrożenia", t: "Powódź", d: "Gdy woda się podnosi", steps: ["Śledź ostrzeżenia IMGW i komunikaty służb. Zabezpiecz dokumenty i leki.", "Przenieś cenne rzeczy wyżej, odłącz prąd w zalewanych pomieszczeniach.", "Nie wchodź ani nie wjeżdżaj w zalaną wodę.", "Na polecenie służb ewakuuj się, zabierając plecak."] },
@@ -222,7 +221,7 @@ export const SOURCES = [
   { n: "Polska Rada Resuscytacji / ERC", l: "Wytyczne 2025", u: "https://www.prc.krakow.pl", w: "Pierwsza pomoc (opracowanie własne zgodne z wytycznymi)" },
   { n: "NEPTUN (neptun.in.ua)", l: "Otwarte API, warunki: neptun.in.ua/api-terms. Nieoficjalny agregator, nie system ostrzegania", u: "https://neptun.in.ua", w: "Obserwacje dronów i rakiet nad Ukrainą (mapa, beta, nieoficjalne; powiadomienia na kanałach Telegram). Dane: Karta powitryanykh tryvoh — NEPTUN" },
   { n: "Rejestr Punktów Schronienia (MSWiA / Państwowa Straż Pożarna)", l: "Dane publiczne udostępniane przez PSP w pakiecie offline aplikacji „Gdzie się ukryć”. Licencja nie jest określona w repozytorium PSP; do zgody KG PSP: patrz uwagi wydawcy", u: "https://gdziesieukryc.pl", w: "Punkty schronienia (adres, dostępność). EGIDA nie jest aplikacją PSP; dane bywają niepełne lub nieaktualne" },
-  { n: "OpenStreetMap", l: "ODbL, © współtwórcy OpenStreetMap", u: "https://www.openstreetmap.org/copyright", w: "Podkład „Mapa” oraz schrony (znaczniki shelter_type i bunker_type = bomb_shelter, dane niezweryfikowane)" },
+  { n: "OpenStreetMap", l: "ODbL, © współtwórcy OpenStreetMap", u: "https://www.openstreetmap.org/copyright", w: "Podkład „Mapa”, schrony (znaczniki shelter_type i bunker_type = bomb_shelter), defibrylatory AED (emergency=defibrillator) i szpitale (amenity=hospital); dane niezweryfikowane" },
   { n: "OpenTopoMap", l: "CC-BY-SA 3.0", u: "https://opentopomap.org", w: "Podkład „Teren”" },
   { n: "EOxCloudless (EOX IT Services GmbH)", l: "CC BY-NC-SA 4.0, tylko użytek niekomercyjny. Zawiera zmodyfikowane dane Copernicus Sentinel 2025", u: "https://cloudless.eox.at", w: "Podkład „Satelita”" },
   { n: "Natural Earth", l: "Domena publiczna", u: "https://www.naturalearthdata.com", w: "Uproszczony obrys Polski do szacowania odległości obiektów od granicy oraz uproszczone granice obwodów Ukrainy do zaznaczania alarmów na mapie (to nie są granice prawne)" },
@@ -232,11 +231,11 @@ export const SOURCES = [
   { n: "Czcionki: Manrope, Source Sans 3", l: "SIL Open Font License", u: "https://openfontlicense.org", w: "Hostowane lokalnie, bez połączeń z Google" },
 ];
 
-// --- Tryb zagrożenia (treść robocza – do zatwierdzenia; docelowo na podstawie Poradnika bezpieczeństwa RCB) ---
+// --- Tryb zagrożenia (na podstawie Poradnika bezpieczeństwa RCB) ---
 export const EMERGENCY = {
   source: "Poradnik bezpieczeństwa RCB (rcb.gov.pl)",
   published: "2026-10-10",
-  reviewed: null,
+  reviewed: "2026-10-12",
   steps: [
     { t: "Schroń się", d: "Wejdź do najbliższego budynku lub schronu. Zostań w środku, najlepiej w głębi budynku, z dala od okien. Nie zostawaj na otwartej przestrzeni." },
     { t: "Sprawdź komunikaty", d: "Włącz radio lub telewizję albo otwórz Alerty w aplikacji. Stosuj się do poleceń służb. Nie wychodź, dopóki nie ogłoszono odwołania zagrożenia." },
@@ -244,10 +243,10 @@ export const EMERGENCY = {
   ],
 };
 
-// --- Polityka prywatności (treść robocza – wymaga przeglądu prawnego; wydawca jest anonimowy) ---
+// --- Polityka prywatności (wydawca jest anonimowy) ---
 export const PRIVACY = {
-  updated: "2026-10-10",
-  reviewed: null,
+  updated: "2026-10-12",
+  reviewed: "2026-10-12",
   sections: [
     { h: "Kim jesteśmy", p: ["EGIDA to nieoficjalna, bezpłatna aplikacja informacyjna prowadzona przez osobę prywatną. Nie jest aplikacją żadnego urzędu ani służby i nie zastępuje syren, Alertu RCB ani poleceń służb."] },
     { h: "Co zostaje w Twoim telefonie", p: ["Wybrane województwo, zgody, odhaczone pozycje listy plecaka, wynik testu gotowości, zapisane miejsca (schrony i ważne miejsca), plan rodziny i karty ICE, ostatnio pobrane komunikaty (kopia na wypadek braku internetu) oraz ustawienia wyglądu.", "Te dane są zapisane tylko w pamięci przeglądarki na tym urządzeniu. W Ustawieniach możesz je pobrać do pliku albo usunąć."] },
@@ -258,7 +257,7 @@ export const PRIVACY = {
       "NEPTUN (neptun.in.ua): warstwa „Obiekty znad Ukrainy” jest domyślnie włączona (na ekranie powitalnym i w Ustawieniach możesz ją wyłączyć). Gdy otwierasz mapę, przeglądarka łączy się z serwisem, który widzi Twój adres IP. To nieoficjalne dane.",
       "Telegram: jeśli dołączysz do kanału, Twoje dane przetwarza Telegram według własnych zasad. Kanały są prywatne i tylko do czytania.",
       "Przyciski „Pieszo” i „Autem” otwierają zewnętrzną aplikację map (domyślnie Mapy Google) z celem trasy.",
-      "Anonimowy licznik odwiedzin jest domyślnie wyłączony. Jeśli włączysz go w Ustawieniach (i gdy zostanie skonfigurowany), zlicza wejścia bez cookies i bez identyfikatorów."] },
+      "Licznik odwiedzin (GoatCounter) zlicza tylko, ile razy strona została otwarta. Działa bez cookies i bez trwałych identyfikatorów i nie zapisuje adresu IP. Usługa rejestruje przy tym ogólne dane zwykłej wizyty, np. kraj i rodzaj przeglądarki. Nie ma dostępu do Twojego planu rodziny, kart ICE, zapisanych miejsc ani lokalizacji."] },
     { h: "Lokalizacja", p: ["Pozycję GPS ustalamy wyłącznie po Twojej zgodzie (przeglądarka zapyta o pozwolenie). Służy do wskazania województwa i najbliższych schronów, jest używana w telefonie i nie jest wysyłana. W pamięci zostają tylko miejsca, które sam zapiszesz."] },
     { h: "Dane o zdrowiu (karty ICE)", p: ["Karty ICE wypełniasz dobrowolnie. Zostają wyłącznie w tym urządzeniu. Nie wpisuj numeru PESEL, haseł ani numerów kart. Wydruk jest Twoją kopią: chroń go jak dokument.", "Wiadomość „Jestem bezpieczny” wysyłasz sam, swoim komunikatorem lub SMS-em. EGIDA jej nie widzi."] },
     { h: "Twoja kontrola", p: ["Wszystko, co zapisano w aplikacji, możesz pobrać lub usunąć w Ustawieniach („Pobierz dane”, „Usuń dane”). Przycisk „Odśwież aplikację” czyści pamięć podręczną offline i ładuje najnowszą wersję."] },

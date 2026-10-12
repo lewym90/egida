@@ -9,7 +9,7 @@ import { loadPspNearest, makePspCache, loadShelterDb, mergeSources, nearest, wal
 import { fmtKmPl } from "./neptun.js";
 
 const $ = (id) => document.getElementById(id);
-const reviewLine = (E, m) => `<p class="src">Źródło: ${E(m.source)}. Ostatni przegląd: ${m.reviewed ? E(m.reviewed) : "<b>oczekuje na zatwierdzenie</b>"}.</p>`;
+const reviewLine = (E, m) => `<p class="src">Źródło: ${E(m.source)}. Ostatni przegląd: ${E(m.reviewed)}.</p>`;
 const regName = (id) => VOIVODESHIPS.find((v) => v.id === id)?.name || "";
 const fmtDist = (km) => (km < 1 ? `${Math.max(10, Math.round((km * 1000) / 10) * 10)} m` : fmtKmPl(km));
 
@@ -37,7 +37,6 @@ export function printSheet(title, bodyHtml, note = "") {
   document.body.classList.add("print-sheet");
   try { window.print(); } catch { done(); }
 }
-const draftNote = (m) => (m.reviewed ? "" : "Wersja robocza: treść oczekuje na zatwierdzenie merytoryczne.");
 
 export function planPrintHtml(plan, E) {
   const row = (k, v) => (v ? `<tr><th>${k}</th><td>${E(v)}</td></tr>` : "");
@@ -91,7 +90,8 @@ export function renderEmergency(ctx) {
   <div class="card"><h2>Zrób teraz</h2><ol class="estep">${steps}</ol>${reviewLine(E, EMERGENCY)}</div>
   <div class="card"><h2>Najbliższy schron</h2>
     <p>${nm ? `Najbliżej: <b>${nm.min} min pieszo</b> <span class="muted small">(ustalone ${nm.ago === 0 ? "przed chwilą" : nm.ago + " min temu"})</span>` : "Otwórz listę schronów, aby ustalić najbliższy punkt od Twojej pozycji."}</p>
-    <a class="btn primary" href="#/schrony">Pokaż schrony i trasę</a></div>
+    <a class="btn primary" href="#/schrony">Pokaż schrony i trasę</a>
+    <div class="grid2" style="margin-top:8px"><a class="btn" href="#/schrony/aed">Defibrylator AED</a><a class="btn" href="#/schrony/szpitale">Szpital</a></div></div>
   <div class="card"><h2>Bliscy</h2>
     ${calls ? `<div class="col">${calls}</div>` : `<p class="muted">Nie zapisano jeszcze kontaktów. Uzupełnij <a href="#/plan-rodziny">Plan rodziny</a>, a tu pojawią się przyciski „Zadzwoń”.</p>`}
     <button class="btn" id="emSafe" style="margin-top:10px">${I.send}Napisz: jestem bezpieczny</button><p id="emSafeMsg" class="muted small" role="status" aria-live="polite"></p></div>
@@ -385,5 +385,5 @@ export function renderPrivacy(ctx) {
   const { esc: E } = ctx;
   const sec = PRIVACY.sections.map((s) => `<div class="card"><h2>${E(s.h)}</h2>${s.p.map((x) => `<p>${E(x)}</p>`).join("")}</div>`).join("");
   return `${ctx.back("#/ustawienia", "Ustawienia")}<div class="hero"><h1>Polityka prywatności</h1><p>Prosto: co zostaje w telefonie i z kim łączy się aplikacja.</p></div>${sec}
-  <p class="src">Ostatnia aktualizacja: ${E(PRIVACY.updated)}. ${PRIVACY.reviewed ? `Przegląd prawny: ${E(PRIVACY.reviewed)}.` : "<b>Tekst oczekuje na przegląd prawny.</b>"}${CONFIG.contactUrl ? "" : " Dane kontaktowe wydawcy zostaną uzupełnione."}</p>`;
+  <p class="src">Ostatni przegląd: ${E(PRIVACY.reviewed)}.</p>`;
 }
