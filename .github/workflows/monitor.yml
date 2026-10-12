@@ -1,0 +1,33 @@
+name: Monitor świeżości danych
+
+# Niezależna kontrola z zewnątrz: działa nawet wtedy, gdy padnie cały serwer (VPS), którego strażnik nie ma jak zgłosić.
+# Co godzinę sprawdza, czy alerts.json i news.json na gałęzi „data” są świeże. Gdy nie – przebieg kończy się błędem,
+# a GitHub wysyła e-mail do właściciela repozytorium.
+on:
+  schedule:
+    - cron: "17 * * * *"
+  workflow_dispatch:
+
+jobs:
+  sprawdz:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Sprawdź alerts.json i news.json
+        run: |
+          base="https://raw.githubusercontent.com/${{ github.repository }}/data"
+          now=$(date +%s)
+          fail=0
+          check() { # plik pole limit_min
+            if ! ts=$(curl -fsS --max-time 30 "$base/$1?t=$now" | jq -er ".$2"); then
+              echo "::error::Nie udało się odczytać $1 (pole $2)"; fail=1; return
+            fi
+            if ! t=$(date -d "$ts" +%s 2>/dev/null); then
+              echo "::error::$1: niepoprawna data '$ts'"; fail=1; return
+            fi
+            age=$(( (now - t) / 60 ))
+            echo "$1: $age min (limit $3)"
+            if [ "$age" -gt "$3" ]; then echo "::error::$1 ma $age min (limit $3 min)"; fail=1; fi
+          }
+          check alerts.json updated 90
+          check news.json generatedAt 120
+          exit $fail
