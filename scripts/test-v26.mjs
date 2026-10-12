@@ -3,6 +3,9 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { SOURCES } from "../server/news-sources.mjs";
 import { offlineCenters, downloadOffline, offlineSummary } from "../js/offline.js";
+import { overpassQueryTile, medicalTiles } from "../js/medical.js";
+import { POLAND_RING } from "../js/poland-border.js";
+import { pointInRing, distToRingKm } from "../js/geo.js";
 import { parseAed, parseHospitals, loadMedicalDb, unpackAed, unpackHospital, overpassQueryAed, overpassQueryHospitals } from "../js/medical.js";
 import { FIRST_AID, WHAT_TO_DO, PLECAK, EMERGENCY, PRIVACY } from "../js/content.js";
 let n = 0;
@@ -129,5 +132,17 @@ await ok("nazwy zakładek i filtry: Zagrożenia, W pobliżu; filtry Schrony / Mo
   assert.match(readFileSync(new URL("../sw.js", import.meta.url), "utf8"), /js\/medical\.js/);
   assert.match(readFileSync(new URL("../server/run.sh", import.meta.url), "utf8"), /medical-sync\.mjs/);
   assert.match(readFileSync(new URL("../server/publish.sh", import.meta.url), "utf8"), /aed\.json/);
+});
+await ok("AED i szpitale: siatka kafelków pokrywa Polskę, a obrys odrzuca punkty za granicą", () => {
+  const tiles = medicalTiles();
+  assert.equal(tiles.length, 16);
+  const inTile = (lat, lon) => tiles.some(([s, w, n, e]) => lat >= s && lat <= n && lon >= w && lon <= e);
+  for (const [name, lat, lon] of [["Warszawa", 52.23, 21.01], ["Gdańsk", 54.35, 18.65], ["Zakopane", 49.3, 19.95], ["Szczecin", 53.43, 14.55], ["Przemyśl", 49.78, 22.77], ["Suwałki", 54.1, 22.93]]) {
+    assert.ok(inTile(lat, lon), name); assert.ok(pointInRing({ lat, lon }, POLAND_RING), name + " w obrysie");
+  }
+  for (const [name, lat, lon] of [["Praga", 50.08, 14.43], ["Berlin", 52.52, 13.4], ["Wilno", 54.69, 25.28], ["Kijów", 50.45, 30.52], ["Mińsk", 53.9, 27.56]]) {
+    const p = { lat, lon }; assert.ok(!(pointInRing(p, POLAND_RING) || distToRingKm(p, POLAND_RING) < 1.5), name + " poza Polską");
+  }
+  assert.match(overpassQueryTile(tiles[0]), /defibrillator.*hospital.*out center tags/);
 });
 console.log(`OK: ${n} grup testów v26`);

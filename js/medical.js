@@ -14,6 +14,15 @@ export const AED_CACHE = "egida.aed.v1", HOSP_CACHE = "egida.hosp.v1";
 export const overpassQueryAed = () => `[out:json][timeout:150];area["ISO3166-1"="PL"][admin_level=2]->.pl;nwr["emergency"="defibrillator"](area.pl);out center tags;`;
 export const overpassQueryHospitals = () => `[out:json][timeout:120];area["ISO3166-1"="PL"][admin_level=2]->.pl;nwr["amenity"="hospital"](area.pl);out center tags;`;
 
+/** Zapytanie dla jednego prostokąta [S, W, N, E]: defibrylatory i szpitale naraz. Zapytania po prostokątach są dużo lżejsze dla Overpass niż filtr „cała Polska”. */
+export const overpassQueryTile = ([so, we, no, ea]) => `[out:json][timeout:90];(nwr["emergency"="defibrillator"](${so},${we},${no},${ea});nwr["amenity"="hospital"](${so},${we},${no},${ea}););out center tags;`;
+/** Siatka 4 × 4 pokrywająca Polskę (z zapasem); zagraniczne punkty przy granicy serwer odrzuca obrysem Polski. */
+export function medicalTiles(rows = 4, cols = 4, [s, w, n, e] = [48.9, 14.0, 54.95, 24.3]) {
+  const out = [];
+  for (let i = 0; i < rows; i++) for (let j = 0; j < cols; j++) out.push([r5(s + ((n - s) * i) / rows), r5(w + ((e - w) * j) / cols), r5(s + ((n - s) * (i + 1)) / rows), r5(w + ((e - w) * (j + 1)) / cols)]);
+  return out;
+}
+
 const ACCESS = { yes: "publiczny", public: "publiczny", permissive: "dostępny", customers: "dla klientów", permit: "za zgodą", private: "prywatny (brak wstępu)", no: "zamknięty" };
 const isDead = (tags) => Object.keys(tags).some((k) => /^(disused|abandoned|removed|was|razed):/.test(k)) || ["disused", "abandoned", "ruins"].some((k) => tags[k] && tags[k] !== "no");
 const addrOf = (t) => [t["addr:street"] || t["addr:place"], t["addr:housenumber"], t["addr:city"]].filter(Boolean).map((x) => clean(x, 40)).join(" ").trim();
