@@ -19,8 +19,8 @@ const PAUSE_MS = Number(process.env.MEDICAL_PAUSE_MS ?? 3000), RETRY_MS = Number
 const MIN_AED = Number(process.env.MEDICAL_MIN_AED ?? 500), MIN_HOSP = Number(process.env.MEDICAL_MIN_HOSP ?? 100);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-async function overpass(query) {
-  for (let round = 0; round < 3; round++) {
+async function overpass(query, rounds = 3) {
+  for (let round = 0; round < rounds; round++) {
     for (const u of MIRRORS) {
       try {
         const r = await fetch(u, { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded", "user-agent": UA }, body: "data=" + encodeURIComponent(query), signal: AbortSignal.timeout(120000) });
@@ -39,13 +39,21 @@ const inPoland = (r) => { const p = { lat: r[1], lon: r[2] }; return pointInRing
 const aed = new Map(), hosp = new Map();
 const tiles = medicalTiles();
 let failedTiles = 0;
+const take = (json) => { const a = parseAed(json), h = parseHospitals(json); for (const r of a) aed.set(r[0], r); for (const r of h) hosp.set(r[0], r); return [a.length, h.length]; };
+// Kafelek, którego serwer nie chce oddać (zwykle gęsto zabudowany, np. duże miasto), dzielimy na 4 mniejsze – do dwóch poziomów.
+async function fetchTile(t, depth = 0) {
+  const json = await overpass(overpassQueryTile(t), depth ? 2 : 3);
+  if (json) { const [a, h] = take(json); console.log(`  ${t.join(", ")}: AED ${a}, szpitali ${h}${depth ? " (podkafelek)" : ""}`); await sleep(PAUSE_MS); return true; }
+  if (depth >= 2) return false;
+  console.log(`  ${t.join(", ")}: brak odpowiedzi – dzielę na 4 części`);
+  const [s0, w0, n0, e0] = t, sm = (s0 + n0) / 2, wm = (w0 + e0) / 2;
+  let ok = true;
+  for (const sub of [[s0, w0, sm, wm], [s0, wm, sm, e0], [sm, w0, n0, wm], [sm, wm, n0, e0]]) if (!(await fetchTile(sub.map((x) => Math.round(x * 1e5) / 1e5), depth + 1))) ok = false;
+  return ok;
+}
 for (const [i, t] of tiles.entries()) {
-  const json = await overpass(overpassQueryTile(t));
-  if (!json) { console.log(`kafelek ${i + 1}/${tiles.length}: brak odpowiedzi`); failedTiles++; continue; }
-  const a = parseAed(json), h = parseHospitals(json);
-  for (const r of a) aed.set(r[0], r); for (const r of h) hosp.set(r[0], r);
-  console.log(`kafelek ${i + 1}/${tiles.length}: elementów ${json.elements.length}, AED ${a.length}, szpitali ${h.length}`);
-  await sleep(PAUSE_MS);
+  console.log(`kafelek ${i + 1}/${tiles.length}`);
+  if (!(await fetchTile(t))) failedTiles++;
 }
 const aedRows = [...aed.values()].filter(inPoland), hospRows = [...hosp.values()].filter(inPoland);
 console.log(`Razem w Polsce: AED ${aedRows.length}, szpitali ${hospRows.length}; nieudane kafelki: ${failedTiles}`);
