@@ -14,8 +14,12 @@ export const AED_CACHE = "egida.aed.v1", HOSP_CACHE = "egida.hosp.v1";
 export const overpassQueryAed = () => `[out:json][timeout:150];area["ISO3166-1"="PL"][admin_level=2]->.pl;nwr["emergency"="defibrillator"](area.pl);out center tags;`;
 export const overpassQueryHospitals = () => `[out:json][timeout:120];area["ISO3166-1"="PL"][admin_level=2]->.pl;nwr["amenity"="hospital"](area.pl);out center tags;`;
 
-/** Zapytanie dla jednego prostokąta [S, W, N, E]: defibrylatory i szpitale naraz. Zapytania po prostokątach są dużo lżejsze dla Overpass niż filtr „cała Polska”. */
-export const overpassQueryTile = ([so, we, no, ea]) => `[out:json][timeout:90];(nwr["emergency"="defibrillator"](${so},${we},${no},${ea});nwr["amenity"="hospital"](${so},${we},${no},${ea}););out center tags;`;
+/** Zapytanie dla jednego prostokąta [S, W, N, E]. what: "aed" | "hospitals" | "both". Zapytania po prostokątach są dużo lżejsze dla Overpass niż filtr „cała Polska”. */
+export const overpassQueryTile = ([so, we, no, ea], what = "both") => {
+  const box = `(${so},${we},${no},${ea})`;
+  const parts = [what !== "hospitals" ? `nwr["emergency"="defibrillator"]${box};` : "", what !== "aed" ? `nwr["amenity"="hospital"]${box};` : ""].join("");
+  return `[out:json][timeout:90];(${parts});out center tags;`;
+};
 /** Siatka 4 × 4 pokrywająca Polskę (z zapasem); zagraniczne punkty przy granicy serwer odrzuca obrysem Polski. */
 export function medicalTiles(rows = 4, cols = 4, [s, w, n, e] = [48.9, 14.0, 54.95, 24.3]) {
   const out = [];
