@@ -312,7 +312,7 @@ const readiness = () => {
 /* ---------- ekrany ---------- */
 function screenStart() {
   const c = state.consent;
-  return `<main class="main" id="main" tabindex="-1">
+  return `<div class="shell"><main class="main" id="main" tabindex="-1">
   <div class="hero" style="padding-top:22px"><div class="brand">${LOGO}<span><span class="wordmark">EGIDA</span><span class="tagline">Twoje centrum bezpieczeństwa</span></span></div>
   <h1 style="margin-top:18px">Witaj w EGIDZIE</h1>
   <p>Darmowa, nieoficjalna aplikacja: ostrzeżenia dla Twojego województwa, pierwsza pomoc, plecak i plan na kryzys. Bez reklam, bez konta, bez sprzedaży danych.</p></div>
@@ -325,7 +325,7 @@ function screenStart() {
   ${legal()}
   <label class="switch" style="border:0"><input type="checkbox" id="cAck" ${c.ack ? "checked" : ""}><span><b>Rozumiem powyższe zasady</b></span></label>
   <div class="col" style="margin-top:6px"><button class="btn primary" id="goStart" ${c.ack ? "" : "disabled"}>Zaczynamy</button>
-  <a class="btn112" style="justify-content:center;min-height:48px" href="tel:112">${I.phone}Zagrożenie życia? Zadzwoń 112</a></div></main>`;
+  <a class="btn112" style="justify-content:center;min-height:48px" href="tel:112">${I.phone}Zagrożenie życia? Zadzwoń 112</a></div></main></div>`;
 }
 
 /* Poziom komunikatów dla Pulpitu: alarm (czerwony) → ostrzeżenie (bursztyn) → spokojnie (zielony). Czerwień tylko dla realnego alarmu. */
