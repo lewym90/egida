@@ -14,7 +14,7 @@ const CACHE_FILE = process.env.ADDR_CACHE || join(DIR, "..", "addr-cache.json");
 const UA = "EGIDA/0.2 (unofficial PWA; OSM address lookup for AED and hospitals; repo lewym90/egida)";
 const dump = process.argv.includes("--dump");
 const BUDGET_MS = Number(process.env.ADDR_BUDGET_MS ?? 45 * 60000), BATCH = Number(process.env.ADDR_BATCH ?? 20), PAUSE_MS = Number(process.env.ADDR_PAUSE_MS ?? 2500);
-const NOMINATIM_MAX = Number(process.env.ADDR_NOMINATIM_MAX ?? 400), RETRY_DAYS = 14;
+const NOMINATIM_MAX = Number(process.env.ADDR_NOMINATIM_MAX ?? 3000), RETRY_DAYS = 14;
 const t0 = Date.now(), sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const timeLeft = () => BUDGET_MS - (Date.now() - t0);
 
@@ -79,10 +79,13 @@ async function runBatch(list, depth = 0) {
   return a && b;
 }
 
-let done = 0, batches = 0;
-for (let i = 0; i < targets.length && timeLeft() > 120000; i += BATCH) {
+let done = 0, batches = 0, fails = 0;
+// Overpass bywa przeciążony (HTTP 504). Po 3 nieudanych paczkach z rzędu nie tracimy czasu: przechodzimy do Nominatim (1 zapytanie/s), które liczy się punkt po punkcie.
+for (let i = 0; i < targets.length && timeLeft() > BUDGET_MS * 0.4; i += BATCH) {
   const list = targets.slice(i, i + BATCH);
-  await runBatch(list); done += list.length; batches++;
+  const okB = await runBatch(list); done += list.length; batches++;
+  fails = okB ? 0 : fails + 1;
+  if (fails >= 3) { console.log("Overpass nie odpowiada – przechodzę do Nominatim."); break; }
   if (batches % 5 === 0) { flush(); console.log(`  sprawdzono ${done}/${targets.length}`); }
   await sleep(PAUSE_MS);
 }
@@ -91,7 +94,7 @@ console.log(`Overpass: sprawdzono ${done} z ${targets.length}.`);
 
 // Rezerwa: Nominatim dla punktów, które nadal nie mają adresu (szpitale najpierw; limit na przebieg, 1 zapytanie/s)
 const missing = [];
-for (const kind of ["szpitale", "aed"]) for (const r of dbs[kind]?.rows || []) { const c = cache[r[0]]; if (!r[ADDR_INDEX[kind]] && !c?.a && c && !c.nm) missing.push({ id: r[0], lat: r[1], lon: r[2] }); }
+for (const kind of ["szpitale", "aed"]) for (const r of dbs[kind]?.rows || []) { const c = cache[r[0]]; if (!r[ADDR_INDEX[kind]] && !c?.a && !c?.nm) missing.push({ id: r[0], lat: r[1], lon: r[2] }); }
 let nm = 0, blocked = false;
 for (const m of missing) {
   if (nm >= NOMINATIM_MAX || timeLeft() < 60000 || blocked) break;

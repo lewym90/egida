@@ -41,9 +41,9 @@ if [ ! -f "$MED_STAMP" ] || [ "$(( $(date +%s) - $(stat -c %Y "$MED_STAMP") ))" 
   touch "$MED_STAMP"
   ( export ADDR_CACHE="$BASE/addr-cache.json"; DATA_DIR="$DATA_DIR" flock "$BASE/medical.lock" timeout 1500 node medical-sync.mjs >> "$BASE/medical.log" 2>&1 || touch -d "-18 hours" "$MED_STAMP" ) 9>&- &
 fi
-# Co ~2 h uzupełnianie adresów i rodzaju obiektu AED/szpitali (OSM; pierwsze przebiegi trwają godzinami, kolejne tylko dla nowych punktów). W tle, ze swoją blokadą.
+# Co ~50 min uzupełnianie adresów i rodzaju obiektu AED/szpitali (OSM; pierwsze przebiegi trwają godzinami, kolejne tylko dla nowych punktów). W tle, ze swoją blokadą.
 ADDR_STAMP="$BASE/medical.addr.checked"
-if [ -f "$DATA_DIR/aed.json" ] && { [ ! -f "$ADDR_STAMP" ] || [ "$(( $(date +%s) - $(stat -c %Y "$ADDR_STAMP") ))" -gt 7200 ]; }; then
+if [ -f "$DATA_DIR/aed.json" ] && { [ ! -f "$ADDR_STAMP" ] || [ "$(( $(date +%s) - $(stat -c %Y "$ADDR_STAMP") ))" -gt 3000 ]; }; then
   touch "$ADDR_STAMP"
   ( export ADDR_CACHE="$BASE/addr-cache.json"; DATA_DIR="$DATA_DIR" flock -n "$BASE/medical.lock" timeout 3300 node medical-addr.mjs >> "$BASE/medical.log" 2>&1 || rm -f "$ADDR_STAMP" ) 9>&- &
 fi

@@ -2,7 +2,7 @@
 // Zasada: tylko oficjalne, zaufane źródła (Policja, MEN, RCB, urzędy wojewódzkie, kuratoria). Nic nie piszemy od siebie, nic nie omijamy.
 import { XMLParser } from "fast-xml-parser";
 import { dedupeSimilar } from "../js/similar.js";
-import { mentionsRegion, nationalThreat, regionsMentioned, strongIncident, foreignEvent, polishHint } from "./news-places.mjs";
+import { mentionsRegion, nationalCore, nationalThreat, regionsMentioned, strongIncident, foreignEvent, polishHint } from "./news-places.mjs";
 
 export const LIMITS = { perSource: 15, total: 200, maxAgeDays: 14, titleChars: 200, summaryChars: 280 };
 
@@ -172,7 +172,8 @@ export function toItem(raw, src, nowMs, why = null) {
       else if (!regs.includes(src.region) && /(^|[\s,])(kraj|świat|swiat|polityka)([\s,]|$)/i.test(raw.cats || "") && !regsAll.includes(src.region)) return no("z kraju/świata");
     } else if (!mentionsRegion(txt, src.region)) {
       if (!nationalThreat(txt)) return no("inny region");
-      region = regionsMentioned(txt)[0] || "all";
+      // Rozgłośnia regionalna nigdy nie „wypycha” wiadomości do całego kraju: jeśli tytuł nie wskazuje innego województwa, zostaje w swoim.
+      region = regionsMentioned(txt)[0] || (nationalCore(txt) ? "all" : src.region);
     }
   }
   const id = raw.key ? `gddkia/${raw.key}` : raw.url.replace(/^https:\/\/(www\.)?/, "").replace(/[?#].*$/, "");

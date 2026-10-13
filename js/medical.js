@@ -113,8 +113,12 @@ const osmUrl = (id) => (LETTER_TYPE[id[0]] && /^\d+$/.test(id.slice(1)) ? `https
 const goodPos = (r) => Array.isArray(r) && Number.isFinite(r[1]) && Number.isFinite(r[2]);
 
 /** Wiersz → obiekt w formacie używanym na ekranie (jak schrony: id, lat, lon, name, how, access, hours, addr, osmUrl, src). */
+/** Opisy z OSM bywają wpisane przez pomyłkę (np. „sala operacyjna” przy poczcie). Opis szpitalny pokazujemy tylko przy placówce medycznej. */
+const MED_PLACE = /szpital|klinik|przychodni|poliklinik|centrum medyczn|ośrodek zdrowia|osrodek zdrowia|sor\b|lecznic|medycz/i;
+const MED_DESC = /sala operacyjn|blok operacyjn|oddzia[lł]|gabinet zabiegow|izba przyj|ordynator/i;
+export const sanitizeHow = (how, name, obj) => (MED_DESC.test(how || "") && !MED_PLACE.test(`${name || ""} ${obj || ""}`) ? "" : how || "");
 export function unpackAed(r) {
-  return { id: String(r[0]), lat: r[1], lon: r[2], name: clean(r[3], 80) || "Defibrylator AED", how: clean(r[4], 200), access: clean(r[5], 40), hours: clean(r[6], 80), addr: clean(r[7], 100), checked: clean(r[8], 12), indoor: r[9] === 1, operator: clean(r[10], 60), level: clean(r[11], 12), near: clean(r[12], 120), obj: clean(r[13], 100), addrD: Number.isFinite(r[14]) ? r[14] : 0, kind: "aed", src: String(r[0])[0] === "r" ? "ratuj" : String(r[0])[0] === "x" ? "miejsce" : "osm", osmUrl: osmUrl(String(r[0])) };
+  return { id: String(r[0]), lat: r[1], lon: r[2], name: clean(r[3], 80) || "Defibrylator AED", how: sanitizeHow(clean(r[4], 200), r[3], r[13]), access: clean(r[5], 40), hours: clean(r[6], 80), addr: clean(r[7], 100), checked: clean(r[8], 12), indoor: r[9] === 1, operator: clean(r[10], 60), level: clean(r[11], 12), near: clean(r[12], 120), obj: clean(r[13], 100), addrD: Number.isFinite(r[14]) ? r[14] : 0, kind: "aed", src: String(r[0])[0] === "r" ? "ratuj" : String(r[0])[0] === "x" ? "miejsce" : "osm", osmUrl: osmUrl(String(r[0])) };
 }
 export function unpackHospital(r) {
   return { id: String(r[0]), lat: r[1], lon: r[2], name: clean(r[3], 100) || NONAME, sor: r[4] === 1, addr: clean(r[5], 100), addrD: Number.isFinite(r[7]) ? r[7] : 0, phone: clean(r[6], 30), how: "", kind: "szpital", src: "osm", osmUrl: osmUrl(String(r[0])) };
