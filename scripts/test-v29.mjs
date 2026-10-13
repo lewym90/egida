@@ -10,3 +10,11 @@ assert.match(m[0], /<\/main><\/div>`;/, "screenStart musi kończyć się zamkni�
 assert.match(src("css/style.css"), /\.shell\{position:fixed;inset:0[^}]*overflow-y:auto/, "na telefonie .shell ma być kontenerem przewijania");
 console.log("  ok ekran powitalny jest przewijalny (w .shell)");
 console.log("OK: 1 grupa testów v29");
+// v30: ekran powitalny przewija się zwykłą stroną (html.onb), a service worker pobiera kod najpierw z sieci.
+assert.match(app, /classList\.toggle\("onb", !state\.onboarded\)/, "render musi przełączać klasę onb");
+assert.match(src("css/style.css"), /html\.onb body\{position:static/, "html.onb ma wyłączać position:fixed");
+assert.match(m[0], /EGIDA \$\{APP_VERSION\}/, "ekran powitalny pokazuje wersję");
+const sw = src("sw.js");
+assert.match(sw, /Kod i style aplikacji: sieć najpierw/, "sw: kod aplikacji najpierw z sieci");
+assert.match(sw, /cache: "no-cache"/, "sw: żądanie z pominięciem cache HTTP");
+console.log("  ok v30: przewijanie ekranu powitalnego, wersja na ekranie, sieć najpierw w sw");

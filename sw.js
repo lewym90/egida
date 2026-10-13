@@ -1,5 +1,5 @@
 // Service worker: offline dla treści (powłoka aplikacji z cache), komunikaty zawsze najpierw z sieci.
-const VERSION = "egida-v29";
+const VERSION = "egida-v30";
 const SHELL = [
   "./", "index.html", "manifest.webmanifest", "css/style.css",
   "js/app.js", "js/content.js", "js/config.js",
@@ -31,7 +31,20 @@ self.addEventListener("fetch", (e) => {
     e.respondWith(fetch(req).then((r) => { const cp = r.clone(); caches.open(VERSION).then((c) => c.put(req, cp)); return r; }).catch(() => caches.match(req)));
     return;
   }
-  // Reszta: cache najpierw, w tle odświeżanie.
+  // Kod i style aplikacji: sieć najpierw (krótki limit), żeby nowa wersja wchodziła od razu; bez sieci – kopia z cache.
+  const code = req.mode === "navigate" || /\.(js|css|html|webmanifest)$/.test(url.pathname) || url.pathname.endsWith("/");
+  if (code) {
+    e.respondWith((async () => {
+      try {
+        const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 4000);
+        const r = await fetch(req, { signal: ctl.signal, cache: "no-cache" }); clearTimeout(t);
+        if (r.ok) { const cp = r.clone(); caches.open(VERSION).then((c) => c.put(req, cp)); return r; }
+        return (await caches.match(req, { ignoreSearch: true })) || r;
+      } catch { return (await caches.match(req, { ignoreSearch: true })) || (await caches.match("index.html")) || Response.error(); }
+    })());
+    return;
+  }
+  // Czcionki, ikony: cache najpierw, w tle odświeżanie.
   e.respondWith(caches.match(req, { ignoreSearch: true }).then((hit) => {
     const net = fetch(req).then((r) => { if (r.ok) { const cp = r.clone(); caches.open(VERSION).then((c) => c.put(req, cp)); } return r; }).catch(() => hit);
     return hit || net;

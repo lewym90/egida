@@ -47,6 +47,8 @@ button,select,input{font:inherit;color:inherit}
 .shell{display:block;min-height:100dvh}
 /* Telefon: przewija się panel aplikacji, a nie cała strona. Dolny pasek zostaje na miejscu i nie da się „wyciągnąć” pustego obszaru pod nim (iOS odbijał stronę razem z paskiem). */
 @media (max-width:959px){html,body{height:100%;overflow:hidden;overscroll-behavior:none}body{position:fixed;inset:0;width:100%}.shell{position:fixed;inset:0;height:auto;min-height:0;overflow-y:auto;overflow-x:hidden;overscroll-behavior:none;-webkit-overflow-scrolling:touch}}
+/* Ekran powitalny: zwykłe przewijanie strony (bez position:fixed), żeby zawsze dało się dojść do przycisku. */
+@media (max-width:959px){html.onb,html.onb body{height:auto;min-height:0;overflow:visible;overscroll-behavior:auto}html.onb body{position:static;inset:auto;width:auto}html.onb .shell{position:static;inset:auto;height:auto;min-height:0;overflow:visible}}
 @media print{html,body{height:auto!important;overflow:visible!important}.shell{height:auto!important;overflow:visible!important}}
 .side{display:none}
 .main{max-width:520px;margin:0 auto;padding:0 16px 150px}

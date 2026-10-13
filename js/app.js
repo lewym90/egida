@@ -325,7 +325,7 @@ function screenStart() {
   ${legal()}
   <label class="switch" style="border:0"><input type="checkbox" id="cAck" ${c.ack ? "checked" : ""}><span><b>Rozumiem powyższe zasady</b></span></label>
   <div class="col" style="margin-top:6px"><button class="btn primary" id="goStart" ${c.ack ? "" : "disabled"}>Zaczynamy</button>
-  <a class="btn112" style="justify-content:center;min-height:48px" href="tel:112">${I.phone}Zagrożenie życia? Zadzwoń 112</a></div></main></div>`;
+  <a class="btn112" style="justify-content:center;min-height:48px" href="tel:112">${I.phone}Zagrożenie życia? Zadzwoń 112</a></div><p class="muted small" style="text-align:center;margin:14px 0 24px">EGIDA ${APP_VERSION}</p></main></div>`;
 }
 
 /* Poziom komunikatów dla Pulpitu: alarm (czerwony) → ostrzeżenie (bursztyn) → spokojnie (zielony). Czerwień tylko dla realnego alarmu. */
@@ -688,6 +688,7 @@ function render() {
   destroyScreens();
   const { route, arg } = parse();
   const app = $("#app");
+  document.documentElement.classList.toggle("onb", !state.onboarded);
   if (!state.onboarded) { app.innerHTML = screenStart(); document.title = "EGIDA – Witaj"; return; }
   let inner;
   switch (route) {
