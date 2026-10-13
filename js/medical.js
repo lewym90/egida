@@ -31,7 +31,7 @@ export function medicalTiles(rows = 4, cols = 4, [s, w, n, e] = [48.9, 14.0, 54.
 
 const ACCESS = { yes: "publiczny", public: "publiczny", permissive: "dostępny", customers: "dla klientów", permit: "za zgodą", private: "prywatny (brak wstępu)", no: "zamknięty" };
 const isDead = (tags) => Object.keys(tags).some((k) => /^(disused|abandoned|removed|was|razed):/.test(k)) || ["disused", "abandoned", "ruins"].some((k) => tags[k] && tags[k] !== "no");
-const addrOf = (t) => [t["addr:street"] || t["addr:place"], t["addr:housenumber"], t["addr:city"]].filter(Boolean).map((x) => clean(x, 40)).join(" ").trim();
+const addrOf = (t) => { const street = [t["addr:street"] || t["addr:place"], t["addr:housenumber"]].filter(Boolean).map((x) => clean(x, 40)).join(" ").trim(); return [street, clean(t["addr:city"] || "", 40)].filter(Boolean).join(", "); };
 const idOf = (e) => `${TYPE_LETTER[e.type] || "n"}${e.id}`;
 const posOf = (e) => ({ lat: e.lat ?? e.center?.lat, lon: e.lon ?? e.center?.lon });
 const okPos = ({ lat, lon }) => Number.isFinite(lat) && Number.isFinite(lon) && lat >= 48.5 && lat <= 55.5 && lon >= 13.5 && lon <= 24.8;
@@ -50,7 +50,7 @@ export function parseAed(json) {
     const operator = clean(t.operator || t["operator:short"] || "", 60);
     const name = clean(t.name || t["name:pl"] || "", 80) || (operator ? `AED – ${operator}` : "Defibrylator AED");
     const where = clean(t["defibrillator:location:pl"] || t["defibrillator:location"] || t["description:pl"] || t.description || t["location:pl"] || t.note || "", 200);
-    out.push([id, r5(p.lat), r5(p.lon), name, where, ACCESS[acc] || "", clean(t.opening_hours, 80), addrOf(t), dateOf(t), t.indoor === "yes" ? 1 : 0, operator, clean(t.level, 12), ""]);
+    out.push([id, r5(p.lat), r5(p.lon), name, where, ACCESS[acc] || "", clean(t.opening_hours, 80), addrOf(t), dateOf(t), t.indoor === "yes" ? 1 : 0, operator, clean(t.level, 12), "", "", 0]);
   }
   return out;
 }
@@ -64,7 +64,7 @@ export function parseHospitals(json) {
     const p = posOf(e); if (!okPos(p)) continue;
     const id = idOf(e); if (seen.has(id)) continue; seen.add(id);
     const name = clean(t.name || t["name:pl"] || t.official_name || t.short_name || t.alt_name || t.loc_name || "", 100) || (t.operator ? `Szpital – ${clean(t.operator, 70)}` : "");
-    out.push([id, r5(p.lat), r5(p.lon), name, t.emergency === "yes" ? 1 : 0, addrOf(t), phoneOf(t)]);
+    out.push([id, r5(p.lat), r5(p.lon), name, t.emergency === "yes" ? 1 : 0, addrOf(t), phoneOf(t), 0]);
   }
   return out;
 }
@@ -113,10 +113,10 @@ const goodPos = (r) => Array.isArray(r) && Number.isFinite(r[1]) && Number.isFin
 
 /** Wiersz → obiekt w formacie używanym na ekranie (jak schrony: id, lat, lon, name, how, access, hours, addr, osmUrl, src). */
 export function unpackAed(r) {
-  return { id: String(r[0]), lat: r[1], lon: r[2], name: clean(r[3], 80) || "Defibrylator AED", how: clean(r[4], 200), access: clean(r[5], 40), hours: clean(r[6], 80), addr: clean(r[7], 100), checked: clean(r[8], 12), indoor: r[9] === 1, operator: clean(r[10], 60), level: clean(r[11], 12), near: clean(r[12], 120), kind: "aed", src: "osm", osmUrl: osmUrl(String(r[0])) };
+  return { id: String(r[0]), lat: r[1], lon: r[2], name: clean(r[3], 80) || "Defibrylator AED", how: clean(r[4], 200), access: clean(r[5], 40), hours: clean(r[6], 80), addr: clean(r[7], 100), checked: clean(r[8], 12), indoor: r[9] === 1, operator: clean(r[10], 60), level: clean(r[11], 12), near: clean(r[12], 120), obj: clean(r[13], 100), addrD: Number.isFinite(r[14]) ? r[14] : 0, kind: "aed", src: "osm", osmUrl: osmUrl(String(r[0])) };
 }
 export function unpackHospital(r) {
-  return { id: String(r[0]), lat: r[1], lon: r[2], name: clean(r[3], 100) || NONAME, sor: r[4] === 1, addr: clean(r[5], 100), phone: clean(r[6], 30), how: "", kind: "szpital", src: "osm", osmUrl: osmUrl(String(r[0])) };
+  return { id: String(r[0]), lat: r[1], lon: r[2], name: clean(r[3], 100) || NONAME, sor: r[4] === 1, addr: clean(r[5], 100), addrD: Number.isFinite(r[7]) ? r[7] : 0, phone: clean(r[6], 30), how: "", kind: "szpital", src: "osm", osmUrl: osmUrl(String(r[0])) };
 }
 
 /**

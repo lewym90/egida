@@ -35,10 +35,17 @@ if [ ! -f "$SH_FILE" ] || [ "$(( $(date +%s) - $(stat -c %Y "$SH_FILE") ))" -gt 
 fi
 # Raz na dobę defibrylatory (AED) i szpitale z OpenStreetMap → aed.json, hospitals.json. Trwa kilka minut (16 zapytań z przerwami),
 # więc działa w tle i zwalnia blokadę – komunikaty nie czekają. Pliki trafią na gałąź data przy najbliższej publikacji (≤ 25 min).
-MED_STAMP="$BASE/medical.v27.checked"
+[ -f "$BASE/medical.log" ] && [ "$(stat -c %s "$BASE/medical.log")" -gt 1000000 ] && tail -n 300 "$BASE/medical.log" > "$BASE/medical.log.tmp" && mv "$BASE/medical.log.tmp" "$BASE/medical.log"
+MED_STAMP="$BASE/medical.v28.checked"
 if [ ! -f "$MED_STAMP" ] || [ "$(( $(date +%s) - $(stat -c %Y "$MED_STAMP") ))" -gt 86400 ]; then
   touch "$MED_STAMP"
-  ( DATA_DIR="$DATA_DIR" timeout 1500 node medical-sync.mjs >> "$BASE/medical.log" 2>&1 || touch -d "-18 hours" "$MED_STAMP" ) 9>&- &
+  ( export ADDR_CACHE="$BASE/addr-cache.json"; DATA_DIR="$DATA_DIR" flock "$BASE/medical.lock" timeout 1500 node medical-sync.mjs >> "$BASE/medical.log" 2>&1 || touch -d "-18 hours" "$MED_STAMP" ) 9>&- &
+fi
+# Co ~2 h uzupełnianie adresów i rodzaju obiektu AED/szpitali (OSM; pierwsze przebiegi trwają godzinami, kolejne tylko dla nowych punktów). W tle, ze swoją blokadą.
+ADDR_STAMP="$BASE/medical.addr.checked"
+if [ -f "$DATA_DIR/aed.json" ] && { [ ! -f "$ADDR_STAMP" ] || [ "$(( $(date +%s) - $(stat -c %Y "$ADDR_STAMP") ))" -gt 7200 ]; }; then
+  touch "$ADDR_STAMP"
+  ( export ADDR_CACHE="$BASE/addr-cache.json"; DATA_DIR="$DATA_DIR" flock -n "$BASE/medical.lock" timeout 3300 node medical-addr.mjs >> "$BASE/medical.log" 2>&1 || rm -f "$ADDR_STAMP" ) 9>&- &
 fi
 # Co ~30 min sonda formatu NEPTUN (3 zapytania REST + 8 s WebSocket): raport trafia na gałąź data jako neptun-schema.json.
 NP_FILE="$DATA_DIR/neptun-schema.json"; NP_NEW=0

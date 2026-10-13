@@ -37,8 +37,9 @@ export const getUser = () => lastUser;
 export function locate(onPos, onErr, watch) {
   if (!navigator.geolocation) { onErr(new Error("Ta przeglądarka nie obsługuje lokalizacji.")); return () => {}; }
   const ok = (p) => { lastUser = { lat: p.coords.latitude, lon: p.coords.longitude, accKm: (p.coords.accuracy || 0) / 1000 }; onPos(lastUser); };
+  // watch (jazda samochodem): dokładny GPS i świeże odczyty
   const opts = { enableHighAccuracy: false, timeout: 15000, maximumAge: 30000 };
-  if (watch) { const id = navigator.geolocation.watchPosition(ok, onErr, opts); return () => navigator.geolocation.clearWatch(id); }
+  if (watch) { const id = navigator.geolocation.watchPosition(ok, onErr, { enableHighAccuracy: true, timeout: 20000, maximumAge: 5000 }); return () => navigator.geolocation.clearWatch(id); }
   navigator.geolocation.getCurrentPosition(ok, onErr, opts);
   return () => {};
 }

@@ -9,6 +9,7 @@ import { writeFileSync, renameSync } from "node:fs";
 import { join } from "node:path";
 import { readFileSync } from "node:fs";
 import { overpassQueryTile, medicalTiles, parseAed, parseHospitals, tidyHospitalRows, addNearHospital } from "../js/medical.js";
+import { applyCache } from "./medical-addr-lib.mjs";
 import { POLAND_RING } from "../js/poland-border.js";
 import { pointInRing, distToRingKm } from "../js/geo.js";
 
@@ -68,6 +69,7 @@ for (const job of JOBS) {
   if (dump) { console.log(JSON.stringify(list.slice(0, 2))); continue; }
   // niepełne pobranie albo podejrzanie mało wyników: nie nadpisuj dobrego pliku
   if (failedTiles > 0 || list.length < job.min) { console.log(`${job.file}: pobranie niepełne lub podejrzanie małe – zostaje poprzedni plik.`); exitCode = 1; continue; }
+  try { applyCache(job.what === "aed" ? "aed" : "szpitale", list, JSON.parse(readFileSync(process.env.ADDR_CACHE || join(DIR, "..", "addr-cache.json"), "utf8"))); } catch { /* brak pamięci adresów – uzupełni medical-addr.mjs */ }
   const out = join(DIR, job.file);
   const body = JSON.stringify({ at: new Date().toISOString(), source: "OpenStreetMap", license: "ODbL, © współtwórcy OpenStreetMap", count: list.length, rows: list });
   writeFileSync(out + ".tmp", body); renameSync(out + ".tmp", out);

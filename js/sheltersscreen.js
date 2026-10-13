@@ -6,7 +6,7 @@ import { fmtKmPl } from "./neptun.js";
 import { DEMO_USER } from "./demo.js";
 import { PSP_URL, nearest, withDistance, walkMin, dirUrl, makeShelter, loadShelterDb, loadPspAround, loadPspNearest, makePspCache, mergeSources } from "./shelters.js";
 import { haversineKm } from "./geo.js";
-import { loadMedicalDb, NONAME as NONAME_HOSP } from "./medical.js";
+import { loadMedicalDb } from "./medical.js";
 
 const RADIUS_KM = 50, SHOW = 5; // szukamy w promieniu 50 km, na liście pokazujemy 5 najbliższych
 import { esc, loadLeaflet, baseLayer, shelterIcon, getUser, locate, setActive, destroyScreens, fmtDt } from "./mapscreen.js";
@@ -24,7 +24,7 @@ export function demoShelters(pos = DEMO_USER) {
 }
 
 const fmtDist = (km) => (km < 1 ? `${Math.max(10, Math.round((km * 1000) / 10) * 10)} m` : fmtKmPl(km));
-const FILTERS = [["schrony", "Schrony"], ["mine", "Moje miejsca"], ["aed", "Defibrylatory AED"], ["szpitale", "Szpitale"]];
+const FILTERS = [["schrony", "Schrony"], ["aed", "Defibrylatory AED"], ["szpitale", "Szpitale"], ["mine", "Moje miejsca"]];
 const MODES = FILTERS.map((f) => f[0]);
 const srcLabel = (s) => (s.mine ? "zgłoszenie użytkownika (Ty)" : s.src === "demo" ? "dane wymyślone (demo)" : s.src === "psp" ? "Rejestr Punktów Schronienia (PSP)" : "OpenStreetMap, wpis społeczności");
 const hospitalIcon = (L, sor) => L.divIcon({
@@ -37,10 +37,9 @@ export function renderSheltersHtml(ctx, { demo = false, mode = "schrony" } = {})
   if (!MODES.includes(mode)) mode = "schrony";
   return `<div class="hero"><div class="row" style="align-items:flex-start"><div style="flex:1"><h1>Pomoc w pobliżu</h1><p>Schrony, defibrylatory AED i szpitale najbliżej Twojej lokalizacji.</p></div>${demo ? `<span class="badge unofficial">Dane przykładowe</span>` : ""}</div></div>
   ${demo ? `<div class="demo-banner"><b>TRYB DEMONSTRACYJNY – DANE WYMYŚLONE.</b> Ten ekran pokazuje, jak będzie wyglądała lista schronów. Obiekty są sztuczne i nie istnieją. <a href="#/schrony">Wyjdź z trybu demo</a></div>` : ""}
-  <div id="shGate" class="card" hidden><h2>Gdzie jesteś?</h2><p class="muted small">Żeby pokazać najbliższe miejsca, potrzebna jest Twoja pozycja. Zostaje w tym telefonie i nigdzie nie jest wysyłana. Możesz też wskazać miejsce ręcznie przyciskiem „Wskaż moją pozycję na mapie”.</p>
+  <div id="shGate" class="card" hidden><h2>Gdzie jesteś?</h2><p class="muted small">Żeby pokazać najbliższe miejsca, potrzebna jest Twoja pozycja z GPS. Zostaje w tym telefonie i nigdzie nie jest wysyłana. Włącz lokalizację w telefonie i dotknij przycisku poniżej.</p>
     <button class="btn primary" id="shLocate">${ctx.I.pin}Użyj mojej pozycji</button><p id="shLocMsg" class="muted small" aria-live="polite"></p></div>
   <div class="row" id="shChips" style="flex-wrap:wrap;margin:10px 0" role="group" aria-label="Filtr listy">${FILTERS.map(([k, n]) => `<button class="chip" data-f="${k}" aria-pressed="${k === mode}">${n}</button>`).join("")}</div>
-  ${demo ? "" : `<button class="btn sm" id="shManual" aria-pressed="false" style="margin-bottom:8px">Wskaż moją pozycję na mapie</button>`}
   <div id="shMap" class="map map-sm" role="region" aria-label="Mapa najbliższych miejsc pomocy. Te same obiekty są wypisane w liście poniżej."><p class="muted" style="padding:12px">Ładuję mapę…</p></div>
   <p id="shTileMsg" class="note warn" hidden role="status"></p>
   <p id="shMapHint" class="muted small" aria-live="polite" style="margin:6px 2px"></p>
@@ -74,7 +73,7 @@ export function initSheltersScreen(ctx, { demo = false, mode = "schrony" } = {})
   const pspMemo = new Map(), pspCache = demo ? null : makePspCache(CONFIG.pspUrl);
   let pspSeq = 0;
   let filter = MODES.includes(mode) ? mode : "schrony", openHow = new Set(), pick = null;
-  let L = null, map = null, gMarks = null, gUser = null, pmarker = null, manualPos = false;
+  let L = null, map = null, gMarks = null, gUser = null, pmarker = null;
 
   const med = { aed: null, szpitale: null }, medState = { aed: demo ? "ok" : "idle", szpitale: demo ? "ok" : "idle" }; // null = jeszcze niewczytane
   const isMed = () => filter === "aed" || filter === "szpitale";
@@ -93,23 +92,22 @@ export function initSheltersScreen(ctx, { demo = false, mode = "schrony" } = {})
   };
 
   const dist = (s) => `<b class="shdist">${esc(fmtDist(s.distKm))}${s.kind === "szpital" && s.distKm > 3 ? "" : ` · ${walkMin(s.distKm)} min pieszo`}</b>`;
-  const howTitle = (s) => (s.kind === "aed" ? "Gdzie jest" : "Jak wejść");
-  const aedBox = (s) => {
-    const ctxl = [s.addr && `Adres: ${esc(s.addr)}`, s.operator && `Właściciel / operator: ${esc(s.operator)}`, s.level && `Piętro / poziom: ${esc(s.level)}`, s.near && `W pobliżu: ${esc(s.near)}`].filter(Boolean);
-    const where = s.how ? `<p><b>${esc(s.how)}</b></p>` : `<p class="note warn" style="margin:6px 0"><b>Brak opisu miejsca w OpenStreetMap.</b> Nie wiadomo, w którym miejscu obiektu jest urządzenie. Dojdź do punktu na mapie i szukaj przy wejściu lub w korytarzu; w razie wątpliwości dzwoń pod 112.</p>`;
-    const none = !s.how && !ctxl.length ? `<p class="small">Brak też nazwy obiektu i adresu – kieruj się punktem na mapie.</p>` : "";
-    return `<div class="howbox" id="how-${esc(s.id)}"><b>Gdzie jest</b>${where}${ctxl.length ? `<p class="small">${ctxl.join("<br>")}</p>` : ""}${none}<p class="src">Opis wpisała społeczność OpenStreetMap; może być niepełny lub nieaktualny.</p></div>`;
-  };
-  const hospBox = (s) => {
-    const noName = s.name === NONAME_HOSP, noAddr = !s.addr;
-    if (!noName && !noAddr) return "";
-    return `<div class="howbox" id="how-${esc(s.id)}"><p class="note warn" style="margin:6px 0">${noName ? "<b>W OpenStreetMap ten szpital nie ma nazwy.</b> " : ""}${noAddr ? "Brak adresu w OpenStreetMap – kieruj się punktem na mapie. " : ""}W zagrożeniu życia dzwoń pod 112 – dyspozytor wskaże właściwy szpital.</p></div>`;
-  };
-  const howBox = (s) => s.kind === "aed" ? aedBox(s) : s.kind === "szpital" ? hospBox(s) : s.how ? `<div class="howbox" id="how-${esc(s.id)}"><b>${howTitle(s)}</b><p>${esc(s.how)}</p><p class="src">Źródło opisu: ${esc(srcLabel(s))}</p></div>` : "";
-  const meta = (s) => [s.mine ? "zapisane w telefonie" : "", s.indoor && "wewnątrz budynku", s.checked && `sprawdzono: ${esc(s.checked)}`, s.phone && `tel. <a href="tel:${esc(s.phone.replace(/[^\d+]/g, ""))}">${esc(s.phone)}</a>`, s.capacity && `ok. ${esc(s.capacity)} osób`, s.level && `poziom ${esc(s.level)}`, s.access && `dostęp: ${esc(s.access)}`, s.hours && `godziny: ${esc(s.hours)}`, s.addr && esc(s.addr)].filter(Boolean).join(" · ");
+  const howTitle = () => "Jak wejść";
+  // Układ jak przy schronach: tytuł = adres (AED) / nazwa (szpital), szara plakietka = rodzaj obiektu, obok krótkie informacje; opis miejsca w niebieskiej ramce.
+  const GENERIC = new Set(["Defibrylator AED", ""]);
+  const titleOf = (s) => (s.kind === "aed" ? s.addr || (GENERIC.has(s.name) ? "Defibrylator AED" : s.name) : s.name);
+  const badgeOf = (s) => (s.kind === "aed" ? s.obj || (GENERIC.has(s.name) || s.name === titleOf(s) ? "Defibrylator AED" : s.name) : kindLabel(s));
+  const approx = (s) => (s.addr && (s.addrD > 15 || s.addrD < 0) ? "adres orientacyjny (najbliższy budynek w OSM)" : "");
+  const howBox = (s) => s.kind === "szpital" ? "" : s.how ? `<div class="howbox" id="how-${esc(s.id)}">${s.kind === "aed" ? "" : `<b>${howTitle(s)}</b>`}<p${s.kind === "aed" ? ` style="margin:0;font-weight:600"` : ""}>${esc(s.how)}</p>${s.kind === "aed" ? "" : `<p class="src">Źródło opisu: ${esc(srcLabel(s))}</p>`}</div>` : "";
+  const meta = (s) => (s.kind === "aed"
+    ? [s.indoor && "wewnątrz budynku", s.level && `poziom ${esc(s.level)}`, s.access && `dostęp: ${esc(s.access)}`, s.hours && `godziny: ${esc(s.hours)}`, s.checked && `sprawdzono: ${esc(s.checked)}`, !s.addr && "adres: brak w OSM", !s.how && "opis miejsca: brak w OSM", approx(s) && esc(approx(s))]
+    : s.kind === "szpital"
+      ? [s.addr ? esc(s.addr) : "adres: brak w OSM", s.phone && `tel. <a href="tel:${esc(s.phone.replace(/[^\d+]/g, ""))}">${esc(s.phone)}</a>`, approx(s) && esc(approx(s))]
+      : [s.mine ? "zapisane w telefonie" : "", s.capacity && `ok. ${esc(s.capacity)} osób`, s.level && `poziom ${esc(s.level)}`, s.access && `dostęp: ${esc(s.access)}`, s.hours && `godziny: ${esc(s.hours)}`, s.addr && esc(s.addr)]
+  ).filter(Boolean).join(" · ");
   const btns = (s, feat) => `<div class="shbtns"><a class="btn primary sm" href="${esc(dirUrl(s, "walking"))}" target="_blank" rel="noopener noreferrer">Pieszo</a><a class="btn primary sm" href="${esc(dirUrl(s, "driving"))}" target="_blank" rel="noopener noreferrer">Autem</a>${
     s.how && s.kind !== "aed" ? `<button class="btn sm howbtn" data-how="${esc(s.id)}" aria-expanded="${feat || openHow.has(s.id)}">${howTitle(s)}</button>` : (s.kind === "aed" || s.kind === "szpital") ? "" : `<span class="btn sm disabled" aria-disabled="true">Brak opisu wejścia</span>`}${s.mine ? `<button class="btn sm" data-del="${esc(s.id)}" aria-label="Usuń miejsce ${esc(s.name)}">Usuń</button>` : ""}</div>`;
-  const kindBadge = (s) => `<span class="badge ${s.mine || s.sor ? "ok" : "soon"}">${kindLabel(s)}</span>`;
+  const kindBadge = (s) => `<span class="badge ${s.mine || s.sor ? "ok" : "soon"}">${esc(badgeOf(s))}</span>`;
 
   const draw = () => {
     if (dead) return;
@@ -138,15 +136,15 @@ export function initSheltersScreen(ctx, { demo = false, mode = "schrony" } = {})
     else if (feat.distKm > 5 && !demo) status = `<div class="note neutral">Najbliższy punkt w rejestrze jest ${esc(fmtKmPl(feat.distKm))} od Ciebie. <b>Bliżej mogą być miejsca, których w rejestrze nie ma</b>. Oficjalna mapa PSP: <a href="${PSP_URL}" target="_blank" rel="noopener noreferrer">${PSP_URL.replace("https://", "")}</a>.</div>`;
     $("shStatus").innerHTML = status;
     $("shFeat").innerHTML = feat ? `<article class="shfeat" aria-label="Najbliższe miejsce"><div class="row"><span class="badge ok">Najbliższy</span><span class="spacer"></span>${dist(feat)}</div>
-      <h2 style="margin:8px 0 2px">${esc(feat.name)}</h2><p class="muted small" style="margin:0 0 8px">${kindBadge(feat)} ${meta(feat)}</p>${howBox(feat)}${btns(feat, true)}</article>` : "";
-    $("shList").innerHTML = rest.map((s) => `<li class="shitem"><div class="row"><b style="font-family:var(--font-h)">${esc(s.name)}</b><span class="spacer"></span>${dist(s)}</div>
-      <p class="muted small" style="margin:2px 0 6px">${kindBadge(s)} ${meta(s)}</p><div id="hw-${esc(s.id)}" ${openHow.has(s.id) || s.kind === "aed" || s.kind === "szpital" ? "" : "hidden"}>${howBox(s)}</div>${btns(s, false)}</li>`).join("");
+      <h2 style="margin:8px 0 2px">${esc(titleOf(feat))}</h2><p class="muted small" style="margin:0 0 8px">${kindBadge(feat)} ${meta(feat)}</p>${howBox(feat)}${btns(feat, true)}</article>` : "";
+    $("shList").innerHTML = rest.map((s) => `<li class="shitem"><div class="row"><b style="font-family:var(--font-h)">${esc(titleOf(s))}</b><span class="spacer"></span>${dist(s)}</div>
+      <p class="muted small" style="margin:2px 0 6px">${kindBadge(s)} ${meta(s)}</p><div id="hw-${esc(s.id)}" ${openHow.has(s.id) || s.kind === "aed" ? "" : "hidden"}>${howBox(s)}</div>${btns(s, false)}</li>`).join("");
     const parts = [];
     if (pspIdx) parts.push(`Rejestr Punktów Schronienia (MSWiA / PSP): ${esc(String(pspIdx.count))} punktów w Polsce${pspIdx.builtAt ? `, stan z ${esc(fmtDt(pspIdx.builtAt))}` : ""}`);
     if (db?.count) parts.push(`OpenStreetMap: ${esc(String(db.count))} wpisów, niezweryfikowane${db.stale ? " (kopia z telefonu)" : ""}`);
     if (isMed()) { const m = med[filter]; parts.length = 0; if (m) parts.push(`OpenStreetMap: ${esc(String(m.count))} ${filter === "aed" ? "defibrylatorów" : "szpitali"}${m.at ? `, stan z ${esc(fmtDt(m.at))}` : ""}, niezweryfikowane${m.stale ? " (kopia z telefonu)" : ""}`); }
     $("shMeta").innerHTML = demo ? "" : parts.length ? "Źródła: " + parts.join("; ") + "." : "";
-    if (!demo && filter === "schrony" && feat && feat.distKm != null && !manualPos) { try { sessionStorage.setItem("egida.nearest", JSON.stringify({ min: walkMin(feat.distKm), t: Date.now() })); } catch { /* tryb prywatny */ } }
+    if (!demo && filter === "schrony" && feat && feat.distKm != null) { try { sessionStorage.setItem("egida.nearest", JSON.stringify({ min: walkMin(feat.distKm), t: Date.now() })); } catch { /* tryb prywatny */ } }
     const NOTE = { aed: "Defibrylatory (AED) pochodzą z OpenStreetMap (© współtwórcy OpenStreetMap, ODbL) i są wpisywane przez społeczność, więc urządzenie mogło zostać zdjęte, a budynek może być zamknięty. <b>Przy zatrzymaniu krążenia najpierw zadzwoń pod 112</b> – dyspozytor poprowadzi resuscytację i wskaże najbliższy AED. Podczas rozmowy poproś kogoś, żeby po niego pobiegł.", szpitale: "Szpitale pochodzą z OpenStreetMap (© współtwórcy OpenStreetMap, ODbL); „Szpital z SOR” oznacza wpis z całodobową pomocą w nagłych przypadkach, ale wpisy bywają niepełne. <b>W zagrożeniu życia dzwoń pod 112</b> – dyspozytor wybierze właściwy szpital. Aktualne kolejki w SOR sprawdzisz na oficjalnej stronie pacjent.gov.pl (szukaj: SOR).", mine: "", schrony: "" };
     $("shNote").innerHTML = NOTE[filter] || "";
     $("shNote").hidden = !NOTE[filter];
@@ -155,7 +153,7 @@ export function initSheltersScreen(ctx, { demo = false, mode = "schrony" } = {})
   };
 
   /* ---- mapa ---- */
-  const popup = (s) => `<div class="pop"><b>${esc(s.name)}</b><br><span class="small muted">${[s.name === kindLabel(s) ? "" : esc(kindLabel(s)), s.distKm != null ? esc(fmtDist(s.distKm)) : ""].filter(Boolean).join(" · ")}</span>${s.access ? `<br><span class="small">Dostępność: ${esc(s.access)}</span>` : ""}${s.kind === "aed" ? `<br><span class="small">Gdzie: ${s.how ? esc(s.how) : "brak opisu w OpenStreetMap"}</span>${s.addr ? `<br><span class="small">${esc(s.addr)}</span>` : ""}` : ""}${s.kind === "szpital" ? `<br><span class="small">${s.addr ? esc(s.addr) : "brak adresu w OpenStreetMap"}</span>${s.phone ? `<br><span class="small">tel. ${esc(s.phone)}</span>` : ""}` : ""}<p class="small" style="margin:6px 0"><a href="${esc(dirUrl(s, "walking"))}" target="_blank" rel="noopener noreferrer">Trasa pieszo</a> · <a href="${esc(dirUrl(s, "driving"))}" target="_blank" rel="noopener noreferrer">Autem</a></p></div>`;
+  const popup = (s) => `<div class="pop"><b>${esc(titleOf(s))}</b><br><span class="small muted">${[esc(badgeOf(s)), s.distKm != null ? esc(fmtDist(s.distKm)) : ""].filter(Boolean).join(" · ")}</span>${s.kind === "aed" && s.how ? `<br><span class="small"><b>${esc(s.how)}</b></span>` : ""}${s.kind === "szpital" ? `<br><span class="small">${s.addr ? esc(s.addr) : "adres: brak w OSM"}</span>${s.phone ? `<br><span class="small">tel. ${esc(s.phone)}</span>` : ""}` : ""}${s.access && s.kind !== "szpital" ? `<br><span class="small">Dostępność: ${esc(s.access)}</span>` : ""}<p class="small" style="margin:6px 0"><a href="${esc(dirUrl(s, "walking"))}" target="_blank" rel="noopener noreferrer">Trasa pieszo</a> · <a href="${esc(dirUrl(s, "driving"))}" target="_blank" rel="noopener noreferrer">Autem</a></p></div>`;
   // Rysujemy WSZYSTKIE punkty widoczne na mapie (od zoomu 12), a nie tylko najbliższe z listy.
   // Znaczniki są utrzymywane „różnicowo” (po id): nie czyścimy ich przy każdym odświeżeniu, bo to zamykało otwartą etykietę (popup).
   const marks = new Map(); let marksFilter = null, userMark = null;
@@ -227,17 +225,16 @@ export function initSheltersScreen(ctx, { demo = false, mode = "schrony" } = {})
   };
   // explicit: pierwsze ustalenie pozycji lub świadomy wybór (dotknięcie mapy, przycisk) ⇒ ustaw widok mapy; zwykła aktualizacja GPS tylko przesuwa „Ty”
   const setPos = (p, manual, explicit = true) => {
-    pos = p; manualPos = !!manual; if (explicit) needFit = true;
+    pos = p; if (explicit) needFit = true;
     if (!loadedAt || haversineKm(loadedAt, pos) > 2) loadPsp(); else draw();
     setLive();
   };
-  const setLive = () => { const el = $("shLive"); if (!el) return; el.textContent = demo ? "" : manualPos ? "Miejsce wskazane ręcznie. Wybierz „Użyj mojej pozycji”, aby lista śledziła Cię na żywo." : liveOn ? "● Na żywo: lista odświeża się, gdy się przemieszczasz." : ""; };
-  let liveOn = false, stopWatch = null, lastTick = 0, manualPick = false;
-  const setManualPick = (on) => { manualPick = on; const b = $("shManual"); if (b) { b.textContent = on ? "Dotknij mapy tam, gdzie jesteś (anuluj)" : "Wskaż moją pozycję na mapie"; b.setAttribute("aria-pressed", String(on)); } const h = $("shMapHint"); if (h && on) h.textContent = "Dotknij mapy w miejscu, w którym jesteś."; };
+  const setLive = () => { const el = $("shLive"); if (!el) return; el.textContent = demo ? "" : liveOn ? "● Na żywo: niebieska kropka to pozycja GPS telefonu, lista odświeża się, gdy się przemieszczasz." : ""; };
+  let liveOn = false, stopWatch = null, lastTick = 0, lastTouch = 0, popupOpen = false;
   const startWatch = () => {
-    stopWatch?.(); liveOn = true; manualPos = false; let first = true;
+    stopWatch?.(); liveOn = true; let first = true;
     stopWatch = locate((p) => {
-      if (dead || manualPos) return;
+      if (dead) return;
       const now = Date.now();
       if (!first && pos && haversineKm(pos, p) < 0.015 && now - lastTick < 5000) return; // bez migotania: ignoruj drobne zmiany
       lastTick = now;
@@ -245,7 +242,8 @@ export function initSheltersScreen(ctx, { demo = false, mode = "schrony" } = {})
       $("shLocMsg").textContent = "";
       setPos(p, false, wasFirst);
       if (wasFirst && map) map.setView([p.lat, p.lon], 15, { animate: false });
-    }, () => { liveOn = false; setLive(); if (!dead) $("shLocMsg").textContent = "Nie udało się ustalić pozycji. Użyj przycisku „Wskaż moją pozycję na mapie” i dotknij mapy."; }, true);
+      else if (map && !popupOpen && Date.now() - lastTouch > 20000) map.panTo([p.lat, p.lon], { animate: true, duration: 0.6 }); // mapa jedzie razem z Tobą, dopóki jej nie przesuwasz palcem
+    }, () => { liveOn = false; setLive(); if (!dead) $("shLocMsg").textContent = "Nie udało się ustalić pozycji GPS. Włącz lokalizację w telefonie (Ustawienia → Prywatność → Usługi lokalizacji) i dotknij „Użyj mojej pozycji”."; }, true);
     cleanups.push(() => stopWatch?.());
     setLive();
   };
@@ -258,14 +256,16 @@ export function initSheltersScreen(ctx, { demo = false, mode = "schrony" } = {})
     const fail = (k) => { const n = $("shTileMsg"); if (n) { n.hidden = false; n.textContent = "Mapa podkładowa nie odpowiada. Lista poniżej działa bez niej."; } };
     baseLayer(L, "map", fail).addTo(map);
     gMarks = L.layerGroup().addTo(map); gUser = L.layerGroup().addTo(map);
+    map.on("dragstart zoomstart", () => { lastTouch = Date.now(); });
+    map.on("popupopen", () => { popupOpen = true; lastTouch = Date.now(); }); map.on("popupclose", () => { popupOpen = false; lastTouch = Date.now(); });
     map.on("moveend", () => { drawMap(); clearTimeout(viewTimer); viewTimer = setTimeout(loadView, 400); });
     cleanups.push(() => clearTimeout(viewTimer));
     setTimeout(() => { if (!dead) map.invalidateSize(); }, 0);
     map.on("click", (e) => {
       const p = { lat: e.latlng.lat, lon: e.latlng.lng };
       if ($("addBox").open) { setPick(p); return; }
-      // Dotknięcie mapy NIE przesuwa już Twojej pozycji (tylko przesuwa mapę). Ręczny wybór: przycisk „Wskaż moją pozycję na mapie”.
-      if (!demo && manualPick) { setManualPick(false); stopWatch?.(); liveOn = false; setPos({ ...p, accKm: 0 }, true); }
+      // Dotknięcie mapy nie zmienia Twojej pozycji: niebieska kropka to zawsze GPS telefonu.
+
     });
     draw();
   }).catch((e) => { console.error("EGIDA mapa schronów:", e); if (!dead) $("shMap").innerHTML = `<p class="note warn" style="margin:12px">Nie udało się załadować mapy. Lista działa bez niej.</p>`; });
@@ -289,7 +289,6 @@ export function initSheltersScreen(ctx, { demo = false, mode = "schrony" } = {})
   /* ---- pozycja ---- */
   const doLocate = (silent) => { if (!silent) $("shLocMsg").textContent = "Ustalam pozycję…"; startWatch(); };
   $("shLocate").addEventListener("click", () => doLocate(false));
-  $("shManual")?.addEventListener("click", () => setManualPick(!manualPick));
   if (!demo && (pos || st().consent?.gps)) startWatch();
 
   /* ---- dodawanie własnego miejsca ---- */
@@ -305,7 +304,7 @@ export function initSheltersScreen(ctx, { demo = false, mode = "schrony" } = {})
     (st().shelters ||= []).push(r.shelter); ctx.save();
     $("shName").value = ""; $("shHow").value = ""; pick = null; $("pickInfo").textContent = "Zapisano. Możesz dodać kolejne miejsce.";
     if (pmarker && map) { map.removeLayer(pmarker); pmarker = null; }
-    if (!pos) setPos({ lat: r.shelter.lat, lon: r.shelter.lon, accKm: 0 }, true); else draw();
+    draw();
   });
   $("addBox").addEventListener("toggle", () => { if ($("addBox").open && map) { $("shMap").scrollIntoView({ block: "nearest" }); } });
 

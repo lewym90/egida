@@ -122,11 +122,11 @@ await ok("tryb offline pobiera też AED i szpitale", async () => {
   assert.match(offlineSummary(r), /2 defibrylatorów AED, 1 szpitali/);
   assert.ok(store.get("egida.aed.v1") && store.get("egida.hosp.v1"));
 });
-await ok("nazwy zakładek i filtry: Zagrożenia, W pobliżu; filtry Schrony / Moje miejsca / Defibrylatory AED / Szpitale", () => {
+await ok("nazwy zakładek i filtry: Zagrożenia, W pobliżu; filtry Schrony / Defibrylatory AED / Szpitale / Moje miejsca", () => {
   const app = src("app.js"), sh = src("sheltersscreen.js");
   assert.match(app, /t: "Zagrożenia"/); assert.match(app, /t: "W pobliżu"/); assert.match(app, /t: "Mapa zagrożeń"/); assert.match(app, /t: "Pomoc w pobliżu"/);
   assert.ok(!/t: "Mapa", i: I\.map/.test(app) && !/t: "Schrony", i: I\.shield/.test(app));
-  assert.match(sh, /\["schrony", "Schrony"\], \["mine", "Moje miejsca"\], \["aed", "Defibrylatory AED"\], \["szpitale", "Szpitale"\]/);
+  assert.match(sh, /\["schrony", "Schrony"\], \["aed", "Defibrylatory AED"\], \["szpitale", "Szpitale"\], \["mine", "Moje miejsca"\]/);
   assert.ok(!/Z opisem wejścia"\]|Do 10 min/.test(sh));
   assert.match(app, /#\/schrony\/aed/); assert.match(src("screens2.js"), /#\/schrony\/szpitale/);
   assert.match(readFileSync(new URL("../sw.js", import.meta.url), "utf8"), /js\/medical\.js/);
