@@ -17,9 +17,9 @@ await ok("zatrzymany Ukrainiec planujący zamach w Polsce trafia do całego kraj
   assert.equal(reg("Zatrzymany Ukrainiec planował zamach na wiele osób"), "all");
   assert.equal(reg("Zamach w Pakistanie. Wielu zabitych"), null);
 });
-await ok("poważne zdarzenie bez miejscowości z naszej listy: cały kraj (kanały dotyczące Polski) lub polski kontekst (portale mieszane)", () => {
-  assert.equal(reg("Wypadek autobusu. Nie żyją trzy osoby"), "all");
-  assert.equal(reg("Nożownik zaatakował w sklepie. Policja zatrzymała sprawcę", { ...S, polishOnly: false }), "all");
+await ok("poważne zdarzenie bez pewnego miejsca jest pomijane (nie zgadujemy), zagranica odpada", () => {
+  assert.equal(reg("Wypadek autobusu. Nie żyją trzy osoby"), null, "v37: miejsca nie ustalono pewnie → wpis pomijany, nie „cały kraj”");
+  assert.equal(reg("Nożownik zaatakował w sklepie. Policja zatrzymała sprawcę", { ...S, polishOnly: false }), null);
   assert.equal(reg("Katastrofa lotnicza w Brazylii. Nie żyje 20 osób", { ...S, polishOnly: false }), null);
   assert.equal(reg("Atak nożownika w Radomsku. Są ranni"), "lodzkie");
   assert.equal(reg("Kierowca zginął na S7 pod Warszawą"), "mazowieckie");

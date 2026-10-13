@@ -17,11 +17,11 @@ await ok("Lubliniec (i „w Lublińcu”) leży w śląskim, nie w lubelskim; Lu
   assert.deepEqual(regionsMentioned("Wypadek w Lublinie"), ["lubelskie"]);
   assert.equal(reg("Gaz gromadził się w studzience. Nocna ewakuacja w Lublińcu"), "slaskie");
 });
-await ok("zdarzenia z USA i innych krajów nie trafiają do żadnego województwa ani do „all”", () => {
+await ok("zdarzenia z USA i innych krajów nie trafiają do żadnego województwa, do „all” ani „world”", () => {
   assert.equal(reg("Tragedia w parku rozrywki. Mężczyzna wypadł z rollercoastera", "https://wydarzenia.interia.pl/swiat/news-tragedia-w-parku-rozrywki,1"), null);
   assert.equal(reg("Tragedia w parku rozrywki w Atlancie. Mężczyzna wypadł z rollercoastera"), null);
   assert.equal(reg("Strzelanina w Teksasie. Nie żyją trzy osoby"), null);
-  assert.equal(reg("Tragedia w parku rozrywki. Mężczyzna wypadł z kolejki", "https://wydarzenia.interia.pl/polska/news-x,2"), "all");
+  assert.equal(reg("Tragedia w parku rozrywki. Mężczyzna wypadł z kolejki", "https://wydarzenia.interia.pl/polska/news-x,2"), null, "v37: polskie zdarzenie bez ustalonego miejsca → pomijane");
 });
 await ok("encje HTML w tytule są zamieniane na znaki (serwer i aplikacja)", () => {
   assert.equal(decodeEntities("Ćwiczenia w Wałbrzychu &ndash; ruch utrudniony"), "Ćwiczenia w Wałbrzychu – ruch utrudniony");

@@ -2,6 +2,7 @@
 // Zasada: tylko oficjalne, zaufane źródła (Policja, MEN, RCB, urzędy wojewódzkie, kuratoria). Nic nie piszemy od siebie, nic nie omijamy.
 import { XMLParser } from "fast-xml-parser";
 import { dedupeSimilar } from "../js/similar.js";
+import { resolvePlace, nationalScope, topicHit, isWorldPath, topTarget } from "./news-geo.mjs";
 import { mentionsRegion, nationalCore, nationalThreat, regionsMentioned, strongIncident, foreignEvent, polishHint } from "./news-places.mjs";
 
 export const LIMITS = { perSource: 15, total: 200, maxAgeDays: 14, titleChars: 200, summaryChars: 280 };
@@ -56,7 +57,7 @@ export function parseRss(xml) {
   for (const it of arr(j?.rss?.channel?.item)) {
     const title = stripTags(txt(it.title)), url = abs(it.link);
     if (!title || !url) continue;
-    out.push({ title, url, date: toIso(txt(it.pubDate) || txt(it.date) || txt(it["dc:date"])), summary: stripTags(txt(it.description)), cats: arr(it.category).map((c) => stripTags(txt(c))).join(" ") });
+    out.push({ title, url, date: toIso(txt(it.pubDate) || txt(it.date) || txt(it["dc:date"])), summary: stripTags(txt(it.description)), catList: arr(it.category).map((c) => stripTags(txt(c))).filter(Boolean), cats: arr(it.category).map((c) => stripTags(txt(c))).join(" ") });
   }
   for (const it of arr(j?.["rdf:RDF"]?.item)) { // RSS 1.0 (RDF), np. Radio Szczecin
     const title = stripTags(txt(it.title)), url = safeHttps(stripTags(txt(it.link)));
@@ -149,7 +150,7 @@ export function parseMediaHtml(html, baseUrl, rule) {
 }
 
 /** Normalizacja wpisu źródłowego do formatu news.json. */
-export function toItem(raw, src, nowMs, why = null) {
+export function toItem(raw, src, nowMs, why = null, info = null) {
   const no = (r) => { why?.push({ title: String(raw.title || "").slice(0, 110), why: r }); return null; };
   if (!raw.date) return no("brak daty");
   const t = new Date(raw.date).getTime(), active = raw.until && new Date(raw.until).getTime() >= nowMs;
@@ -160,21 +161,37 @@ export function toItem(raw, src, nowMs, why = null) {
   let region = raw.region || src.region;
   if (src.kind === "media") {
     const txt = `${raw.title} ${raw.cats || ""}`, regs = regionsMentioned(raw.title), regsAll = regionsMentioned(txt);
-    if (src.national) { // portal ogólnopolski: województwo z nazwy miejscowości/regionu w tytule; zagrożenie krajowe bez miejsca → cały kraj; inaczej odrzucamy
-      if (regs.length) region = regs[0];
-      else if (nationalThreat(raw.title)) region = "all";
-      // Poważne zdarzenie w Polsce bez miejscowości z naszej listy (nożownik, zabójstwo, wypadek z ofiarami…): cały kraj. Portale „z kraju i ze świata” – tylko z polskim kontekstem.
-      else if (strongIncident(raw.title) && !foreignEvent(raw.title) && (src.polishOnly || polishHint(raw.title) || /\/polska(\/|$)/.test(raw.url)) && !/\/(swiat|swiecie|world)(\/|$)/.test(raw.url)) region = "all";
-      else return no("brak miejsca");
+    const pl = resolvePlace(raw); // nowe, ścisłe ustalanie miejsca (odmiany, kategorie, adres, opis, treść artykułu); konflikt = wstrzymanie
+    const note = (group, layer) => info?.push({ title: String(raw.title).slice(0, 110), group, layer, source: src.label });
+    if (src.national) { // portal ogólnopolski: 1) miejsce z kategorii/adresu/tytułu/opisu/artykułu → województwo; 2) bez miejsca: z kraju / ze świata (ścisła reguła) / nieprzypisane (tylko w aplikacji); inaczej odrzucamy
+      const lead = `${raw.title} ${raw.summary || ""} ${(raw.page?.text || "").slice(0, 600)}`;
+      if (topTarget(raw.title) && !foreignEvent(raw.title) && !isWorldPath(raw.url)) { region = "all"; note("kraj", "zamach na władze"); }
+      else if (pl.status === "ok") { region = pl.region; note(region, pl.layer); }
+      else {
+        // „Z kraju” tylko z dowodem na Polskę (słowo Polska/polski w tekście, dział /polska/ albo źródło wyłącznie polskie); dawne „nie wiadomo gdzie, więc pewnie u nas” wycięte (zamach na Grenlandii nie jest sprawą Polski).
+        const sc = nationalScope(lead, raw.url), legacyAll = nationalThreat(raw.title) && (src.polishOnly || /\/polska(\/|$)/.test(raw.url)) && !isWorldPath(raw.url) && !foreignEvent(raw.title); // zatrzymany Ukrainiec planujący zamach = sprawa Polski
+        const scope = sc === "all" || legacyAll ? "all" : sc;
+        if (scope === "all") { region = "all"; note("kraj", "temat+Polska"); }
+        else if (scope === "world") { region = "world"; note("swiat", "temat+powiązanie"); }
+        // Gdy miejsca nie udało się ustalić pewnie (brak albo konflikt dwóch województw), wpis NIE jest pokazywany (decyzja: lepiej pominąć niż pomylić).
+        else return no(pl.status === "conflict" ? "konflikt miejsc" : strongIncident(raw.title) ? "brak pewnego miejsca" : "brak miejsca");
+      }
     } else if (src.local) { // regionalny portal prywatny (np. Lublin112): domyślnie jego województwo, ale nie wiadomości „z kraju”
-      if (nationalThreat(raw.title) && !regs.includes(src.region)) region = regs[0] || "all";
+      if (nationalThreat(raw.title) && !regs.includes(src.region)) region = regs[0] || (pl.status === "ok" ? pl.region : "all");
       else if (regs.length && !regs.includes(src.region)) region = regs[0];
+      else if (!regs.includes(src.region) && pl.status === "ok" && pl.region !== src.region) region = pl.region;
       else if (!regs.includes(src.region) && /(^|[\s,])(kraj|świat|swiat|polityka)([\s,]|$)/i.test(raw.cats || "") && !regsAll.includes(src.region)) return no("z kraju/świata");
-    } else if (!mentionsRegion(txt, src.region)) {
+    } else if (!mentionsRegion(txt, src.region) && !(pl.status === "ok" && pl.region === src.region)) {
       if (!nationalThreat(txt)) return no("inny region");
       // Rozgłośnia regionalna nigdy nie „wypycha” wiadomości do całego kraju: jeśli tytuł nie wskazuje innego województwa, zostaje w swoim.
-      region = regionsMentioned(txt)[0] || (nationalCore(txt) ? "all" : src.region);
+      region = regionsMentioned(txt)[0] || (pl.status === "ok" ? pl.region : nationalCore(txt) ? "all" : src.region);
     }
+  }
+  // Portal policja.pl zbiera wpisy ze wszystkich regionów (region źródła „mixed”): miejsce z kategorii/adresu/tytułu/opisu albo wpis odpada.
+  if (src.region === "mixed" && src.kind !== "media") {
+    const pl = resolvePlace(raw);
+    if (pl.status !== "ok") return no(pl.status === "conflict" ? "konflikt miejsc" : "brak pewnego miejsca");
+    region = pl.region;
   }
   const id = raw.key ? `gddkia/${raw.key}` : raw.url.replace(/^https:\/\/(www\.)?/, "").replace(/[?#].*$/, "");
   return { id, title: clip(decodeEntities(raw.title), LIMITS.titleChars), summary: src.kind === "media" ? "" : clip(raw.summary || "", LIMITS.summaryChars), url: raw.url, date: new Date(t).toISOString(), source: src.label, region, kind: src.kind, ...(active ? { until: raw.until } : {}) };
@@ -248,6 +265,7 @@ export function parseGddkia(xml, nowMs, regionIds) {
 // ---------- Doniesienia medialne (regionalne rozgłośnie publiczne): tylko tytuły poważnych zdarzeń, bez sportu i kultury ----------
 const MEDIA_SAFETY = ["alarm", "bomb", "ewakuac", "zagroz", "ostrzez", "grozb", "pozar", "wybuch", "wypad", "zablokowan", "zamkniet", "utrudnien", "powodz", "podtopien", "wichur", "nawalnic",
   "burz", "tornado", "gololed", "skazeni", "katastrof", "nie zyje", "nie zyja", "zgin", "smiertel", "ranni", "ranny", "rannych", "strzelani", "nozown", "atak", "zamach", "dron", "rakiet", "syren",
+  "sabotaz", "dywersj", "szpieg", "wojn", "bron jadrow", "bron biolog", "bron chemicz", "zestrzel", "przestrzen powietrzn", "mobilizac", "inwazj", "agresj", "cyberatak",
   "zabojstw", "morderstw", "napad", "porwan", "zaginion", "brak pradu", "brak wody", "przerw w dostaw", "awari", "zatruc", "epidemi"];
 const MEDIA_DENY = ["mecz", "liga", "ligi", "turniej", "puchar", "zawodnik", "zawodnicz", "pilkarz", "pilkark", "siatkar", "koszykar", "reprezentacj", "wyscig", "koncert", "festiwal", "wystaw", "premiera", "premiery",
   "kino", "teatr", "spektakl", "konkurs", "rocznic", "jubileusz", "horoskop", "rozmowa", "reportaz", "podcast", "felieton", "wideo", "quiz", "gosc", "wywiad", "ekspert", "pogoda na", "targi", "zwyciez", "pokonal", "przegral",
@@ -286,4 +304,30 @@ export function robotsAllows(txt, path, ua = "egida") {
     if (new RegExp("^" + pat).test(path) && (!best || v.length >= best.len)) best = { len: v.length, allow: k === "allow" };
   }
   return best ? best.allow : true;
+}
+
+// ---------- Strona artykułu (warstwa ostatniej szansy dla miejsca) ----------
+/** Co portal zazwyczaj wpisuje na stronie artykułu: opis, dział, słowa kluczowe, miejsce (JSON-LD), okruszki, początek treści. */
+export function articleInfo(html) {
+  const h = String(html || "").slice(0, 900000);
+  const meta = (names) => { for (const n of names) { const m = new RegExp(`<meta[^>]+(?:property|name)\\s*=\\s*["']${n}["'][^>]*>`, "i").exec(h); if (m) { const c = /content\s*=\s*["']([^"']*)["']/i.exec(m[0]); if (c && c[1].trim()) return stripTags(c[1]); } } return ""; };
+  const cats = [meta(["article:section"]), meta(["keywords", "news_keywords"]), meta(["article:tag"])];
+  const ld = [];
+  for (const m of h.matchAll(/<script[^>]+application\/ld\+json[^>]*>([\s\S]*?)<\/script>/gi)) {
+    try { const walk = (o) => { if (!o || typeof o !== "object") return; if (Array.isArray(o)) return o.forEach(walk); for (const k of ["articleSection", "keywords"]) if (o[k]) ld.push(Array.isArray(o[k]) ? o[k].join(" ") : String(o[k])); for (const k of ["contentLocation", "locationCreated", "spatialCoverage"]) if (o[k]) ld.push(typeof o[k] === "string" ? o[k] : [o[k].name, o[k].address?.addressRegion, o[k].address?.addressLocality].filter(Boolean).join(" ")); Object.values(o).forEach(walk); }; walk(JSON.parse(m[1])); } catch { /* uszkodzony JSON-LD */ }
+  }
+  for (const m of h.matchAll(/<(?:nav|ol|ul|div)[^>]+class\s*=\s*["'][^"']*breadcrumb[^"']*["'][^>]*>([\s\S]*?)<\/(?:nav|ol|ul|div)>/gi)) cats.push(stripTags(m[1]));
+  const body = h.replace(/<(script|style|nav|aside|footer|header|noscript|form)\b[\s\S]*?<\/\1>/gi, " ");
+  const art = /<article\b[\s\S]*?<\/article>/i.exec(body)?.[0] || /<main\b[\s\S]*?<\/main>/i.exec(body)?.[0] || body;
+  const paras = [...art.matchAll(/<p\b[^>]*>([\s\S]*?)<\/p>/gi)].map((m) => stripTags(m[1])).filter((x) => x.length >= 40 && !/^(czytaj|zobacz|przeczytaj|polecamy|sprawdź|sprawdz|więcej|wiecej|reklama)/i.test(x));
+  const text = [meta(["og:description", "description", "twitter:description"]), ...paras.slice(0, 3)].filter(Boolean).join(" ").slice(0, 1400);
+  return { text, cats: [...cats, ...ld].filter(Boolean).join(" ; ").slice(0, 600) };
+}
+/** Czy dla wpisu z portalu krajowego warto pobrać stronę artykułu? Tylko gdy cienkie warstwy nie wskazały miejsca, a temat jest istotny (zdarzenie w Polsce albo temat „świat”). */
+export function needsArticle(raw, src) {
+  if (!src.national || src.kind !== "media" || raw.page) return false;
+  if (resolvePlace(raw).status !== "none") return false;
+  if (!passesFilter(src.filter, raw.title, raw.summary)) return false;
+  const t = raw.title;
+  return nationalThreat(t) || topicHit(`${t} ${raw.summary || ""}`) || (strongIncident(t) && !foreignEvent(t) && !isWorldPath(raw.url));
 }

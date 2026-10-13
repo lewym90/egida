@@ -16,7 +16,7 @@ export function normalizeNews(raw) {
   for (const x of raw.items) {
     if (!x || typeof x !== "object") continue;
     const title = decodeEntities(x.title).trim().slice(0, 240), url = String(x.url || ""), t = Date.parse(x.date);
-    const region = x.region === "all" || x.region === "mixed" || IDS.has(x.region) ? x.region : null; // „mixed” = portal krajowy bez ustalonego regionu
+    const region = x.region === "all" || x.region === "world" || IDS.has(x.region) ? x.region : null; // „world” = ze świata (wpływ na Polskę); starsze wpisy „mixed” (miejsce nieustalone) pomijamy
     if (!title || !httpsOnly(url) || !Number.isFinite(t) || !region) continue;
     items.push({ id: String(x.id || url).slice(0, 200), title, summary: decodeEntities(x.summary).slice(0, 300), url, date: new Date(t).toISOString(), source: String(x.source || "").slice(0, 80), region, kind: String(x.kind || "").slice(0, 20), until: Number.isFinite(Date.parse(x.until)) ? new Date(x.until).toISOString() : null });
   }
@@ -38,7 +38,7 @@ export function dedupeNews(list) {
   return list.filter((x) => keep.has(x));
 }
 
-/** Wpisy dla województwa użytkownika + ogólnopolskie (bez województwa: wszystkie, także „mixed”). opts: {max, onlyRegion, onlyAll} */
+/** Wpisy dla województwa użytkownika + ogólnopolskie (bez województwa: wszystkie). opts: {max, onlyRegion, onlyAll} */
 export function newsForRegion(feed, regionId, opts = {}) {
   if (!feed) return [];
   let l = feed.items.filter((x) => x.kind !== "gddkia"); // utrudnienia drogowe GDDKiA mają własne miejsce: „Dobrze wiedzieć” na Pulpicie
@@ -65,3 +65,22 @@ export function roadsForRegion(feed, regionId, opts = {}, nowMs = Date.now()) {
   return opts.max ? l.slice(0, opts.max) : l;
 }
 export const ROADS_LINK = "https://drogi.gddkia.gov.pl/informacje-drogowe/lista-utrudnien";
+
+/* ---------- Trzy grupy wiadomości: Moje województwo / Z kraju / Ze świata - wpływ na Polskę ---------- */
+export const NEWS_GROUPS = [["region", "Moje województwo"], ["kraj", "Z kraju"], ["swiat", "Ze świata - wpływ na Polskę"]];
+const VOI = Object.fromEntries(VOIVODESHIPS.map((v) => [v.id, v.name]));
+/** Wpisy jednej grupy (bez utrudnień GDDKiA, bez powtórzeń). region: tylko wybrane województwo; kraj: region „all”; swiat: „world”. */
+export function newsGroup(feed, group, regionId, opts = {}) {
+  if (!feed) return [];
+  const pick = { region: (x) => !!regionId && x.region === regionId, kraj: (x) => x.region === "all", swiat: (x) => x.region === "world" }[group];
+  if (!pick) return [];
+  const l = dedupeNews(feed.items.filter((x) => x.kind !== "gddkia" && pick(x)));
+  return opts.max ? l.slice(0, opts.max) : l;
+}
+/** Etykieta grupy przy wpisie: „Z kraju”, „Ze świata”, „Twoje woj.” albo nazwa innego województwa. */
+export function groupLabel(x, regionId) {
+  if (x.region === "all") return "Z kraju";
+  if (x.region === "world") return "Ze świata";
+  return x.region === regionId ? "Twoje woj." : VOI[x.region] || null;
+}
+export const newsCounts = (feed, regionId) => Object.fromEntries(NEWS_GROUPS.map(([g]) => [g, newsGroup(feed, g, regionId).length]));

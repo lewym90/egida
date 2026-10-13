@@ -2,6 +2,7 @@ import { CONFIG } from "./config.js";
 import {
   VOIVODESHIPS, LEGAL_HTML, ALERT_FILTERS, PLECAK, FIRST_AID, WHAT_TO_DO, READINESS_QUESTIONS, SOURCES,
 } from "./content.js";
+import { APTECZKA } from "./content.js";
 import { analyze, statusOf, summarize, compose } from "./classify.js";
 import { APP_VERSION, APP_BUILD } from "./version.js";
 import { storyTokens, sameStory } from "./similar.js";
@@ -11,7 +12,7 @@ import { renderMapHtml, initMapScreen, destroyScreens } from "./mapscreen.js";
 import { renderSheltersHtml, initSheltersScreen } from "./sheltersscreen.js";
 import { makePspCache } from "./shelters.js";
 import { offlineCenters, downloadOffline, offlineSummary } from "./offline.js";
-import { normalizeNews, newsFresh, newsForRegion, roadsForRegion, ROADS_LINK, ageLabel } from "./news.js";
+import { normalizeNews, newsFresh, newsForRegion, newsGroup, groupLabel, newsCounts, NEWS_GROUPS, roadsForRegion, ROADS_LINK, ageLabel } from "./news.js";
 
 /* ---------- pomocnicze ---------- */
 const $ = (s, r = document) => r.querySelector(s);
@@ -103,7 +104,7 @@ const alertsFresh = () => {
 };
 /* ---------- „Wiadomości z regionu i kraju”: aktualności z oficjalnych źródeł (Policja, MEN, RCB, urzędy, kuratoria), zebrane przez serwer ---------- */
 let newsData = null; // znormalizowany plik albo null (brak/niepoprawny)
-let newsScope = "region"; // region | all-pl | everything
+let newsScope = null; // region | kraj | swiat (null = domyślnie: województwo, a bez wybranego – z kraju)
 const NEWS_CACHE = "egida.news.v1";
 async function loadNews() {
   if (!CONFIG.newsUrl) return;
@@ -119,7 +120,7 @@ async function loadNews() {
     try { newsData = normalizeNews(JSON.parse(localStorage.getItem(NEWS_CACHE) || "null")) || newsData; } catch { /* uszkodzone */ }
   }
 }
-const newsLink = (x) => `<li class="newsitem"><a href="${esc(x.url)}" target="_blank" rel="noopener noreferrer"><span class="nt">${esc(x.title)}</span><span class="nm">${x.kind === "media" ? '<span class="badge media">doniesienie medialne</span> ' : ""}${esc(x.source)} · ${esc(ageLabel(x.date))}</span></a></li>`;
+const newsLink = (x) => { const g = groupLabel(x, state.region); return `<li class="newsitem"><a href="${esc(x.url)}" target="_blank" rel="noopener noreferrer"><span class="nt">${esc(x.title)}</span><span class="nm">${g ? `<span class="badge grp${x.region === "world" ? " world" : x.region === "all" ? " kraj" : ""}">${esc(g)}</span> ` : ""}${x.kind === "media" ? '<span class="badge media">doniesienie medialne</span> ' : ""}${esc(x.source)} · ${esc(ageLabel(x.date))}</span></a></li>`; };
 /* Utrudnienia na drogach krajowych (GDDKiA) dla Twojego województwa: wiersze do bloku „Dobrze wiedzieć” */
 const roadRows = () => (state.region && newsData && newsFresh(newsData) ? roadsForRegion(newsData, state.region) : []);
 const roadLi = (x) => `<li><span class="lbl">Drogi krajowe · GDDKiA</span><span class="shead">${esc(x.title)}</span><span class="ssub">od ${esc(fmtDate(x.date))}${x.until ? `, do ${esc(fmtDate(x.until))}` : ""}</span></li>`;
@@ -128,25 +129,33 @@ function newsCardHtml() {
   if (!newsData || !state.region) return "";
   const fresh = newsFresh(newsData);
   const list = fresh ? newsForRegion(newsData, state.region, { max: 5 }) : [];
-  if (fresh && !list.length) return "";
-  const body = fresh ? `<ul class="newslist">${list.map(newsLink).join("")}</ul>` : `<p class="muted small" style="margin:6px 0 0">Brak aktualnych danych. Wiadomości z oficjalnych stron mogą być nieaktualne, więc ich nie pokazujemy.</p>`;
-  return `<div class="card newscard"><h2>Wiadomości z regionu i kraju</h2>${body}<a class="smore2" href="#/wazne">Wszystkie wiadomości ${I.chevr}</a></div>`;
+  if (fresh && !list.length && !newsGroup(newsData, "swiat", state.region).length) return "";
+  const body = fresh ? (list.length ? `<ul class="newslist">${list.map(newsLink).join("")}</ul>` : `<p class="muted small" style="margin:6px 0 0">Brak nowych wiadomości z Twojego województwa i z kraju.</p>`) : `<p class="muted small" style="margin:6px 0 0">Brak aktualnych danych. Wiadomości z oficjalnych stron mogą być nieaktualne, więc ich nie pokazujemy.</p>`;
+  const nw = fresh ? newsGroup(newsData, "swiat", state.region).length : 0;
+  const world = nw ? `<button class="smore2 newsworld" data-newsgo="swiat">Ze świata - wpływ na Polskę (${nw}) ${I.chevr}</button>` : "";
+  return `<div class="card newscard"><h2>Wiadomości</h2>${body}${world}<a class="smore2" href="#/wazne">Wszystkie wiadomości ${I.chevr}</a></div>`;
 }
+const curScope = () => newsScope || (state.region ? "region" : "kraj");
 function newsListHtml() {
   if (!CONFIG.newsUrl || !newsData) return `<div class="note neutral">Nie udało się pobrać wiadomości. Sprawdź połączenie. Oficjalne komunikaty są w zakładce <a href="#/alerty">Alerty</a>.</div>`;
   if (!newsFresh(newsData)) return `<div class="note warn"><b>Brak aktualnych danych.</b> Wiadomości z oficjalnych stron nie były ostatnio odświeżane, więc ich nie pokazujemy. Sprawdź strony Policji i swojego urzędu wojewódzkiego.</div>`;
-  const list = newsScope === "everything" ? newsForRegion(newsData, null) : newsForRegion(newsData, state.region); // „Cała Polska” = wszystkie regiony razem, z nazwą źródła przy każdym wpisie
-  if (!list.length) return `<div class="note neutral">Brak wiadomości o bezpieczeństwie w tym zakresie z ostatnich dni.</div>`;
+  const sc = curScope();
+  if (sc === "region" && !state.region) return `<div class="note neutral">Wybierz swoje województwo w <a href="#/ustawienia">Ustawieniach</a>, a pokażemy wiadomości z Twojego regionu. Na razie zajrzyj do „Z kraju”.</div>`;
+  const list = newsGroup(newsData, sc, state.region);
+  const empty = { region: "Brak wiadomości o bezpieczeństwie z Twojego województwa z ostatnich dni.", kraj: "Brak wiadomości ogólnopolskich z ostatnich dni.", swiat: "Brak wiadomości ze świata, które wpływają na Polskę." }[sc];
+  if (!list.length) return `<div class="note neutral">${empty}</div>`;
   return `<div class="card flat"><ul class="list newslist">${list.map(newsLink).join("")}</ul></div>`;
 }
+const SCOPE_HELP = { region: "Z Twojego województwa: Policja, urzędy, kuratoria i media. Miejsce ustala program po nazwie miejscowości lub regionu. Gdy nie ma pewności, wpisu nie pokazujemy.", kraj: "Sprawy ogólnopolskie: RCB, MEN i poważne zagrożenia dotyczące całej Polski.", swiat: "Tylko wiadomości ze świata, które wprost wiążą się z Polską, Ukrainą, Rosją, Białorusią, NATO lub Europą (wojna, drony, sabotaż, broń masowego rażenia, granica). Dodatkowo ostrzeżenia służb wywiadowczych państw NATO (np. MI5) przed bronią masowego rażenia, terroryzmem lub sabotażem. Wydarzenia bez takiego związku pomijamy." };
 function screenWazne() {
-  const sc = [["region", state.region ? `Moje województwo` : "Moje woj. (wybierz)"], ["everything", "Cała Polska"]];
-  const chips = sc.map(([id, t]) => `<button class="chip" data-newsscope="${id}" aria-pressed="${newsScope === id}">${t}</button>`).join("");
+  const sc = curScope(), counts = newsData && newsFresh(newsData) ? newsCounts(newsData, state.region) : {};
+  const chips = NEWS_GROUPS.map(([id, t]) => `<button class="chip" data-newsscope="${id}" aria-pressed="${sc === id}">${id === "region" && !state.region ? "Moje woj. (wybierz)" : t}${counts[id] ? ` · ${counts[id]}` : ""}</button>`).join("");
   const upd = newsData?.generatedAt ? ` Ostatnie odświeżenie: ${esc(fmtDate(newsData.generatedAt))}.` : "";
-  return `<div class="hero"><h1>Wiadomości z regionu i kraju</h1><p>Wiadomości o bezpieczeństwie z oficjalnych stron: Policji, MEN, RCB, urzędów wojewódzkich i kuratoriów.</p></div>
+  return `<div class="hero"><h1>Wiadomości</h1><p>Wiadomości o bezpieczeństwie: z Twojego województwa, z kraju i ze świata (tylko to, co wpływa na Polskę).</p></div>
   <div class="chips" role="group" aria-label="Zakres">${chips}</div>
+  <p class="muted small" style="margin:6px 2px 10px">${esc(SCOPE_HELP[sc])}</p>
   <div id="newsList">${newsListHtml()}</div>
-  <p class="muted small">Wpisy wybiera automatycznie program po słowach kluczowych (np. zagrożenie, ostrzeżenie, szkoła, ewakuacja) i odsyła do strony źródłowej. To nie są alerty: nie zastępują syren, Alertów RCB ani poleceń służb. Brak wpisu nie oznacza braku zagrożenia.${upd}</p>`;
+  <p class="muted small">Wpisy wybiera automatycznie program po słowach kluczowych i odsyła do strony źródłowej. To nie są alerty: nie zastępują syren, Alertów RCB ani poleceń służb. Brak wpisu nie oznacza braku zagrożenia.${upd}</p>`;
 }
 
 /* Ocena: waga, ważność, odwołania (js/classify.js). „Aktywne” = jeszcze ważne i nieodwołane; reszta trafia do „Wcześniejsze”. */
@@ -191,16 +200,17 @@ const NAV = [
   { h: "#/pulpit", k: "pulpit", t: "Pulpit", i: I.home },
   { h: "#/alerty", k: "alerty", t: "Alerty", i: I.bell },
   { h: "#/mapa", k: "mapa", t: "Zagrożenia", i: I.map },
-  { h: "#/poradnik", k: "poradnik", t: "Poradnik", i: I.book },
   { h: "#/schrony", k: "schrony", t: "W pobliżu", i: I.shield },
+  { h: "#/poradnik", k: "poradnik", t: "Poradnik", i: I.book },
 ];
 const TABS = [...NAV, { h: "#/wiecej", k: "wiecej", t: "Więcej", i: I.more }];
 const MORE = [
-  { h: "#/wazne", t: "Wiadomości z regionu i kraju", d: "Policja, MEN, RCB i urzędy: bezpieczeństwo", i: I.bell },
+  { h: "#/wazne", t: "Wiadomości", d: "Policja, MEN, RCB i urzędy: bezpieczeństwo", i: I.bell },
   { h: "#/ustawienia", t: "Ustawienia", d: "Województwo, zgody, wygląd, Twoje dane", i: I.gear },
   { h: "#/plan-rodziny", t: "Plan rodziny", d: "Kontakty, miejsce spotkania, karty ICE", i: I.users },
   { h: "#/plecak", t: "Plecak i zapasy", d: "Zestaw na 72 godziny, zapas domowy, dokumenty", i: I.bag },
   { h: "#/pierwsza-pomoc", t: "Pierwsza pomoc", d: "Krok po kroku, działa offline", i: I.heart },
+  { h: "#/apteczka", t: "Apteczka", d: "Co mieć, jak przechowywać, do czego służy", i: I.bag },
   { h: "#/test", t: "Test gotowości", d: "Sprawdź, jak jesteś przygotowany", i: I.test },
   { h: "#/zagrozenie", t: "Tryb zagrożenia", d: "112, schron i trzy kroki", i: I.alert },
   { h: "#/miejsca", t: "Ważne miejsca", d: "Dom, praca, rodzina", i: I.pin },
@@ -210,12 +220,13 @@ const MORE = [
 ];
 const SIDE = [
   ...NAV.slice(0, 2),
-  { h: "#/wazne", k: "wazne", t: "Wiadomości z regionu i kraju", i: I.bell },
+  { h: "#/wazne", k: "wazne", t: "Wiadomości", i: I.bell },
   { h: "#/telegram", k: "telegram", t: "Powiadomienia Telegram", i: I.send },
   { h: "#/mapa", k: "mapa", t: "Mapa zagrożeń", i: I.map },
   { h: "#/schrony", k: "schrony", t: "Pomoc w pobliżu", i: I.shield },
-  { h: "#/poradnik", k: "poradnik", t: "Co robić", i: I.list },
+  { h: "#/poradnik", k: "poradnik", t: "Poradnik", i: I.list },
   { h: "#/pierwsza-pomoc", k: "pierwsza-pomoc", t: "Pierwsza pomoc", i: I.heart },
+  { h: "#/apteczka", k: "apteczka", t: "Apteczka", i: I.bag },
   { h: "#/plecak", k: "plecak", t: "Plecak i zapasy", i: I.bag },
   { h: "#/test", k: "test", t: "Test gotowości", i: I.test },
   { h: "#/zagrozenie", k: "zagrozenie", t: "Tryb zagrożenia", i: I.alert },
@@ -224,11 +235,11 @@ const SIDE = [
   { h: "#/ustawienia", k: "ustawienia", t: "Ustawienia", i: I.gear },
   { h: "#/zrodla", k: "zrodla", t: "Źródła i licencje", i: I.book },
 ];
-const GROUP = { ustawienia: "wiecej", zrodla: "wiecej", prywatnosc: "wiecej", telegram: "alerty", "co-robic": "poradnik", "pierwsza-pomoc": "poradnik", test: "poradnik", plecak: "wiecej", "plan-rodziny": "pulpit", zagrozenie: "pulpit", miejsca: "pulpit" };
+const GROUP = { ustawienia: "wiecej", zrodla: "wiecej", prywatnosc: "wiecej", telegram: "alerty", "co-robic": "poradnik", "pierwsza-pomoc": "poradnik", apteczka: "poradnik", test: "poradnik", plecak: "wiecej", "plan-rodziny": "pulpit", zagrozenie: "pulpit", miejsca: "pulpit" };
 
 function shell(route, inner) {
   const cur = GROUP[route] || route;
-  const side = SIDE.map((n) => `<a class="nav ${n.soon ? "soon" : ""}" href="${n.h}" ${n.k === route || (n.k === "poradnik" && route === "co-robic" && n.t === "Co robić") ? 'aria-current="page"' : ""}>${n.i}<span>${n.t}</span>${n.soon ? '<span class="badge soon">wkrótce</span>' : ""}</a>`).join("");
+  const side = SIDE.map((n) => `<a class="nav ${n.soon ? "soon" : ""}" href="${n.h}" ${n.k === route || (n.k === "poradnik" && route === "co-robic") ? 'aria-current="page"' : ""}>${n.i}<span>${n.t}</span>${n.soon ? '<span class="badge soon">wkrótce</span>' : ""}</a>`).join("");
   const tabs = TABS.map((n) => `<a href="${n.h}" ${n.k === cur ? 'aria-current="page"' : ""}>${n.i}<span>${n.t}</span></a>`).join("");
   return `<div class="shell"><nav class="side" aria-label="Menu główne"><a class="brand" href="#/pulpit">${LOGO}<span><span class="wordmark">EGIDA</span><span class="tagline">Twoje centrum bezpieczeństwa</span></span></a>${side}</nav>
   <main class="main" id="main" tabindex="-1">${topbar()}${inner}${legal()}</main>
@@ -399,7 +410,7 @@ function screenPulpit() {
   <div class="card ready"><div class="row" style="gap:16px">${ring(r.pct)}<div style="flex:1"><h2 style="margin:0">Twoja gotowość</h2><p class="muted small" style="margin:2px 0 0">Trzy małe kroki, żeby poczuć się pewniej.</p></div></div>
   <ul class="steps stepsnav">${steps}</ul></div>
   <div class="grid2 grid-d grid4">${tile("#/schrony", "t-green", I.pin, "Pomoc w pobliżu", nm != null ? `Schron: ${nm} min pieszo · AED · szpitale` : "Schrony, AED, szpitale")}${tile("#/pierwsza-pomoc", "t-red", I.heart, "Pierwsza pomoc", "Krok po kroku, offline")}${tile("#/plecak", "t-blue", I.bag, "Plecak i zapasy", "Zestaw na 72 godziny")}${tile("#/plan-rodziny", "t-amber", I.users, "Plan rodziny", "Kontakty i miejsce spotkania")}</div>
-  <div class="grid2 grid-d" style="margin-top:12px"><a class="tile" style="flex-direction:row;align-items:center" href="#/poradnik"><span class="ti t-green">${I.list}</span><b>Co robić, gdy…</b></a><a class="tile" style="flex-direction:row;align-items:center" href="#/telegram"><span class="ti t-blue">${I.send}</span><b>Powiadomienia Telegram dla Twojego województwa</b></a></div>
+  <div class="grid2 grid-d" style="margin-top:12px"><a class="tile" style="flex-direction:row;align-items:center" href="#/poradnik"><span class="ti t-green">${I.list}</span><b>Poradnik: co robić, gdy…</b></a><a class="tile" style="flex-direction:row;align-items:center" href="#/telegram"><span class="ti t-blue">${I.send}</span><b>Powiadomienia Telegram dla Twojego województwa</b></a></div>
   ${installHint()}
 `;
 }
@@ -527,9 +538,23 @@ function screenPoradnik() {
   return `<div class="hero"><h1>Poradnik</h1><p>Krótkie instrukcje, które działają także bez internetu.</p></div>
   <a class="tile" style="flex-direction:row;align-items:center;margin-bottom:12px" href="#/zagrozenie"><span class="ti t-red">${I.alert}</span><b>Tryb zagrożenia: 112, schron, 3 kroki</b></a>
   <a class="tile" style="flex-direction:row;align-items:center" href="#/pierwsza-pomoc"><span class="ti">${I.heart}</span><b>Pierwsza pomoc, w tym resuscytacja (RKO)</b></a>
+  <a class="tile" style="flex-direction:row;align-items:center;margin-top:12px" href="#/apteczka"><span class="ti t-red">${I.bag}</span><b>Apteczka: co mieć i do czego służy</b></a>
   <h2 style="margin-top:20px">Co robić, gdy…</h2>${items}
   <a class="tile" style="flex-direction:row;align-items:center;margin-top:12px" href="#/test"><span class="ti">${I.test}</span><b>Test gotowości (2 minuty)</b></a>
   <button class="btn" id="printGuide" style="margin-top:12px">Drukuj instrukcje (pierwsza pomoc i „Co robić”)</button>`;
+}
+/* Apteczka: osobny ekran z zakładkami (APTECZKA w js/content.js). */
+let apteczkaTab = "dom";
+const aptLine = (s) => { const m = /^([^:]{3,60}): (.+)$/.exec(s); return m ? `<b>${esc(m[1])}:</b> ${esc(m[2])}` : esc(s); };
+function screenApteczka() {
+  const tab = APTECZKA.tabs.find((x) => x.id === apteczkaTab) || APTECZKA.tabs[0];
+  const chips = APTECZKA.tabs.map((x) => `<button class="chip" data-apttab="${x.id}" aria-pressed="${x.id === tab.id}">${esc(x.t)}</button>`).join("");
+  const link = (l) => `<a class="gall" href="${esc(l.h)}">${esc(l.t)} ${I.chevr}</a>`;
+  const blocks = tab.blocks.map((b) => `<h3 class="grp">${esc(b.h)}</h3><div class="card flat apt">${b.p ? `<p>${esc(b.p)}</p>` : ""}${b.items ? `<ul class="aptlist">${b.items.map((x) => `<li>${aptLine(x)}</li>`).join("")}</ul>` : ""}${b.note ? `<div class="note ${b.note.k === "warn" ? "warn" : "neutral"}">${esc(b.note.t)}</div>` : ""}${b.link ? link(b.link) : ""}</div>`).join("");
+  return `${back("#/poradnik", "Poradnik")}<div class="hero"><h1>Apteczka</h1><p>${esc(APTECZKA.intro)}</p></div>
+  <div class="chips" role="group" aria-label="Rozdziały apteczki">${chips}</div>
+  ${blocks}${tab.link ? `<div class="card flat apt">${link(tab.link)}</div>` : ""}
+  <p class="muted small">Opracowanie własne EGIDA na podstawie wytycznych PRC/ERC. Ostatni przegląd: ${esc(APTECZKA.reviewed)}. Przy zagrożeniu życia dzwoń pod 112.</p>`;
 }
 function screenCoRobic(id) {
   const x = WHAT_TO_DO.items.find((i) => i.id === id);
@@ -703,6 +728,7 @@ function render() {
     case "poradnik": inner = screenPoradnik(); break;
     case "co-robic": inner = screenCoRobic(arg); break;
     case "pierwsza-pomoc": inner = screenPierwszaPomoc(); break;
+    case "apteczka": inner = screenApteczka(); break;
     case "plecak": inner = screenPlecak(); break;
     case "test": inner = arg === "wynik" ? screenWynik() : screenTest(); break;
     case "telegram": inner = screenTelegram(); break;
@@ -836,7 +862,9 @@ document.addEventListener("click", (e) => {
   else if (b.id === "printPack") printSheet("Plecak i zapasy", packPrintHtml(state, esc));
   else if (b.id === "importBtn") $("#importFile")?.click();
   else if (b.id === "refreshApp") { b.disabled = true; b.textContent = "Odświeżam…"; refreshApp(); }
+  else if (b.dataset.apttab) { apteczkaTab = b.dataset.apttab; render(); }
   else if (b.dataset.newsscope) { newsScope = b.dataset.newsscope; render(); }
+  else if (b.dataset.newsgo) { newsScope = b.dataset.newsgo; location.hash = "#/wazne"; render(); }
   else if (b.dataset.filter) { alertFilter = b.dataset.filter; render(); }
   else if (b.dataset.when) { alertWhen = b.dataset.when; render(); }
   else if (b.dataset.ptab) { plecakTab = b.dataset.ptab; render(); }

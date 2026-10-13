@@ -206,14 +206,14 @@ const FEED = { generatedAt: "2026-10-11T09:50:00Z", items: [
 ] };
 ok("normalizeNews: odrzuca niebezpieczne adresy i nieznane województwa", () => {
   const f = normalizeNews(FEED);
-  assert.deepEqual(f.items.map((x) => x.id), ["1", "2", "3", "6"]);
+  assert.deepEqual(f.items.map((x) => x.id), ["1", "2", "3"], "v37: starszy wpis „mixed” (miejsce nieustalone) jest pomijany");
   assert.equal(normalizeNews(null), null); assert.equal(normalizeNews({ items: "x" }), null);
 });
 ok("newsForRegion: województwo użytkownika + ogólnopolskie; bez regionu – wszystko", () => {
   const f = normalizeNews(FEED);
   assert.deepEqual(newsForRegion(f, "mazowieckie").map((x) => x.id), ["1", "3"]);
   assert.deepEqual(newsForRegion(f, "lubelskie").map((x) => x.id), ["2", "3"]);
-  assert.equal(newsForRegion(f, null).length, 4); // „Wszystkie regiony” zawiera też portal krajowy
+  assert.equal(newsForRegion(f, null).length, 3);
   assert.ok(!newsForRegion(f, "mazowieckie").some((x) => x.region === "mixed"), "portal krajowy nie trafia do Mojego województwa");
   assert.ok(!newsForRegion(f, null, { onlyAll: true }).some((x) => x.region === "mixed"));
   assert.equal(newsForRegion(f, "mazowieckie", { max: 1 }).length, 1);

@@ -53,7 +53,7 @@ const RADIO = [
 
 export const SOURCES = [
   // Ogólnopolskie (sprawdzone z serwera EGIDA: HTTP 200)
-  // Portal policja.pl zbiera wiadomości ze WSZYSTKICH regionów, więc nie wiemy, którego dotyczą: region „mixed” = pokazujemy tylko w zakresie „Wszystkie regiony”.
+  // Portal policja.pl zbiera wiadomości ze WSZYSTKICH regionów, więc nie wiemy, którego dotyczą: region „mixed” = miejsce ustalamy z kategorii/adresu/tytułu/opisu (news-geo); gdy nie da się pewnie, wpis pomijamy.
   { id: "policja-pl", label: "Policja (portal krajowy)", region: "mixed", kind: "rss", filter: "safety", urls: ["https://policja.pl/dokumenty/rss/1-rss-1.rss"] },
   { id: "rcb", label: "Rządowe Centrum Bezpieczeństwa", region: "all", kind: "html", filter: "safety", urls: ["https://www.gov.pl/web/rcb/wiadomosci", "https://www.gov.pl/web/rcb"] },
   { id: "men", label: "Ministerstwo Edukacji Narodowej", region: "all", kind: "html", filter: "school", urls: ["https://www.gov.pl/web/edukacja/wiadomosci", "https://www.gov.pl/web/edukacja"] },

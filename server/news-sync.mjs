@@ -6,7 +6,7 @@
 import { writeFileSync, readFileSync, renameSync } from "node:fs";
 import { robotsAllows } from "./news-lib.mjs";
 import { VOIVODESHIPS } from "../js/content.js";
-import { parseGddkia, parseRss, parseHtmlList, parseMediaHtml, discoverFeeds, discoverRssPages, toItem, mergeItems } from "./news-lib.mjs";
+import { parseGddkia, parseRss, parseHtmlList, parseMediaHtml, discoverFeeds, discoverRssPages, toItem, mergeItems, needsArticle, articleInfo } from "./news-lib.mjs";
 import { SOURCES as ALL_SOURCES } from "./news-sources.mjs";
 
 const OUT = process.env.NEWS_OUT || "news.json";
@@ -30,7 +30,7 @@ async function robotsOk(url) { // dla mediów: szanujemy robots.txt rozgłośni
 // Rozgłośnie czytane ze stron (bez RSS): kiedy serwer po raz pierwszy zobaczył dany wpis. To jest data wpisu w „Doniesieniach medialnych”.
 const SEEN_FILE = process.env.NEWS_SEEN_FILE || "news-seen.json";
 let seen = {}; try { seen = JSON.parse(readFileSync(SEEN_FILE, "utf8")); } catch { /* pierwszy przebieg */ }
-seen.urls ||= {}; seen.sources ||= {};
+seen.urls ||= {}; seen.sources ||= {}; seen.articles ||= {}; // articles: adres → { t, page } (strona artykułu czytana raz, wynik pamiętamy)
 function stamp(srcId, items) {
   const first = !seen.sources[srcId]; // pierwszy przebieg tego źródła: wpisy na stronie mogą mieć kilka godzin, więc cofamy datę
   return items.map((it) => { if (!(it.url in seen.urls)) seen.urls[it.url] = first ? now - 6 * 36e5 : now; return { ...it, date: new Date(seen.urls[it.url]).toISOString() }; });
@@ -97,7 +97,25 @@ async function runSource(src) {
     rep.ok = rep.urls.some((x) => x.status === 200 && x.items > 0);
     if (!rep.ok) rep.error = rep.urls.map((x) => x.error).filter(Boolean)[0] || "brak wpisów w odpowiedzi";
   } catch (e) { rep.error = String(e.message || e); }
-  const why = [], items = raws.map((r) => toItem(r, src, now, why)).filter(Boolean);
+  // Warstwa „strona artykułu”: tylko dla portali krajowych i tylko, gdy kategoria/adres/tytuł/opis nie wskazały miejsca, a temat jest istotny.
+  // Szanujemy robots.txt, max 12 stron na źródło na przebieg, wynik zapamiętujemy (kolejne przebiegi nie pobierają ponownie).
+  let fetched = 0;
+  for (const r of raws) {
+    if (!needsArticle(r, src)) continue;
+    const c = seen.articles[r.url];
+    if (c) { r.page = c.page; continue; }
+    if (fetched >= 12 || FAST && fetched >= 6) continue;
+    try {
+      if (!(await robotsOk(r.url))) { seen.articles[r.url] = { t: now, page: { text: "", cats: "" } }; continue; }
+      fetched++;
+      r.page = articleInfo(await get(r.url));
+      seen.articles[r.url] = { t: now, page: r.page };
+    } catch (e) { (rep.articleErrors ||= []).push(String(e.message || e).slice(0, 60)); }
+  }
+  if (fetched) rep.articlesFetched = fetched;
+  const why = [], info = [], items = raws.map((r) => toItem(r, src, now, why, info)).filter(Boolean);
+  if (info.length) { rep.groups = {}; for (const x of info) rep.groups[x.group] = (rep.groups[x.group] || 0) + 1; rep.placed = info.slice(0, 12); }
+  rep.held = why.filter((x) => /miejsc/.test(x.why)).length; // wstrzymane: brak pewnego miejsca albo konflikt województw
   if (src.kind === "media" && why.length) { rep.droppedCount = why.length; rep.dropped = why.filter((x) => x.why !== "data").slice(0, 10); } // próbka odrzuconych tytułów: do strojenia filtrów
   if (src.noCap) items.noCap = true;
   rep.kept = items.length;
@@ -110,7 +128,8 @@ await Promise.all(Array.from({ length: 3 }, async () => { for (let s; (s = queue
 
 const items = mergeItems(results.map((r) => r.items), now);
 const okCount = results.filter((r) => r.rep.ok).length;
-const report = { generatedAt: new Date(now).toISOString(), sources: SOURCES.length, ok: okCount, items: items.length, details: results.map((r) => r.rep).sort((a, b) => a.id.localeCompare(b.id)) };
+const groups = { kraj: items.filter((x) => x.region === "all").length, swiat: items.filter((x) => x.region === "world").length, wojewodztwa: items.filter((x) => x.region !== "all" && x.region !== "world").length };
+const report = { generatedAt: new Date(now).toISOString(), sources: SOURCES.length, ok: okCount, items: items.length, groups, details: results.map((r) => r.rep).sort((a, b) => a.id.localeCompare(b.id)) };
 for (const d of report.details) console.log(`${d.ok ? "OK " : "ERR"} ${d.id.padEnd(22)} pobrano ${d.fetched}, po filtrze ${d.kept}${d.error ? " – " + d.error : ""}`);
 console.log(`Źródła: ${okCount}/${SOURCES.length}, wpisów w news.json: ${items.length}`);
 if (DUMP) process.exit(0);
@@ -118,6 +137,7 @@ if (DUMP) process.exit(0);
 if (!okCount) { console.log("Żadne źródło nie odpowiedziało – zostaje poprzedni news.json"); try { writeFileSync(REPORT, JSON.stringify(report, null, 1)); } catch { /* ignoruj */ } process.exit(1); }
 try { writeFileSync(CACHE, JSON.stringify(cache)); } catch { /* ignoruj */ }
 for (const [u, t] of Object.entries(seen.urls)) if (now - t > 21 * 864e5) delete seen.urls[u]; // porządek w pamięci
+for (const [u, a] of Object.entries(seen.articles)) if (now - a.t > 7 * 864e5) delete seen.articles[u];
 try { writeFileSync(SEEN_FILE, JSON.stringify(seen)); } catch { /* ignoruj */ }
 const save = (file, obj) => { const tmp = `${file}.${process.pid}.tmp`; writeFileSync(tmp, JSON.stringify(obj)); renameSync(tmp, file); };
 // Wpisy ze źródeł, które chwilowo zawiodły, zachowujemy z poprzedniego pliku (do limitu wieku), aby wiadomość nie znikała przez jeden błąd sieci.

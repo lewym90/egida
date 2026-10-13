@@ -364,6 +364,15 @@ input[type="search"].sel{-webkit-appearance:none;appearance:none;width:100%;font
 .newsitem .nm{font-size:.8125rem;color:var(--muted,#5b6b78)}
 .list.newslist .newsitem{padding:0 14px}
 .smore2{display:inline-flex;align-items:center;gap:4px;min-height:44px;font-weight:700;color:var(--brand-ink)}
+.apt p{margin:0 0 8px}
+.aptlist{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:7px}
+.aptlist li{line-height:1.45}
+.apt .note{margin-top:10px}
+.apt .gall{margin-top:6px}
+.badge.grp{background:var(--brand-tint);color:var(--brand-ink);padding:1px 8px;margin-right:2px}
+.badge.grp.kraj{background:var(--info-bg);color:var(--info)}
+.badge.grp.world{background:var(--warn-bg);color:var(--warn-ink)}
+.newsworld{display:flex;align-items:center;justify-content:space-between;width:100%;min-height:44px;background:none;border:0;border-top:1px solid var(--line);padding:10px 0 0;font:inherit;font-family:var(--font-h);font-weight:700;color:var(--brand-ink);cursor:pointer;text-align:left}
 .badge.media{background:var(--note);color:var(--text-card);border:1px solid var(--line);padding:1px 8px;margin-right:2px}
 .goodtoknow .gall{display:flex;align-items:center;gap:6px;min-height:44px}
 h3.grp{margin:18px 2px 8px;font-family:var(--font-h);font-size:.95rem;color:var(--muted,#667);text-transform:uppercase;letter-spacing:.04em}
