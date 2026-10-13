@@ -6,15 +6,19 @@ const IDS = new Set(VOIVODESHIPS.map((v) => v.id));
 const httpsOnly = (u) => { try { return new URL(u).protocol === "https:"; } catch { return false; } };
 
 /** Sprawdza strukturę pobranego pliku; odrzuca wpisy z adresem innym niż https i z nieznanym województwem. Zwraca null, gdy plik jest bezużyteczny. */
+const NAMED = { nbsp: " ", amp: "&", quot: '"', apos: "'", lt: "<", gt: ">", ndash: "–", mdash: "—", hellip: "…", bdquo: "„", ldquo: "“", rdquo: "”", laquo: "«", raquo: "»", oacute: "ó", Oacute: "Ó", rsquo: "’", lsquo: "‘" };
+/** Zamiana encji HTML w tytule na znaki (zabezpieczenie, gdyby serwer przysłał „&ndash;”). */
+export const decodeEntities = (s) => { let t = String(s || ""); for (let i = 0; i < 2; i++) t = t.replace(/&(?:#(\d{1,6})|#[xX]([0-9a-fA-F]{1,6})|([A-Za-z][A-Za-z0-9]{1,8}));/g, (m, d, h, n) => { try { if (d) return String.fromCodePoint(Number(d)); if (h) return String.fromCodePoint(parseInt(h, 16)); return n in NAMED ? NAMED[n] : m; } catch { return m; } }); return t; };
+
 export function normalizeNews(raw) {
   if (!raw || typeof raw !== "object" || !Array.isArray(raw.items)) return null;
   const items = [];
   for (const x of raw.items) {
     if (!x || typeof x !== "object") continue;
-    const title = String(x.title || "").trim().slice(0, 240), url = String(x.url || ""), t = Date.parse(x.date);
+    const title = decodeEntities(x.title).trim().slice(0, 240), url = String(x.url || ""), t = Date.parse(x.date);
     const region = x.region === "all" || x.region === "mixed" || IDS.has(x.region) ? x.region : null; // „mixed” = portal krajowy bez ustalonego regionu
     if (!title || !httpsOnly(url) || !Number.isFinite(t) || !region) continue;
-    items.push({ id: String(x.id || url).slice(0, 200), title, summary: String(x.summary || "").slice(0, 300), url, date: new Date(t).toISOString(), source: String(x.source || "").slice(0, 80), region, kind: String(x.kind || "").slice(0, 20), until: Number.isFinite(Date.parse(x.until)) ? new Date(x.until).toISOString() : null });
+    items.push({ id: String(x.id || url).slice(0, 200), title, summary: decodeEntities(x.summary).slice(0, 300), url, date: new Date(t).toISOString(), source: String(x.source || "").slice(0, 80), region, kind: String(x.kind || "").slice(0, 20), until: Number.isFinite(Date.parse(x.until)) ? new Date(x.until).toISOString() : null });
   }
   items.sort((a, b) => b.date.localeCompare(a.date));
   return { generatedAt: Number.isFinite(Date.parse(raw.generatedAt)) ? new Date(raw.generatedAt).toISOString() : null, items };

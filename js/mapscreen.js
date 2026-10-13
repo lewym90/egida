@@ -76,7 +76,7 @@ const CONF = { low: "niska", medium: "średnia", high: "wysoka" };
 /* ---------- ikony ---------- */
 export const shelterIcon = (L, mine) => L.divIcon({
   className: "sh-ic", iconSize: [30, 30], iconAnchor: [15, 15],
-  html: `<svg viewBox="0 0 30 30" width="30" height="30" aria-hidden="true"><circle cx="15" cy="15" r="13" fill="${mine ? "#0B6B63" : "#2A4DA0"}" stroke="#fff" stroke-width="2"/><path d="M15 6l7 2.6v4.9c0 4.3-3 7.1-7 8.4-4-1.3-7-4.1-7-8.4V8.6z" fill="none" stroke="#fff" stroke-width="1.8" stroke-linejoin="round"/></svg>`,
+  html: `<svg viewBox="0 0 30 30" width="30" height="30" aria-hidden="true"><circle cx="15" cy="15" r="13" fill="${mine ? "#0B6B63" : "#E65100"}" stroke="#fff" stroke-width="2"/><path d="M15 6l7 2.6v4.9c0 4.3-3 7.1-7 8.4-4-1.3-7-4.1-7-8.4V8.6z" fill="none" stroke="#fff" stroke-width="1.8" stroke-linejoin="round"/></svg>`,
 });
 function threatIcon(L, row) {
   const t = row.t, fast = TYPES[t.type].kind === "fast";
@@ -263,7 +263,7 @@ export function initMapScreen(ctx, { demo = false, diag = false } = {}) {
         for (const s of list) {
           if (!bounds.contains([s.lat, s.lon]) || n++ > 1500) continue;
           if (s.src === "osm") L.marker([s.lat, s.lon], { icon: shelterIcon(L, false), keyboard: false }).bindPopup(pop(s, "OpenStreetMap · niezweryfikowane", s.access ? `<br><span class="small">Dostęp: ${esc(s.access)}</span>` : "")).addTo(gShelters);
-          else L.circleMarker([s.lat, s.lon], { renderer: canvas, radius: 7, color: "#fff", weight: 2, fillColor: "#2A4DA0", fillOpacity: 1 }).bindPopup(pop(s, "Punkt schronienia · Rejestr PSP", s.access ? `<br><span class="small">Dostępność: ${esc(s.access)}</span>` : "")).addTo(gShelters);
+          else L.circleMarker([s.lat, s.lon], { renderer: canvas, radius: 7, color: "#fff", weight: 2, fillColor: "#E65100", fillOpacity: 1 }).bindPopup(pop(s, "Punkt schronienia · Rejestr PSP", s.access ? `<br><span class="small">Dostępność: ${esc(s.access)}</span>` : "")).addTo(gShelters);
         }
       }
       if (hint) hint.textContent = z < 12 && ml().shelters !== false ? "Przybliż mapę (zoom 12 lub więcej), aby zobaczyć punkty schronienia." : "";

@@ -22,8 +22,8 @@ const NATIONAL = [
   // 5. element: opcje źródła. polishOnly = kanał dotyczy wyłącznie Polski, więc poważne zdarzenie bez znanej miejscowości trafia do całego kraju.
   ["polsatnews", "Polsat News", ["https://www.polsatnews.pl/rss/polska.xml"], null, { polishOnly: true }],
   ["tvn24", "TVN24", ["https://tvn24.pl/polska.xml", "https://tvn24.pl/najnowsze.xml"], null, { polishOnly: false }],
-  ["rmf24", "RMF24", ["https://www.rmf24.pl/fakty/polska/feed", "https://www.rmf24.pl/feed"], null, { polishOnly: true }],
-  ["interia", "Interia", ["https://wydarzenia.interia.pl/polska/feed", "https://wydarzenia.interia.pl/feed"], null, { polishOnly: true }],
+  ["rmf24", "RMF24", ["https://www.rmf24.pl/fakty/polska/feed", "https://www.rmf24.pl/feed"], null, { polishOnly: false }],
+  ["interia", "Interia", ["https://wydarzenia.interia.pl/polska/feed", "https://wydarzenia.interia.pl/feed"], null, { polishOnly: false }],
   // Wirtualna Polska (kanał Wiadomości, RSS 2.0 – sprawdzony 13.10.2026) i Onet (kandydat): portale „z kraju i ze świata”, więc tylko z polskim kontekstem w tytule.
   ["wp", "Wirtualna Polska", ["https://wiadomosci.wp.pl/rss.xml"]],
   ["onet", "Onet Wiadomości", ["https://wiadomosci.onet.pl/.feed"]],

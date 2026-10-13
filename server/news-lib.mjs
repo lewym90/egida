@@ -35,7 +35,10 @@ export function passesFilter(mode, title, summary = "") {
   return matches(text, SAFETY);
 }
 
-const stripTags = (s) => String(s || "").replace(/<[^>]*>/g, " ").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&#0?39;|&apos;/g, "'").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&#(\d+);/g, (_, n) => String.fromCodePoint(Number(n))).replace(/\s+/g, " ").trim();
+const NAMED = { nbsp: " ", amp: "&", quot: '"', apos: "'", lt: "<", gt: ">", ndash: "–", mdash: "—", hellip: "…", bdquo: "„", ldquo: "“", rdquo: "”", laquo: "«", raquo: "»", lsquo: "‘", rsquo: "’", sbquo: "‚", oacute: "ó", Oacute: "Ó", aogon: "ą", Aogon: "Ą", eogon: "ę", Eogon: "Ę", cacute: "ć", Cacute: "Ć", sacute: "ś", Sacute: "Ś", zacute: "ź", Zacute: "Ź", zdot: "ż", Zdot: "Ż", nacute: "ń", Nacute: "Ń", lstrok: "ł", Lstrok: "Ł", eacute: "é", uuml: "ü", ouml: "ö", auml: "ä", copy: "©", deg: "°", euro: "€", bull: "•", middot: "·", shy: "" };
+/** Zamienia encje HTML (nazwane i liczbowe) na znaki; powtarza raz, bo część kanałów koduje podwójnie („&amp;ndash;”). */
+export const decodeEntities = (s) => { let t = String(s || ""); for (let i = 0; i < 2; i++) t = t.replace(/&(?:#(\d{1,6})|#[xX]([0-9a-fA-F]{1,6})|([A-Za-z][A-Za-z0-9]{1,8}));/g, (m, d, h, n) => { try { if (d) return String.fromCodePoint(Number(d)); if (h) return String.fromCodePoint(parseInt(h, 16)); return n in NAMED ? NAMED[n] : m; } catch { return m; } }); return t; };
+const stripTags = (s) => decodeEntities(String(s || "").replace(/<[^>]*>/g, " ")).replace(/\s+/g, " ").trim();
 const clip = (s, n) => (s.length > n ? s.slice(0, n - 1).trimEnd() + "…" : s);
 const toIso = (v) => { const d = new Date(v); return Number.isFinite(d.getTime()) ? d.toISOString() : null; };
 /** Tylko adresy https (nigdy javascript:, data:). */
@@ -161,7 +164,7 @@ export function toItem(raw, src, nowMs, why = null) {
       if (regs.length) region = regs[0];
       else if (nationalThreat(raw.title)) region = "all";
       // Poważne zdarzenie w Polsce bez miejscowości z naszej listy (nożownik, zabójstwo, wypadek z ofiarami…): cały kraj. Portale „z kraju i ze świata” – tylko z polskim kontekstem.
-      else if (strongIncident(raw.title) && !foreignEvent(raw.title) && (src.polishOnly || polishHint(raw.title))) region = "all";
+      else if (strongIncident(raw.title) && !foreignEvent(raw.title) && (src.polishOnly || polishHint(raw.title) || /\/polska(\/|$)/.test(raw.url)) && !/\/(swiat|swiecie|world)(\/|$)/.test(raw.url)) region = "all";
       else return no("brak miejsca");
     } else if (src.local) { // regionalny portal prywatny (np. Lublin112): domyślnie jego województwo, ale nie wiadomości „z kraju”
       if (nationalThreat(raw.title) && !regs.includes(src.region)) region = regs[0] || "all";
@@ -173,7 +176,7 @@ export function toItem(raw, src, nowMs, why = null) {
     }
   }
   const id = raw.key ? `gddkia/${raw.key}` : raw.url.replace(/^https:\/\/(www\.)?/, "").replace(/[?#].*$/, "");
-  return { id, title: clip(raw.title, LIMITS.titleChars), summary: src.kind === "media" ? "" : clip(raw.summary || "", LIMITS.summaryChars), url: raw.url, date: new Date(t).toISOString(), source: src.label, region, kind: src.kind, ...(active ? { until: raw.until } : {}) };
+  return { id, title: clip(decodeEntities(raw.title), LIMITS.titleChars), summary: src.kind === "media" ? "" : clip(raw.summary || "", LIMITS.summaryChars), url: raw.url, date: new Date(t).toISOString(), source: src.label, region, kind: src.kind, ...(active ? { until: raw.until } : {}) };
 }
 
 /** Łączy wpisy ze wszystkich źródeł: deduplikacja po adresie, limit na źródło, sortowanie od najnowszych. */

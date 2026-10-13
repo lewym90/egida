@@ -163,7 +163,7 @@ export function initSheltersScreen(ctx, { demo = false, mode = "schrony" } = {})
     if (x.kind === "aed") return L.circleMarker([x.lat, x.lon], { ...o, renderer: canvas, radius: 9, color: "#fff", weight: 2, fillColor: "#C62828", fillOpacity: 1 });
     if (x.kind === "szpital") return L.marker([x.lat, x.lon], { icon: hospitalIcon(L, x.sor), keyboard: false, bubblingMouseEvents: false });
     if (x.mine || x.src === "osm" || x.src === "demo") return L.marker([x.lat, x.lon], { icon: shelterIcon(L, !!x.mine), keyboard: false, bubblingMouseEvents: false });
-    return L.circleMarker([x.lat, x.lon], { ...o, renderer: canvas, radius: 8, color: "#fff", weight: 2, fillColor: "#2A4DA0", fillOpacity: 1 });
+    return L.circleMarker([x.lat, x.lon], { ...o, renderer: canvas, radius: 8, color: "#fff", weight: 2, fillColor: "#E65100", fillOpacity: 1 });
   };
   const drawMap = () => {
     if (!map || !L || dead) return;
