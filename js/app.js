@@ -127,7 +127,7 @@ const roadMore = (n) => `<a class="gall" href="${ROADS_LINK}" target="_blank" re
 function newsCardHtml() {
   if (!newsData || !state.region) return "";
   const fresh = newsFresh(newsData);
-  const list = fresh ? newsForRegion(newsData, state.region, { max: 3 }) : [];
+  const list = fresh ? newsForRegion(newsData, state.region, { max: 5 }) : [];
   if (fresh && !list.length) return "";
   const body = fresh ? `<ul class="newslist">${list.map(newsLink).join("")}</ul>` : `<p class="muted small" style="margin:6px 0 0">Brak aktualnych danych. Wiadomości z oficjalnych stron mogą być nieaktualne, więc ich nie pokazujemy.</p>`;
   return `<div class="card newscard"><h2>Wiadomości z regionu i kraju</h2>${body}<a class="smore2" href="#/wazne">Wszystkie wiadomości ${I.chevr}</a></div>`;
@@ -287,7 +287,7 @@ async function runOffline(btn) {
     const vv = VOIVODESHIPS.find((v) => v.id === state.region);
     const centers = offlineCenters({ gps, places: state.places || [], shelters: state.shelters || [], regionCenter: vv ? { lat: vv.lat, lon: vv.lon } : null });
     if (!centers.length) { msg.textContent = "Najpierw wybierz województwo w Ustawieniach albo dodaj Ważne miejsce (dom, praca, rodzina)."; return; }
-    const r = await downloadOffline({ centers, pspUrl: CONFIG.pspUrl, sheltersUrl: CONFIG.sheltersUrl, aedUrl: CONFIG.aedUrl, hospitalsUrl: CONFIG.hospitalsUrl, cache: makePspCache(CONFIG.pspUrl),
+    const r = await downloadOffline({ centers, pspUrl: CONFIG.pspUrl, sheltersUrl: CONFIG.sheltersUrl, aedUrl: CONFIG.aedUrl, aedExtraUrl: CONFIG.aedRatujUrl, hospitalsUrl: CONFIG.hospitalsUrl, cache: makePspCache(CONFIG.pspUrl),
       onProgress: ({ done, total, label }) => { msg.textContent = `Pobieranie ${Math.min(done + 1, total)} z ${total}${label ? ": " + label : ""}…`; } });
     await Promise.allSettled([loadAlerts(), loadNews()]);
     if (r.failed && !r.points && !r.shelterDb && !r.aed && !r.hospitals) { msg.style.color = "var(--danger-ink)"; msg.textContent = "Nie udało się pobrać danych. Sprawdź połączenie i spróbuj ponownie."; return; }
@@ -860,7 +860,38 @@ applyPrefs(); applyCounter();
 testAnswers = { ...(state.test?.answers || {}) };
 render();
 loadNews().then(() => { if (state.onboarded && ["pulpit", "wazne", ""].includes(parse().route) && !document.activeElement?.closest?.("select,input,textarea")) render(); });
-setInterval(() => loadNews().then(() => { if (["pulpit", "wazne"].includes(parse().route) && !document.activeElement?.closest?.("select,input,textarea")) render(); }), 10 * 60 * 1000);
 loadAlerts().then(() => { if (state.onboarded && ["pulpit", "alerty", "ustawienia", "telegram", ""].includes(parse().route) && !document.activeElement?.closest?.("select,input,textarea")) render(); });
-setInterval(() => loadAlerts().then(() => { if (["pulpit", "alerty", "ustawienia", "telegram"].includes(parse().route) && !document.activeElement?.closest?.("select,input,textarea")) render(); }), 5 * 60 * 1000);
+
+/* ---------- odświeżanie na żywo ----------
+   Alerty co minutę, wiadomości co 2 minuty (tylko gdy aplikacja jest na ekranie), a po powrocie z tła / z uśpienia / po odzyskaniu sieci – od razu.
+   Ekran przerysowujemy tylko wtedy, gdy dane naprawdę się zmieniły, z zachowaniem miejsca przewinięcia i bez przerywania pisania. */
+const LIVE_ALERT_MS = 60 * 1000, LIVE_NEWS_MS = 2 * 60 * 1000, LIVE_MIN_GAP = 15 * 1000;
+const sigAlerts = () => JSON.stringify([alertsData.ok, alertsData.updated, alertsData.items]);
+const sigNews = () => JSON.stringify([newsData ? newsFresh(newsData) : null, newsData?.items?.map((x) => x.id)]);
+const editingNow = () => !!document.activeElement?.closest?.("select,input,textarea");
+function softRender() {
+  const sh = document.querySelector(".shell"), y = sh ? sh.scrollTop : 0, wy = window.scrollY;
+  render();
+  const sh2 = document.querySelector(".shell"); if (sh2 && y) sh2.scrollTop = y; if (wy) window.scrollTo(0, wy);
+}
+let liveBusy = false, liveLast = { alerts: Date.now(), news: Date.now() };
+async function refreshLive(kinds, { force = false } = {}) {
+  if (liveBusy || (document.hidden && !force) || !state.onboarded) return;
+  liveBusy = true;
+  try {
+    const route = parse().route, before = [sigAlerts(), sigNews()], now = Date.now();
+    const wantA = kinds.includes("alerts"), wantN = kinds.includes("news");
+    if (wantA) liveLast.alerts = now; if (wantN) liveLast.news = now;
+    await Promise.all([wantA ? loadAlerts() : null, wantN ? loadNews() : null]);
+    const changed = (wantA && sigAlerts() !== before[0] && ["pulpit", "alerty", "ustawienia", "telegram", ""].includes(route)) || (wantN && sigNews() !== before[1] && ["pulpit", "wazne", ""].includes(route));
+    if (changed && !editingNow() && parse().route === route) softRender();
+  } catch { /* następna próba za chwilę */ } finally { liveBusy = false; }
+}
+setInterval(() => { if (Date.now() - liveLast.alerts >= LIVE_ALERT_MS - 1000) refreshLive(["alerts"]); }, 10 * 1000);
+setInterval(() => { if (Date.now() - liveLast.news >= LIVE_NEWS_MS - 1000) refreshLive(["news"]); }, 20 * 1000);
+const resumeLive = () => { if (document.hidden) return; const gap = Date.now() - Math.max(liveLast.alerts, liveLast.news); if (gap >= LIVE_MIN_GAP) refreshLive(["alerts", "news"], { force: true }); };
+document.addEventListener("visibilitychange", resumeLive);
+window.addEventListener("pageshow", resumeLive);
+window.addEventListener("focus", resumeLive);
+window.addEventListener("online", () => refreshLive(["alerts", "news"], { force: true }));
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});

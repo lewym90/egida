@@ -2,7 +2,7 @@
 // Zasada: tylko oficjalne, zaufane źródła (Policja, MEN, RCB, urzędy wojewódzkie, kuratoria). Nic nie piszemy od siebie, nic nie omijamy.
 import { XMLParser } from "fast-xml-parser";
 import { dedupeSimilar } from "../js/similar.js";
-import { mentionsRegion, nationalThreat, regionsMentioned } from "./news-places.mjs";
+import { mentionsRegion, nationalThreat, regionsMentioned, strongIncident, foreignEvent, polishHint } from "./news-places.mjs";
 
 export const LIMITS = { perSource: 15, total: 200, maxAgeDays: 14, titleChars: 200, summaryChars: 280 };
 
@@ -146,24 +146,29 @@ export function parseMediaHtml(html, baseUrl, rule) {
 }
 
 /** Normalizacja wpisu źródłowego do formatu news.json. */
-export function toItem(raw, src, nowMs) {
-  if (!raw.date) return null;
+export function toItem(raw, src, nowMs, why = null) {
+  const no = (r) => { why?.push({ title: String(raw.title || "").slice(0, 110), why: r }); return null; };
+  if (!raw.date) return no("brak daty");
   const t = new Date(raw.date).getTime(), active = raw.until && new Date(raw.until).getTime() >= nowMs;
-  if (!Number.isFinite(t) || t > nowMs + 36e5 || (!active && nowMs - t > LIMITS.maxAgeDays * 864e5)) return null; // za stare albo z przyszłości
-  if (!passesFilter(src.filter, raw.title, raw.summary)) return null;
+  if (!Number.isFinite(t) || t > nowMs + 36e5 || (!active && nowMs - t > LIMITS.maxAgeDays * 864e5)) return no("data"); // za stare albo z przyszłości
+  if (!passesFilter(src.filter, raw.title, raw.summary)) return no("filtr słów");
   // Media: wpis musi dotyczyć województwa rozgłośni (tytuł lub kategorie wskazują miejscowość/region), inaczej to wiadomość z kraju lub ze świata.
   // Wyjątek: poważne zagrożenie bezpieczeństwa w Polsce (zamach, planowany atak) – pokazujemy je w województwie, które wymieniono w tekście, a gdy miejsca nie ma, w całym kraju.
   let region = raw.region || src.region;
   if (src.kind === "media") {
     const txt = `${raw.title} ${raw.cats || ""}`, regs = regionsMentioned(raw.title), regsAll = regionsMentioned(txt);
     if (src.national) { // portal ogólnopolski: województwo z nazwy miejscowości/regionu w tytule; zagrożenie krajowe bez miejsca → cały kraj; inaczej odrzucamy
-      if (regs.length) region = regs[0]; else if (nationalThreat(raw.title)) region = "all"; else return null;
+      if (regs.length) region = regs[0];
+      else if (nationalThreat(raw.title)) region = "all";
+      // Poważne zdarzenie w Polsce bez miejscowości z naszej listy (nożownik, zabójstwo, wypadek z ofiarami…): cały kraj. Portale „z kraju i ze świata” – tylko z polskim kontekstem.
+      else if (strongIncident(raw.title) && !foreignEvent(raw.title) && (src.polishOnly || polishHint(raw.title))) region = "all";
+      else return no("brak miejsca");
     } else if (src.local) { // regionalny portal prywatny (np. Lublin112): domyślnie jego województwo, ale nie wiadomości „z kraju”
       if (nationalThreat(raw.title) && !regs.includes(src.region)) region = regs[0] || "all";
       else if (regs.length && !regs.includes(src.region)) region = regs[0];
-      else if (!regs.includes(src.region) && /(^|[\s,])(kraj|świat|swiat|polityka)([\s,]|$)/i.test(raw.cats || "") && !regsAll.includes(src.region)) return null;
+      else if (!regs.includes(src.region) && /(^|[\s,])(kraj|świat|swiat|polityka)([\s,]|$)/i.test(raw.cats || "") && !regsAll.includes(src.region)) return no("z kraju/świata");
     } else if (!mentionsRegion(txt, src.region)) {
-      if (!nationalThreat(txt)) return null;
+      if (!nationalThreat(txt)) return no("inny region");
       region = regionsMentioned(txt)[0] || "all";
     }
   }
@@ -246,7 +251,16 @@ const MEDIA_DENY = ["mecz", "liga", "ligi", "turniej", "puchar", "zawodnik", "za
   "wybor", "koalicj", "prawic", "lewic", "opozycj", "sondaz", "sejm", "posel", "poslank", "burza po", "burza wokol", "burza medialn", "burza polityczn", "burza w sieci", "burza w internecie",
   "wyrok", "skazan", "biegl", "sad podja", "zajal sie sad", "forum", "rywaliz", "zawody", "remont"];
 /** Filtr mediów: tytuł musi zawierać słowo o zagrożeniu/poważnym zdarzeniu i nie zawierać słów ze sportu, kultury i rozmów. */
-export function passesMedia(title) { return matches(title, MEDIA_SAFETY) && (!matches(title, MEDIA_DENY) || nationalThreat(title)); } // „zamach na premiera” nie jest premierą teatralną
+// Słowa „miękkie” (forma materiału: wideo, wywiad…) nie kasują poważnego zdarzenia. „Twarde” (sport, kultura, polityka, sądy) odrzucają zawsze:
+// „Zabił bramkę” to mecz, a „skazany za zabójstwo” to wyrok, nie bieżące wydarzenie.
+const SOFT_DENY = ["wideo", "gosc", "ekspert", "rozmowa", "wywiad", "reportaz", "podcast", "felieton"];
+const HARD_DENY = [...MEDIA_DENY.filter((w) => !SOFT_DENY.includes(w)), "bramk", "proces", "akt oskarz", "apelac", "sedzi"];
+export function passesMedia(title) {
+  const strong = strongIncident(title);
+  if (!matches(title, MEDIA_SAFETY) && !strong) return false;
+  if (!matches(title, MEDIA_DENY)) return true;
+  return nationalThreat(title) || (strong && !matches(title, HARD_DENY)); // „zamach na premiera” nie jest premierą teatralną
+}
 
 /** Minimalny czytnik robots.txt: czy User-agent „*” (lub nasz) może pobrać ścieżkę. Brak pliku = wolno. */
 export function robotsAllows(txt, path, ua = "egida") {

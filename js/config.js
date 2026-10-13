@@ -46,4 +46,6 @@ export const CONFIG = {
   // Defibrylatory (AED) i szpitale z OpenStreetMap, odświeżane raz na dobę przez serwer EGIDA (gałąź data).
   aedUrl: "https://raw.githubusercontent.com/lewym90/egida/data/aed.json",
   hospitalsUrl: "https://raw.githubusercontent.com/lewym90/egida/data/hospitals.json",
+  // Drugie źródło defibrylatorów: publiczna mapa „Ratuj z sercem – Mapa AED” (ratujzsercem.pl), odczytywana przez serwer EGIDA raz na dobę. Brak pliku = pomijane.
+  aedRatujUrl: "https://raw.githubusercontent.com/lewym90/egida/data/aed-ratuj.json",
 };

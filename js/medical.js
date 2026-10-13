@@ -3,6 +3,7 @@
 // Telefon pobiera gotowe pliki (nie pyta OSM o nic) i trzyma kopię na wypadek braku internetu. Dane © współtwórcy OpenStreetMap, ODbL.
 // Pozycje w plikach to kompaktowe wiersze (tablice), żeby plik z ok. 15 tys. defibrylatorów był mały.
 
+import { AED_EXTRA } from "./aed-extra.js";
 import { haversineKm } from "./geo.js";
 
 const clean = (v, max = 160) => (typeof v === "string" ? v.replace(/[\u0000-\u001f\u007f]+/g, " ").trim().slice(0, max) : "");
@@ -113,7 +114,7 @@ const goodPos = (r) => Array.isArray(r) && Number.isFinite(r[1]) && Number.isFin
 
 /** Wiersz → obiekt w formacie używanym na ekranie (jak schrony: id, lat, lon, name, how, access, hours, addr, osmUrl, src). */
 export function unpackAed(r) {
-  return { id: String(r[0]), lat: r[1], lon: r[2], name: clean(r[3], 80) || "Defibrylator AED", how: clean(r[4], 200), access: clean(r[5], 40), hours: clean(r[6], 80), addr: clean(r[7], 100), checked: clean(r[8], 12), indoor: r[9] === 1, operator: clean(r[10], 60), level: clean(r[11], 12), near: clean(r[12], 120), obj: clean(r[13], 100), addrD: Number.isFinite(r[14]) ? r[14] : 0, kind: "aed", src: "osm", osmUrl: osmUrl(String(r[0])) };
+  return { id: String(r[0]), lat: r[1], lon: r[2], name: clean(r[3], 80) || "Defibrylator AED", how: clean(r[4], 200), access: clean(r[5], 40), hours: clean(r[6], 80), addr: clean(r[7], 100), checked: clean(r[8], 12), indoor: r[9] === 1, operator: clean(r[10], 60), level: clean(r[11], 12), near: clean(r[12], 120), obj: clean(r[13], 100), addrD: Number.isFinite(r[14]) ? r[14] : 0, kind: "aed", src: String(r[0])[0] === "r" ? "ratuj" : String(r[0])[0] === "x" ? "miejsce" : "osm", osmUrl: osmUrl(String(r[0])) };
 }
 export function unpackHospital(r) {
   return { id: String(r[0]), lat: r[1], lon: r[2], name: clean(r[3], 100) || NONAME, sor: r[4] === 1, addr: clean(r[5], 100), addrD: Number.isFinite(r[7]) ? r[7] : 0, phone: clean(r[6], 30), how: "", kind: "szpital", src: "osm", osmUrl: osmUrl(String(r[0])) };
@@ -123,17 +124,36 @@ export function unpackHospital(r) {
  * Pobiera aed.json / hospitals.json i zapisuje kopię w telefonie. kind: "aed" | "szpitale".
  * Zwraca { at, count, items, stale } albo null. Przy błędzie sieci oddaje ostatnią kopię (stale:true).
  */
-export async function loadMedicalDb(kind, url, storage = globalThis.localStorage, fetchImpl = (...a) => fetch(...a)) {
+export async function loadMedicalDb(kind, url, storage = globalThis.localStorage, fetchImpl = (...a) => fetch(...a), extraUrl = "") {
   const key = kind === "aed" ? AED_CACHE : HOSP_CACHE, unpack = kind === "aed" ? unpackAed : unpackHospital;
-  const build = (j) => { const good = j.rows.filter(goodPos), items = (kind === "aed" ? good : tidyHospitalRows(good)).map(unpack); return { at: clean(j.at, 40), count: items.length, items }; };
+  // Dopisuje punkty z innego źródła tylko tam, gdzie w promieniu 30 m nie ma już defibrylatora.
+  const addNew = (base, extra) => {
+    const cell = (la, lo) => Math.floor(la / 0.001) + "," + Math.floor(lo / 0.0016), idx = new Map();
+    for (const g of base) { const k = cell(g[1], g[2]); if (!idx.has(k)) idx.set(k, []); idx.get(k).push(g); }
+    return extra.filter((x) => { const ci = Math.floor(x[1] / 0.001), cj = Math.floor(x[2] / 0.0016); for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) for (const g of idx.get(`${ci + a},${cj + b}`) || []) if (haversineKm({ lat: g[1], lon: g[2] }, { lat: x[1], lon: x[2] }) < 0.03) return false; return true; });
+  };
+  const build = (j) => {
+    const good = j.rows.filter(goodPos); let rows = kind === "aed" ? good : tidyHospitalRows(good), extra = 0, ratuj = 0;
+    if (kind === "aed") {
+      const manual = addNew(good, AED_EXTRA), rt = addNew(good.concat(manual), (Array.isArray(j.ratuj) ? j.ratuj : []).filter(goodPos));
+      rows = good.concat(manual, rt); extra = manual.length; ratuj = rt.length;
+    }
+    const items = rows.map(unpack); return { at: clean(j.at, 40), count: good.length, extra, ratuj, items };
+  };
   if (url) {
     try {
-      const r = await fetchImpl(url + (url.includes("?") ? "&" : "?") + "t=" + Math.floor(Date.now() / 3600000), { signal: AbortSignal.timeout(30000) });
+      const stamp = "t=" + Math.floor(Date.now() / 3600000);
+      const r = await fetchImpl(url + (url.includes("?") ? "&" : "?") + stamp, { signal: AbortSignal.timeout(30000) });
       if (!r.ok) throw new Error("HTTP " + r.status);
       const j = await r.json();
       if (!j || !Array.isArray(j.rows)) throw new Error("format");
+      if (kind === "aed" && extraUrl) {
+        j.ratuj = null;
+        try { const r2 = await fetchImpl(extraUrl + "?" + stamp, { signal: AbortSignal.timeout(20000) }); if (r2.ok) { const j2 = await r2.json(); if (Array.isArray(j2?.rows)) j.ratuj = j2.rows; } } catch { /* drugie źródło jest dodatkiem */ }
+        if (!j.ratuj) { try { const old = JSON.parse(storage?.getItem(key) || "null"); j.ratuj = Array.isArray(old?.ratuj) ? old.ratuj : []; } catch { j.ratuj = []; } }
+      }
       const db = build(j);
-      try { storage?.setItem(key, JSON.stringify({ at: j.at, rows: j.rows })); } catch { /* brak miejsca */ }
+      try { storage?.setItem(key, JSON.stringify({ at: j.at, rows: j.rows, ratuj: j.ratuj || undefined })); } catch { /* brak miejsca */ }
       return { ...db, stale: false };
     } catch { /* spróbujemy kopii */ }
   }

@@ -88,7 +88,7 @@ export function initSheltersScreen(ctx, { demo = false, mode = "schrony" } = {})
   const ensureMed = (k) => {
     if (demo || med[k] || medState[k] === "loading") return;
     medState[k] = "loading"; draw();
-    loadMedicalDb(k, k === "aed" ? CONFIG.aedUrl : CONFIG.hospitalsUrl).then((d) => { if (dead) return; med[k] = d; medState[k] = d ? "ok" : "none"; draw(); }).catch(() => { if (!dead) { medState[k] = "none"; draw(); } });
+    loadMedicalDb(k, k === "aed" ? CONFIG.aedUrl : CONFIG.hospitalsUrl, undefined, undefined, k === "aed" ? CONFIG.aedRatujUrl : "").then((d) => { if (dead) return; med[k] = d; medState[k] = d ? "ok" : "none"; draw(); }).catch(() => { if (!dead) { medState[k] = "none"; draw(); } });
   };
 
   const dist = (s) => `<b class="shdist">${esc(fmtDist(s.distKm))}${s.kind === "szpital" && s.distKm > 3 ? "" : ` · ${walkMin(s.distKm)} min pieszo`}</b>`;
@@ -100,7 +100,7 @@ export function initSheltersScreen(ctx, { demo = false, mode = "schrony" } = {})
   const approx = (s) => (s.addr && (s.addrD > 15 || s.addrD < 0) ? "adres orientacyjny (najbliższy budynek w OSM)" : "");
   const howBox = (s) => s.kind === "szpital" ? "" : s.how ? `<div class="howbox" id="how-${esc(s.id)}">${s.kind === "aed" ? "" : `<b>${howTitle(s)}</b>`}<p${s.kind === "aed" ? ` style="margin:0;font-weight:600"` : ""}>${esc(s.how)}</p>${s.kind === "aed" ? "" : `<p class="src">Źródło opisu: ${esc(srcLabel(s))}</p>`}</div>` : "";
   const meta = (s) => (s.kind === "aed"
-    ? [s.indoor && "wewnątrz budynku", s.level && `poziom ${esc(s.level)}`, s.access && `dostęp: ${esc(s.access)}`, s.hours && `godziny: ${esc(s.hours)}`, s.checked && `sprawdzono: ${esc(s.checked)}`, !s.addr && "adres: brak w OSM", !s.how && "opis miejsca: brak w OSM", approx(s) && esc(approx(s))]
+    ? [s.indoor && "wewnątrz budynku", s.level && `poziom ${esc(s.level)}`, s.access && `dostęp: ${esc(s.access)}`, s.hours && `godziny: ${esc(s.hours)}`, s.checked && `sprawdzono: ${esc(s.checked)}`, s.src === "ratuj" && "źródło: Ratuj z sercem – Mapa AED", !s.addr && (s.src === "osm" ? "adres: brak w OSM" : "adres: brak w źródle"), !s.how && (s.src === "osm" ? "opis miejsca: brak w OSM" : "opis miejsca: brak w źródle"), approx(s) && esc(approx(s))]
     : s.kind === "szpital"
       ? [s.addr ? esc(s.addr) : "adres: brak w OSM", s.phone && `tel. <a href="tel:${esc(s.phone.replace(/[^\d+]/g, ""))}">${esc(s.phone)}</a>`, approx(s) && esc(approx(s))]
       : [s.mine ? "zapisane w telefonie" : "", s.capacity && `ok. ${esc(s.capacity)} osób`, s.level && `poziom ${esc(s.level)}`, s.access && `dostęp: ${esc(s.access)}`, s.hours && `godziny: ${esc(s.hours)}`, s.addr && esc(s.addr)]
@@ -134,6 +134,7 @@ export function initSheltersScreen(ctx, { demo = false, mode = "schrony" } = {})
     else if (!shown.length) status = `<div class="note neutral">W promieniu ${RADIUS_KM} km nie ma punktów w rejestrze. <b>To nie znaczy, że nie ma schronów</b>: rejestr może być niepełny. Sprawdź oficjalną mapę PSP: <a href="${PSP_URL}" target="_blank" rel="noopener noreferrer">${PSP_URL.replace("https://", "")}</a> albo dodaj własne miejsce poniżej.</div>`;
     else if (pspState === "none") status = `<div class="note warn">Nie wszystkie dane z okolicy udało się wczytać (brak internetu?). Lista może być niepełna.</div>`;
     else if (feat.distKm > 5 && !demo) status = `<div class="note neutral">Najbliższy punkt w rejestrze jest ${esc(fmtKmPl(feat.distKm))} od Ciebie. <b>Bliżej mogą być miejsca, których w rejestrze nie ma</b>. Oficjalna mapa PSP: <a href="${PSP_URL}" target="_blank" rel="noopener noreferrer">${PSP_URL.replace("https://", "")}</a>.</div>`;
+    if (filter === "aed" && pos && !demo && med.aed && med.szpitale) { const h = nearest(med.szpitale.items, pos, { maxKm: 0.6, limit: 1 })[0]; if (h && (!feat || h.distKm < feat.distKm)) status += `<div class="note neutral"><b>Bliżej jest szpital:</b> ${esc(h.name)} (${esc(fmtDist(h.distKm))}). Szpitale zwykle mają defibrylatory, ale nie zawsze są one na mapie – zapytaj personel (rejestracja, SOR).</div>`; }
     $("shStatus").innerHTML = status;
     $("shFeat").innerHTML = feat ? `<article class="shfeat" aria-label="Najbliższe miejsce"><div class="row"><span class="badge ok">Najbliższy</span><span class="spacer"></span>${dist(feat)}</div>
       <h2 style="margin:8px 0 2px">${esc(titleOf(feat))}</h2><p class="muted small" style="margin:0 0 8px">${kindBadge(feat)} ${meta(feat)}</p>${howBox(feat)}${btns(feat, true)}</article>` : "";
@@ -142,7 +143,7 @@ export function initSheltersScreen(ctx, { demo = false, mode = "schrony" } = {})
     const parts = [];
     if (pspIdx) parts.push(`Rejestr Punktów Schronienia (MSWiA / PSP): ${esc(String(pspIdx.count))} punktów w Polsce${pspIdx.builtAt ? `, stan z ${esc(fmtDt(pspIdx.builtAt))}` : ""}`);
     if (db?.count) parts.push(`OpenStreetMap: ${esc(String(db.count))} wpisów, niezweryfikowane${db.stale ? " (kopia z telefonu)" : ""}`);
-    if (isMed()) { const m = med[filter]; parts.length = 0; if (m) parts.push(`OpenStreetMap: ${esc(String(m.count))} ${filter === "aed" ? "defibrylatorów" : "szpitali"}${m.at ? `, stan z ${esc(fmtDt(m.at))}` : ""}, niezweryfikowane${m.stale ? " (kopia z telefonu)" : ""}`); }
+    if (isMed()) { const m = med[filter]; parts.length = 0; if (m) parts.push(`OpenStreetMap: ${esc(String(m.count))} ${filter === "aed" ? "defibrylatorów" : "szpitali"}${m.at ? `, stan z ${esc(fmtDt(m.at))}` : ""}, niezweryfikowane${m.stale ? " (kopia z telefonu)" : ""}${filter === "aed" && m.ratuj ? `; mapa „Ratuj z sercem – Mapa AED” (ratujzsercem.pl): ${esc(String(m.ratuj))} dodatkowych punktów` : ""}${filter === "aed" && m.extra ? `; ${esc(String(m.extra))} dodatkowych punktów potwierdzonych na miejscu` : ""}`); }
     $("shMeta").innerHTML = demo ? "" : parts.length ? "Źródła: " + parts.join("; ") + "." : "";
     if (!demo && filter === "schrony" && feat && feat.distKm != null) { try { sessionStorage.setItem("egida.nearest", JSON.stringify({ min: walkMin(feat.distKm), t: Date.now() })); } catch { /* tryb prywatny */ } }
     const NOTE = { aed: "Defibrylatory (AED) pochodzą z OpenStreetMap (© współtwórcy OpenStreetMap, ODbL) i są wpisywane przez społeczność, więc urządzenie mogło zostać zdjęte, a budynek może być zamknięty. <b>Przy zatrzymaniu krążenia najpierw zadzwoń pod 112</b> – dyspozytor poprowadzi resuscytację i wskaże najbliższy AED. Podczas rozmowy poproś kogoś, żeby po niego pobiegł.", szpitale: "Szpitale pochodzą z OpenStreetMap (© współtwórcy OpenStreetMap, ODbL); „Szpital z SOR” oznacza wpis z całodobową pomocą w nagłych przypadkach, ale wpisy bywają niepełne. <b>W zagrożeniu życia dzwoń pod 112</b> – dyspozytor wybierze właściwy szpital. Aktualne kolejki w SOR sprawdzisz na oficjalnej stronie pacjent.gov.pl (szukaj: SOR).", mine: "", schrony: "" };
@@ -274,7 +275,7 @@ export function initSheltersScreen(ctx, { demo = false, mode = "schrony" } = {})
   $("shChips").addEventListener("click", (e) => {
     const b = e.target.closest("[data-f]"); if (!b) return;
     filter = b.dataset.f; needFit = true;
-    if (isMed()) ensureMed(filter);
+    if (isMed()) { ensureMed(filter); if (filter === "aed") ensureMed("szpitale"); }
     document.querySelectorAll("#shChips [data-f]").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
     draw();
   });
@@ -314,6 +315,6 @@ export function initSheltersScreen(ctx, { demo = false, mode = "schrony" } = {})
     fetch(CONFIG.pspUrl + "index.json", { signal: AbortSignal.timeout(15000) }).then((r) => (r.ok ? r.json() : null)).then((j) => { if (!dead && j && Number.isFinite(j.count)) { pspIdx = j; draw(); } }).catch(() => {});
     if (pos) loadPsp();
   }
-  if (isMed()) ensureMed(filter);
+  if (isMed()) { ensureMed(filter); if (filter === "aed") ensureMed("szpitale"); }
   draw();
 }

@@ -52,7 +52,7 @@ export function baseLayer(L, key, onFail) {
   const c = CONFIG.tiles[key] || CONFIG.tiles.map;
   const urls = [c.url, ...(c.fallbackUrls || [])];
   let i = 0, ok = 0, bad = 0, badTotal = 0, lastBad = "";
-  const opts = { attribution: c.attribution, maxZoom: c.maxZoom ?? 18, maxNativeZoom: c.maxNativeZoom, subdomains: c.subdomains || "abc" };
+  const opts = { attribution: c.attribution, maxZoom: c.maxZoom ?? 18, maxNativeZoom: c.maxNativeZoom, subdomains: c.subdomains || "abc", updateWhenIdle: false, updateWhenZooming: false, keepBuffer: 4, updateInterval: 120 };
   // Satelita (EOX): adres wklejony w pasek przeglądarki działa (nie wysyła nagłówka Referer), więc tu też go nie wysyłamy.
   // Dla OSM zostaje domyślnie: polityka OSM wymaga prawidłowego nagłówka Referer.
   if (c.referrerPolicy) opts.referrerPolicy = c.referrerPolicy;
@@ -227,8 +227,8 @@ export function initMapScreen(ctx, { demo = false, diag = false } = {}) {
     };
     drawUser();
     let firstFix = !user;
-    if (demo) map.setView([DEMO_USER.lat, DEMO_USER.lon], 7);
-    else if (user) map.setView([user.lat, user.lon], 8);
+    if (demo) map.setView([DEMO_USER.lat, DEMO_USER.lon], 7, { animate: false });
+    else if (user) map.setView([user.lat, user.lon], 8, { animate: false });
     let stopLoc = null;
     cleanups.push(() => stopLoc?.());
     // W trybie demo nie używamy prawdziwej pozycji (nie mieszamy jej z wymyślonymi obiektami).
@@ -243,7 +243,7 @@ export function initMapScreen(ctx, { demo = false, diag = false } = {}) {
         scheduleRefresh();
       }, () => { $("locMsg").textContent = "Nie udało się ustalić pozycji. Sprawdź, czy lokalizacja jest włączona i dozwolona dla tej strony."; }, true);
     });
-    $("btnBorder")?.addEventListener("click", () => map.fitBounds([[49.0, 21.6], [54.6, 24.6]]));
+    $("btnBorder")?.addEventListener("click", () => map.fitBounds([[49.0, 21.6], [54.6, 24.6]], { animate: false }));
 
     /* schrony na mapie */
     let dbItems = [], pspItems = [];
@@ -400,7 +400,7 @@ export function initMapScreen(ctx, { demo = false, diag = false } = {}) {
         const bnd = map.getBounds();
         if (!view.rows.some((r) => bnd.contains([(r.pred.ok ? r.pred.here : r.t).lat, (r.pred.ok ? r.pred.here : r.t).lon]))) {
           const pts = view.rows.map((r) => [(r.pred.ok ? r.pred.here : r.t).lat, (r.pred.ok ? r.pred.here : r.t).lon]);
-          map.fitBounds(pts, { padding: [30, 30], maxZoom: 7 });
+          map.fitBounds(pts, { padding: [30, 30], maxZoom: 7, animate: false });
         }
       }
       if (openId != null && !view.rows.some((r) => String(r.t.id) === openId)) openId = null; // obiekt zniknął z danych
@@ -435,7 +435,7 @@ export function initMapScreen(ctx, { demo = false, diag = false } = {}) {
     $("btnObjects")?.addEventListener("click", () => {
       const pts = lastRows.map((r) => [(r.pred.ok ? r.pred.here : r.t).lat, (r.pred.ok ? r.pred.here : r.t).lon]);
       if (user) pts.push([user.lat, user.lon]);
-      if (pts.length) map.fitBounds(pts, { padding: [30, 30], maxZoom: 9 });
+      if (pts.length) map.fitBounds(pts, { padding: [30, 30], maxZoom: 9, animate: false });
     });
 
     if (neptunWanted()) startFeed();

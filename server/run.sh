@@ -47,6 +47,12 @@ if [ -f "$DATA_DIR/aed.json" ] && { [ ! -f "$ADDR_STAMP" ] || [ "$(( $(date +%s)
   touch "$ADDR_STAMP"
   ( export ADDR_CACHE="$BASE/addr-cache.json"; DATA_DIR="$DATA_DIR" flock -n "$BASE/medical.lock" timeout 3300 node medical-addr.mjs >> "$BASE/medical.log" 2>&1 || rm -f "$ADDR_STAMP" ) 9>&- &
 fi
+# Raz na dobę (±) defibrylatory z publicznej mapy „Ratuj z sercem – Mapa AED” → aed-ratuj.json + raport ratuj-probe.json (robots.txt respektowany, kilka zapytań).
+RJ_STAMP="$BASE/ratuj.checked"; RJ_NEW=0
+if [ ! -f "$RJ_STAMP" ] || [ "$(( $(date +%s) - $(stat -c %Y "$RJ_STAMP") ))" -gt 86400 ]; then
+  touch "$RJ_STAMP"
+  if RATUJ_OUT="$DATA_DIR/aed-ratuj.json" RATUJ_PROBE_OUT="$DATA_DIR/ratuj-probe.json" timeout 120 node ratuj-sync.mjs 2>&1 | tail -n 6; then RJ_NEW=1; else echo "ratuj-sync nieudany – zostaje poprzedni plik"; fi
+fi
 # Co ~30 min sonda formatu NEPTUN (3 zapytania REST + 8 s WebSocket): raport trafia na gałąź data jako neptun-schema.json.
 NP_FILE="$DATA_DIR/neptun-schema.json"; NP_NEW=0
 if [ ! -f "$NP_FILE" ] || [ "$(( $(date +%s) - $(stat -c %Y "$NP_FILE") ))" -gt 1800 ]; then
@@ -87,7 +93,7 @@ NEW="$(node -e 'const j=JSON.parse(require("fs").readFileSync(process.env.ALERTS
 OLD="$(cat "$BASE/last.hash" 2>/dev/null || true)"
 AGE=99999
 [ -f "$BASE/last.push" ] && AGE=$(( ( $(date +%s) - $(stat -c %Y "$BASE/last.push") ) / 60 ))
-if [ "$NEW" != "$OLD" ] || [ "$AGE" -ge 25 ] || [ "$SH_NEW" = 1 ] || [ "$PSP_NEW" = 1 ] || [ "$NP_NEW" = 1 ] || [ "$NEWS_NEW" = 1 ]; then
+if [ "$NEW" != "$OLD" ] || [ "$AGE" -ge 25 ] || [ "$SH_NEW" = 1 ] || [ "$PSP_NEW" = 1 ] || [ "$NP_NEW" = 1 ] || [ "$NEWS_NEW" = 1 ] || [ "$RJ_NEW" = 1 ]; then
   if bash "$SERVER_DIR/publish.sh"; then echo "$NEW" > "$BASE/last.hash"; touch "$BASE/last.push"; echo "opublikowano"; ok; else echo "publikacja nieudana"; fail; exit 1; fi
 else
   echo "bez zmian (ostatnia publikacja ${AGE} min temu)"; ok

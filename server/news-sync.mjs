@@ -97,7 +97,8 @@ async function runSource(src) {
     rep.ok = rep.urls.some((x) => x.status === 200 && x.items > 0);
     if (!rep.ok) rep.error = rep.urls.map((x) => x.error).filter(Boolean)[0] || "brak wpisów w odpowiedzi";
   } catch (e) { rep.error = String(e.message || e); }
-  const items = raws.map((r) => toItem(r, src, now)).filter(Boolean);
+  const why = [], items = raws.map((r) => toItem(r, src, now, why)).filter(Boolean);
+  if (src.kind === "media" && why.length) { rep.droppedCount = why.length; rep.dropped = why.filter((x) => x.why !== "data").slice(0, 10); } // próbka odrzuconych tytułów: do strojenia filtrów
   if (src.noCap) items.noCap = true;
   rep.kept = items.length;
   return { rep, items };

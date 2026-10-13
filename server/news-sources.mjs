@@ -19,16 +19,20 @@ const KWP_NAME = { dolnoslaskie: "Policja Dolnośląska", "kujawsko-pomorskie": 
 
 // Ogólnopolskie portale informacyjne (RSS). Kandydaci adresów: pierwszy działający wygrywa.
 const NATIONAL = [
-  ["polsatnews", "Polsat News", ["https://www.polsatnews.pl/rss/polska.xml"]],
-  ["tvn24", "TVN24", ["https://tvn24.pl/najnowsze.xml", "https://tvn24.pl/polska.xml"]],
-  ["rmf24", "RMF24", ["https://www.rmf24.pl/fakty/polska/feed", "https://www.rmf24.pl/feed"]],
-  ["interia", "Interia", ["https://wydarzenia.interia.pl/feed", "https://wydarzenia.interia.pl/polska/feed"]],
+  // 5. element: opcje źródła. polishOnly = kanał dotyczy wyłącznie Polski, więc poważne zdarzenie bez znanej miejscowości trafia do całego kraju.
+  ["polsatnews", "Polsat News", ["https://www.polsatnews.pl/rss/polska.xml"], null, { polishOnly: true }],
+  ["tvn24", "TVN24", ["https://tvn24.pl/polska.xml", "https://tvn24.pl/najnowsze.xml"], null, { polishOnly: false }],
+  ["rmf24", "RMF24", ["https://www.rmf24.pl/fakty/polska/feed", "https://www.rmf24.pl/feed"], null, { polishOnly: true }],
+  ["interia", "Interia", ["https://wydarzenia.interia.pl/polska/feed", "https://wydarzenia.interia.pl/feed"], null, { polishOnly: true }],
+  // Wirtualna Polska (kanał Wiadomości, RSS 2.0 – sprawdzony 13.10.2026) i Onet (kandydat): portale „z kraju i ze świata”, więc tylko z polskim kontekstem w tytule.
+  ["wp", "Wirtualna Polska", ["https://wiadomosci.wp.pl/rss.xml"]],
+  ["onet", "Onet Wiadomości", ["https://wiadomosci.onet.pl/.feed"]],
   // Radio ZET i TVP Info: adresy RSS podał użytkownik (12.10.2026). Działanie i zgodność z robots.txt sprawdza serwer przy każdym przebiegu
   // (news-report.json); źródło odrzucone przez robots.txt lub błąd HTTP jest po prostu pomijane.
   ["radiozet", "Radio ZET", ["https://player.radiozet.pl/externals/xml/radio-zet-wiadomosci.xml"]],
   ["tvpinfo", "TVP Info", ["https://www.tvp.info/informacje?xslt=tvp-info/news/rss.xslt"]],
   // Polskie Radio 24: robots.txt zabrania pobierania – pomijamy.
-  ["info112", "Info112", ["https://info112.pl/feed/"]],
+  ["info112", "Info112", ["https://info112.pl/feed/"], null, { polishOnly: true }],
 ];
 // Komendy Wojewódzkie PSP na gov.pl (adresy: gov.pl/web/kwpsp-<miasto>/aktualnosci).
 const PSP = [["dolnoslaskie", ["wroclaw"]], ["kujawsko-pomorskie", ["torun", "bydgoszcz"]], ["lubelskie", ["lublin"]], ["lubuskie", ["gorzow", "zielona-gora", "gorzow-wielkopolski"]],
@@ -78,7 +82,7 @@ export const SOURCES = [
     urls: ["https://www.radio.katowice.pl/"], scrape: { link: "^https://(?:www\\.)?radio\\.katowice\\.pl/zobacz,\\d+," } },
   // WARSTWA 2: portale ogólnopolskie (RSS). Wpis trafia do województwa wymienionego w tytule (miejscowość lub region); zagrożenie krajowe bez miejsca (np. zamach) – do całego kraju.
   // Pokazujemy wyłącznie nagłówek, nazwę źródła i link. Podane adresy to kandydaci: pierwszy, który odpowie i zawiera wpisy, jest używany; robots.txt respektowany; o działaniu decyduje news-report.json.
-  ...NATIONAL.map(([id, label, urls, discover]) => ({ id: "media-" + id, label, region: "all", kind: "media", filter: "media", national: true, urls, ...(discover ? { discover } : {}) })),
+  ...NATIONAL.map(([id, label, urls, discover, opts]) => ({ id: "media-" + id, label, region: "all", kind: "media", filter: "media", national: true, urls, ...(discover ? { discover } : {}), ...(opts || {}) })),
   // Regionalne portale: Lublin112 (Lubelskie) – cały RSS; wiadomości „z kraju” pomijamy, chyba że dotyczą zagrożenia w Polsce.
   { id: "media-lublin112", label: "Lublin112", region: "lubelskie", kind: "media", filter: "media", local: true, urls: ["https://www.lublin112.pl/feed/"] },
   // WARSTWA 3: Państwowa Straż Pożarna – komendy wojewódzkie (oficjalne, szybsze niż policja przy pożarach, powodziach, wypadkach). Kilka możliwych adresów: pierwszy działający wystarcza.
