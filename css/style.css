@@ -56,7 +56,7 @@ button,select,input{font:inherit;color:inherit}
 .topbar .brand{flex:1;min-width:0}
 .topbar .spacer{display:none}
 .region{order:3;flex:1 1 100%;max-width:none}
-.fab112{position:fixed;right:14px;bottom:calc(78px + env(safe-area-inset-bottom));z-index:40;min-width:56px;height:56px;padding:0 16px;border-radius:999px;background:var(--danger);color:#fff;display:flex;align-items:center;justify-content:center;gap:6px;text-decoration:none;font-family:var(--font-h);font-weight:800;font-size:1rem;box-shadow:0 4px 14px rgba(179,38,30,.35)}
+.fab112{position:fixed;right:14px;bottom:calc(66px + max(6px,calc(env(safe-area-inset-bottom) - 16px)));z-index:40;min-width:56px;height:56px;padding:0 16px;border-radius:999px;background:var(--danger);color:#fff;display:flex;align-items:center;justify-content:center;gap:6px;text-decoration:none;font-family:var(--font-h);font-weight:800;font-size:1rem;box-shadow:0 4px 14px rgba(179,38,30,.35)}
 .brand{display:flex;align-items:center;gap:9px;text-decoration:none;color:var(--text);min-width:0}
 .brand svg,.brand .logo{flex:none}
 .brand .logo{height:34px;width:auto}
@@ -136,8 +136,8 @@ button,select,input{font:inherit;color:inherit}
 .src{font-size:.8125rem;color:var(--muted);margin-top:10px}
 
 /* Nawigacja dolna */
-.tabbar{position:fixed;left:0;right:0;bottom:0;background:var(--card);border-top:1px solid var(--line);display:grid;grid-template-columns:repeat(6,1fr);padding:6px 2px calc(6px + env(safe-area-inset-bottom));z-index:30}
-.tabbar a{display:flex;flex-direction:column;align-items:center;gap:2px;min-height:52px;justify-content:center;text-decoration:none;color:var(--muted);font-size:.75rem;font-weight:600;border-radius:14px}
+.tabbar{position:fixed;left:0;right:0;bottom:0;background:var(--card);border-top:1px solid var(--line);display:grid;grid-template-columns:repeat(6,1fr);padding:4px 2px max(6px,calc(env(safe-area-inset-bottom) - 16px));z-index:30}
+.tabbar a{display:flex;flex-direction:column;align-items:center;gap:2px;min-height:48px;justify-content:center;text-decoration:none;color:var(--muted);font-size:.75rem;font-weight:600;border-radius:14px}
 .tabbar a[aria-current="page"]{color:var(--brand);font-weight:700}
 .morelist>li{padding:0}
 .morelist a{display:flex;align-items:center;gap:14px;min-height:64px;padding:10px 16px;color:var(--text);text-decoration:none}
@@ -364,6 +364,7 @@ input[type="search"].sel{-webkit-appearance:none;appearance:none;width:100%;font
 .newsitem .nm{font-size:.8125rem;color:var(--muted,#5b6b78)}
 .list.newslist .newsitem{padding:0 14px}
 .smore2{display:inline-flex;align-items:center;gap:4px;min-height:44px;font-weight:700;color:var(--brand-ink)}
+.card.flat.apt{padding:14px 16px;overflow:visible}
 .apt p{margin:0 0 8px}
 .aptlist{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:7px}
 .aptlist li{line-height:1.45}
