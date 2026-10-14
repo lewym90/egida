@@ -228,7 +228,7 @@ const MORE = [
   { h: "#/test", t: "Test gotowości", d: "Sprawdź, jak jesteś przygotowany", i: C.test },
   { h: "#/zagrozenie", t: "Tryb zagrożenia", d: "112, schron i trzy kroki", i: C.danger },
   { h: "#/miejsca", t: "Ważne miejsca", d: "Dom, praca, rodzina", i: C.pin },
-  { h: "#/telegram", t: "Powiadomienia Telegram", d: "Kanał dla Twojego województwa", i: C.tg },
+  { h: "#/telegram", t: "Powiadomienia Telegram", d: "Alerty, wiadomości i drogi na telefon", i: C.tg },
   { h: "#/ustawienia", t: "Ustawienia", d: "Województwo, zgody, wygląd, tryb seniora, kopia danych", i: C.gear },
   { h: "#/zrodla", t: "Źródła i licencje", d: "Skąd mamy dane", i: C.book },
   { h: "#/prywatnosc", t: "Polityka prywatności", d: "Co zostaje w telefonie", i: C.list },
@@ -589,13 +589,13 @@ function screenTelegram() {
   }).join("");
   return `<div class="hero"><h1>Powiadomienia Telegram</h1><p>Ważne komunikaty dla Twojego województwa prosto na telefon, także wtedy, gdy nie masz otwartej aplikacji.</p></div>
   <div class="card"><h2>Jak to działa</h2>
-  <ol class="how"><li>EGIDA co kilka minut sprawdza oficjalne komunikaty (RSO).</li>
-  <li>Gdy pojawi się nowy ważny komunikat dla Twojego województwa, bot publikuje go na kanale Telegram tego województwa.</li>
-  <li>Jeśli subskrybujesz kanał, dostajesz powiadomienie. W treści jest odsyłacz do aplikacji, gdzie możesz śledzić rozwój sytuacji.</li></ol>
+  <ol class="how"><li>EGIDA co kilka minut sprawdza oficjalne komunikaty (RSO), wiadomości z mediów i służb oraz utrudnienia na drogach krajowych (GDDKiA).</li>
+  <li>Gdy pojawi się coś nowego dla Twojego województwa, bot publikuje to na kanale Telegram tego województwa. Wiadomości z kraju i ze świata (z wpływem na Polskę) trafiają na wszystkie kanały.</li>
+  <li>Jeśli subskrybujesz kanał, dostajesz powiadomienie. W treści jest odsyłacz „Śledź w aplikacji EGIDA”, gdzie możesz śledzić rozwój sytuacji.</li></ol>
   <p class="muted small">To kanały „tylko do czytania”: nikt poza botem nie może w nich pisać, nie ma czatu ani komentarzy, a Twoje dane nie są nikomu udostępniane.</p></div>
   <div class="card"><h2>Co będzie przychodzić</h2>
-  <ul class="how2"><li><b>Alerty RCB</b> i komunikaty ewakuacyjne,</li><li><b>ostrzeżenia pogodowe</b> (IMGW),</li><li><b>komunikaty o wodzie</b>: susza, wysoki stan rzek, jakość wody,</li><li><b>komunikaty oznaczone w RSO jako alarm</b>.</li></ul>
-  <p class="muted small">Komunikaty drogowe zostają tylko w aplikacji, żeby nie zasypywać telefonu.</p>
+  <ul class="how2"><li><b>Alerty RCB</b> i komunikaty ewakuacyjne,</li><li><b>ostrzeżenia pogodowe</b> (IMGW),</li><li><b>komunikaty o wodzie</b>: susza, wysoki stan rzek, jakość wody,</li><li><b>komunikaty oznaczone w RSO jako alarm</b>,</li><li><b>wiadomości</b> z Twojego województwa (bez limitu), z kraju (najwyżej 10 na godzinę) i ze świata, gdy dotyczą Polski (najwyżej 5 na godzinę),</li><li><b>utrudnienia i zamknięcia dróg krajowych</b> (GDDKiA).</li></ul>
+  <p class="muted small">Kolor wiadomości mówi o wadze: 🔴 pilne, 🟠 uwaga lub droga zamknięta, 🟡 utrudnienia na drodze, 🔵 informacja. Wiadomości z mediów są oznaczone jako doniesienie medialne, nie komunikat służb. Wszystkie ważne wiadomości o bezpieczeństwie znajdziesz też w aplikacji.</p>
   <div class="note warn" style="margin-top:10px"><span class="badge soon">Beta</span> <b>Obiekty latające w pobliżu granicy.</b> Alert RCB dostajesz SMS-em, ale nie podaje on szczegółów. Na <a href="#/mapa">mapie</a> jest już wersja testowa nieoficjalnych informacji o dronach i rakietach przy granicy: <b>pozycja, kurs i przewidywany tor</b>. Są oznaczone jako <b>nieoficjalne</b>, pochodzą z zewnętrznego serwisu (NEPTUN) i mogą być spóźnione lub błędne. Na kanały Telegram trafia ostrzeżenie tylko wtedy, gdy obiekt jest bliżej niż 100 km od granicy i leci w jej stronę. Dalsze obiekty są tylko widoczne na mapie.</div></div>
   <div class="card"><h2>Jak dołączyć</h2>
   <ol class="how"><li>Zainstaluj aplikację <b>Telegram</b> (jeśli jej nie masz) i załóż konto. Wystarczy numer telefonu.</li>

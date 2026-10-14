@@ -227,7 +227,7 @@ export const SOURCES = [
   { n: "EOxCloudless (EOX IT Services GmbH)", l: "CC BY-NC-SA 4.0, tylko użytek niekomercyjny. Zawiera zmodyfikowane dane Copernicus Sentinel 2025", u: "https://cloudless.eox.at", w: "Podkład „Satelita”" },
   { n: "Natural Earth", l: "Domena publiczna", u: "https://www.naturalearthdata.com", w: "Uproszczony obrys Polski do szacowania odległości obiektów od granicy oraz uproszczone granice obwodów Ukrainy do zaznaczania alarmów na mapie (to nie są granice prawne)" },
   { n: "Państwowy Rejestr Granic (GUGiK)", l: "Dane publiczne GUGiK (dane bez opłat). Używamy wersji uproszczonej (konwersja: ppatrzyk/polska-geojson)", u: "https://www.gov.pl/web/gugik", w: "Granice województw do wskazania województwa z GPS (dokładność ok. 1–2 km, to nie jest granica prawna)" },
-  { n: "Telegram", l: "Warunki i polityka prywatności Telegram", u: "https://telegram.org/tos", w: "Prywatne kanały powiadomień „tylko do czytania” (dołączasz z własnego konta Telegram)" },
+  { n: "Telegram", l: "Warunki i polityka prywatności Telegram", u: "https://telegram.org/tos", w: "Prywatne kanały „tylko do czytania”: alerty, wiadomości i utrudnienia drogowe (dołączasz z własnego konta Telegram)" },
   { n: "Leaflet", l: "BSD-2-Clause", u: "https://leafletjs.com", w: "Biblioteka mapy (hostowana lokalnie)" },
   { n: "Czcionki: Manrope, Source Sans 3", l: "SIL Open Font License", u: "https://openfontlicense.org", w: "Hostowane lokalnie, bez połączeń z Google" },
 ];

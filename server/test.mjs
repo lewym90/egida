@@ -129,4 +129,51 @@ w = decide(true, w.state, NOW + 36e5); assert.equal(w.action, "none", "bez powta
 w = decide(true, w.state, NOW + (WD.remindH + 0.1) * 36e5); assert.equal(w.action, "remind", "przypomnienie po kilku godzinach");
 w = decide(false, w.state, NOW + 10 * 36e5); assert.equal(w.action, "up", "wiadomość o powrocie do normy"); assert.equal(w.state.down, false);
 assert.equal(decide(false, w.state, NOW + 11 * 36e5).action, "none");
+// --- Telegram: wiadomości z news.json ---
+import { appLink, APP_FOLLOW } from "./tg-policy.mjs";
+import { newsMessage, levelOf as nLevel, categoryOf as nCat, selectNews, markNewsSent, channelsFor, sampleItems, LIMITS as NL } from "./tg-news-lib.mjs";
+{
+  const strip = (h) => h.replace(/<[^>]+>/g, "");
+  const APP = "https://app.test/egida/";
+  const al = appLink(APP);
+  assert.ok(al.includes(`href="${APP}"`) && strip(al) === APP_FOLLOW && !strip(al).includes("app.test"), "ukryty link do aplikacji");
+  assert.equal(appLink(""), APP_FOLLOW); assert.equal(appLink("http://x"), APP_FOLLOW);
+  assert.ok(!strip(tgText(it("x", { type: "rcb", title: "T" }), "danger", { appUrl: APP })).includes("app.test"), "adres aplikacji niewidoczny w alercie RSO");
+  const NOW = Date.parse("2026-10-14T12:00:00Z"), ago = (m) => new Date(NOW - m * 6e4).toISOString();
+  const mk = (id, o) => ({ id, kind: "rss", region: "mazowieckie", source: "Źr <b>", url: "https://x.pl/?a=1&b=2", date: ago(10), title: `Tytuł ${id} <i>`, summary: "", ...o });
+  const m = newsMessage(mk("a", { title: "Ostrzeżenie przed wichurami & burzami" }), { appUrl: APP });
+  assert.ok(m.includes("🟠") && m.includes("Mazowieckie") && m.includes("&amp;") && !m.includes("<i>Tytuł") && m.includes("Więcej ważnych wiadomości") && !strip(m).includes("app.test"));
+  assert.ok(m.includes(`href="${APP}"`), "link do aplikacji ukryty w tekście");
+  const mr = newsMessage(mk("r", { kind: "gddkia", title: "7 · A - B: droga zamknięta", until: new Date(NOW + 36e5).toISOString() }), { appUrl: APP });
+  assert.ok(mr.includes("🟠") && mr.includes("Drogi krajowe") && !mr.includes("Więcej ważnych wiadomości"), "drogi bez stopki o wiadomościach");
+  assert.ok(!strip(newsMessage(mk("n"), {})).includes("http"), "bez appUrl zwykłe zdanie bez adresu");
+  assert.equal(nCat(mk("k", { region: "all" })), "kraj"); assert.equal(nCat(mk("w", { region: "world" })), "swiat"); assert.equal(nCat(mk("g", { kind: "gddkia" })), "droga");
+  assert.equal(nLevel(mk("g", { kind: "gddkia", title: "Remont" })), "traffic");
+  // limity: kraj 10/h, świat 5/h, region bez limitu
+  const uniqTitles = ["Sejm uchwalił budżet", "Premier spotkał się z prezydentem", "Pogoda nad morzem", "Zmiany w kodeksie pracy", "Rosną ceny paliw", "Nowa linia kolejowa", "Rząd przyjął strategię", "Debata o szkołach", "Rekord eksportu żywności", "Ceny mieszkań spadają", "Konkurs dla uczniów", "Otwarto nowy most"];
+  const kr = uniqTitles.map((t, i) => mk("kr" + i, { region: "all", title: t + " " + "x".repeat(i) }));
+  const sw = ["Wybory w Brazylii", "Trzęsienie ziemi w Japonii", "Szczyt klimatyczny w Egipcie", "Strajk we Francji", "Nowa misja księżycowa", "Powódź w Indiach", "Inflacja w Turcji"].map((t, i) => mk("sw" + i, { region: "world", title: t }));
+  const reg = ["Remont szkoły", "Festyn w parku", "Zmiana rozkładu autobusów", "Otwarcie basenu", "Wystawa w muzeum", "Targi pracy", "Koncert plenerowy", "Dni miasta", "Wyścig kolarski", "Nowy plac zabaw", "Kiermasz", "Bieg uliczny", "Spacer historyczny", "Pokaz filmu", "Zbiórka darów"].map((t, i) => mk("rg" + i, { title: t + " " + "y".repeat(i) }));
+  let r = selectNews([...kr, ...sw, ...reg], { sent: {} }, { now: NOW });
+  const cnt = (c) => r.send.filter((x) => x.cat === c).length;
+  assert.equal(cnt("kraj"), NL.kraj); assert.equal(cnt("swiat"), NL.swiat); assert.equal(cnt("region"), Math.min(15, NL.maxPerRun - NL.kraj - NL.swiat), "region bez limitu godzinowego, tylko pułap na przebieg");
+  // po wysłaniu limit godzinowy się wyczerpuje, po godzinie wraca
+  for (const x of r.send) markNewsSent(r.state, x, NOW);
+  const more = [mk("kr_new", { region: "all", title: "Zupełnie inna sprawa krajowa" })];
+  assert.equal(selectNews(more, r.state, { now: NOW + 6e4 }).send.length, 0, "limit 10/h wyczerpany");
+  assert.equal(selectNews([mk("kr_new2", { region: "all", title: "Zupełnie inna sprawa krajowa", date: new Date(NOW + 61 * 6e4 - 6e4).toISOString() })], r.state, { now: NOW + 61 * 6e4 }).send.length, 1, "po godzinie limit wraca");
+  // świeżość, duplikaty, już wysłane, kinds
+  assert.equal(selectNews([mk("old", { date: ago(4 * 60) })], { sent: {} }, { now: NOW }).send.length, 0, "starsze niż 3 h pomijane");
+  assert.equal(selectNews([mk("a1")], { sent: { a1: NOW } }, { now: NOW }).send.length, 0);
+  const dup = selectNews([mk("d1", { title: "Pożar hali magazynowej w Radomiu, trwa akcja gaśnicza" }), mk("d2", { title: "Pożar hali magazynowej w Radomiu – trwa akcja gaśnicza strażaków" })], { sent: {} }, { now: NOW });
+  assert.equal(dup.send.length, 1); assert.equal(dup.duplicates.length, 1);
+  const road = mk("rd", { kind: "gddkia", date: ago(20 * 24 * 60), until: new Date(NOW + 36e5).toISOString(), title: "S7: utrudnienia" });
+  assert.equal(selectNews([road], { sent: {} }, { now: NOW }).send.length, 1, "droga liczy się dopóki obowiązuje");
+  assert.equal(selectNews([{ ...road, until: ago(5) }], { sent: {} }, { now: NOW }).send.length, 0);
+  assert.equal(selectNews([...kr.slice(0, 2), road], { sent: {} }, { now: NOW, kinds: new Set(["droga"]) }).send.length, 1, "filtr kinds");
+  // kanały
+  const chs = { mazowieckie: "-1", slaskie: "-2" };
+  assert.deepEqual(channelsFor(kr[0], chs), ["-1", "-2"]); assert.deepEqual(channelsFor(reg[0], chs), ["-1"]); assert.deepEqual(channelsFor(mk("z", { region: "pomorskie" }), chs), []);
+  assert.equal(sampleItems(NOW).length, 6);
+}
 console.log("OK: wszystkie testy serwera przeszły (parser RSO, reguły Telegram wg wagi, strażnik)");

@@ -35,6 +35,12 @@ export function selectForTelegram(fresh, state, { now = Date.now(), recentH = 6 
   return out;
 }
 
+/** Zdanie zachęcające do aplikacji. Z adresem: ukryty link (widać tylko tekst), bez adresu: zwykłe zdanie. Adres aplikacji nigdy nie jest widoczny w treści wiadomości. */
+export const APP_FOLLOW = "Śledź w aplikacji EGIDA – Twoje centrum bezpieczeństwa";
+export function appLink(appUrl = "") {
+  const u = /^https:\/\/[^\s"<>]+$/.test(appUrl || "") ? appUrl.replace(/&/g, "&amp;") : "";
+  return u ? `<a href="${u}">${APP_FOLLOW}</a>` : APP_FOLLOW;
+}
 const escHtml = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 const when = (iso) => { if (!iso) return ""; const d = new Date(iso); return isNaN(d) ? "" : d.toLocaleString("pl-PL", { timeZone: "Europe/Warsaw", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }); };
 
@@ -47,7 +53,7 @@ export function tgText(a, level, { appUrl = "" } = {}) {
   const body = a.body ? `\n${escHtml(String(a.body).slice(0, 500))}` : "";
   const time = t ? `\n🕒 ${escHtml(t)}` : "";
   const src = `\n\nŹródło: ${escHtml(a.source)}${a.url ? ` · ${escHtml(a.url)}` : ""}`;
-  const follow = `\n\n📲 <b>Śledź rozwój sytuacji w aplikacji EGIDA</b>${appUrl ? `: ${escHtml(appUrl)}` : ""}\n🛡 Stosuj się do zaleceń służb, kieruj się syrenami i Alertem RCB. W zagrożeniu życia dzwoń <b>112</b>.`;
+  const follow = `\n\n📲 ${appLink(appUrl)}\n🛡 Stosuj się do zaleceń służb, kieruj się syrenami i Alertem RCB. W zagrożeniu życia dzwoń <b>112</b>.`;
   const foot = `\n<i>EGIDA to nieoficjalna aplikacja informacyjna. Dane mogą być opóźnione lub niepełne.</i>`;
   return `${head}\n<b>${escHtml(a.title)}</b>${body}${time}${src}${follow}${foot}`;
 }

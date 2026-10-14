@@ -141,3 +141,6 @@ else echo "pomijam Ratuj z sercem (budżet czasu tego przebiegu) – zrobię prz
 if [ "$SH_NEW" = 1 ] || [ "$PSP_NEW" = 1 ] || [ "$NP_NEW" = 1 ] || [ "$NEWS_NEW" = 1 ] || [ "$RJ_NEW" = 1 ] || [ "$AIR_NEW" = 1 ]; then
   if bash "$SERVER_DIR/publish.sh"; then touch "$BASE/last.push"; echo "opublikowano (dodatkowe pliki)"; else echo "druga publikacja nieudana – spróbuję przy następnym przebiegu"; fi
 fi
+
+# Wiadomości i utrudnienia drogowe na Telegram (wyłączenie: touch /opt/egida/tg-news.off). Błąd tu niczego nie zatrzymuje.
+timeout 100 node tg-news.mjs 2>&1 | tail -n 12 || true

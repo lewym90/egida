@@ -92,7 +92,7 @@ t("serwer: nagłówek User-Agent w air-sync jest czystym ASCII (znaki spoza Lati
 t("źródła: GIOŚ jest wymieniony w Źródłach i licencjach", () => { assert.ok(SOURCES.some((x) => /GIOŚ/.test(x.n) && /^https:/.test(x.u))); });
 t("serwis: nowe pliki w SHELL, wersja v40, serwer publikuje air.json", () => {
   for (const f of readdirSync(new URL("../js", import.meta.url)).filter((x) => x.endsWith(".js"))) assert.ok(sw.includes(`"js/${f}"`), f + " w SHELL");
-  assert.match(sw, /egida-v43/);
+  assert.match(sw, /egida-v44/);
   assert.match(readFileSync(new URL("../server/publish.sh", import.meta.url), "utf8"), /git add air\.json/);
   assert.match(readFileSync(new URL("../server/run.sh", import.meta.url), "utf8"), /air-sync\.mjs/);
   assert.match(readFileSync(new URL("../js/config.js", import.meta.url), "utf8"), /airUrl: "https:\/\/raw\.githubusercontent\.com\/lewym90\/egida\/data\/air\.json"/);

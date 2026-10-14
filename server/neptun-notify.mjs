@@ -5,6 +5,7 @@
 import { borderApproach, TYPES } from "../js/neptun.js";
 import { regionsWithin } from "../js/regions.js";
 import { compassPl } from "../js/geo.js";
+import { appLink } from "./tg-policy.mjs";
 
 export const NAMES = { dolnoslaskie: "Dolnośląskie", "kujawsko-pomorskie": "Kujawsko-pomorskie", lubelskie: "Lubelskie", lubuskie: "Lubuskie", lodzkie: "Łódzkie", malopolskie: "Małopolskie", mazowieckie: "Mazowieckie", opolskie: "Opolskie", podkarpackie: "Podkarpackie", podlaskie: "Podlaskie", pomorskie: "Pomorskie", slaskie: "Śląskie", swietokrzyskie: "Świętokrzyskie", "warminsko-mazurskie": "Warmińsko-mazurskie", wielkopolskie: "Wielkopolskie", zachodniopomorskie: "Zachodniopomorskie" };
 export const LIMITS = { regionKm: 50, perRegionPerHour: 8, keepH: 6, maxItemsPerMessage: 4 };
@@ -71,5 +72,5 @@ export function buildMessage(region, items, { appUrl = "" } = {}) {
   const head = top === 0 ? "Obiekt nad terytorium Polski" : top === 50 ? "Obiekt blisko granicy, leci w jej stronę" : "Obiekt zbliża się do granicy";
   return `🟠 <b>NIEOFICJALNE · NEPTUN</b> · ${esc(NAMES[region] || region)}\n<b>${esc(head)}</b>\n${shown.map(line).join("\n")}${more > 0 ? `\n…i ${more} ${more === 1 ? "inny obiekt" : "innych obiektów"}.` : ""}\n\n` +
     `⚠️ To <b>nieoficjalna</b> informacja z serwisu NEPTUN (neptun.in.ua), a nie system ostrzegania. Może być spóźniona, niepełna lub błędna. Kieruj się syrenami, Alertem RCB i poleceniami służb. W zagrożeniu życia dzwoń <b>112</b>.\n` +
-    `📲 Mapa na żywo w aplikacji EGIDA${appUrl ? `: ${esc(appUrl)}` : ""}\nŹródło danych: NEPTUN (neptun.in.ua)`;
+    `📲 Mapa na żywo: ${appLink(appUrl)}\nŹródło danych: NEPTUN (neptun.in.ua)`;
 }
