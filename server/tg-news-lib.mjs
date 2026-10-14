@@ -5,7 +5,6 @@
 //  - utrudnienia drogowe GDDKiA: nowe wpisy na kanał województwa, bez limitu;
 //  - kolor wg powagi: 🔴 PILNE, 🟠 UWAGA, 🔵 INFORMACJA (drogi: 🟠 zamknięcie, 🟡 pozostałe utrudnienia);
 //  - w treści nigdy nie ma gołego adresu aplikacji: jest ukryty link „Śledź w aplikacji EGIDA – Twoje centrum bezpieczeństwa”.
-import { strongIncident, nationalThreat } from "./news-places.mjs";
 import { dedupeSimilar } from "../js/similar.js";
 import { appLink } from "./tg-policy.mjs";
 
@@ -14,17 +13,13 @@ export const LIMITS = { kraj: 10, swiat: 5, recentH: 3, titleChars: 240, summary
 export const NAMES = { dolnoslaskie: "Dolnośląskie", "kujawsko-pomorskie": "Kujawsko-pomorskie", lubelskie: "Lubelskie", lubuskie: "Lubuskie", lodzkie: "Łódzkie", malopolskie: "Małopolskie", mazowieckie: "Mazowieckie", opolskie: "Opolskie", podkarpackie: "Podkarpackie", podlaskie: "Podlaskie", pomorskie: "Pomorskie", slaskie: "Śląskie", swietokrzyskie: "Świętokrzyskie", "warminsko-mazurskie": "Warmińsko-mazurskie", wielkopolskie: "Wielkopolskie", zachodniopomorskie: "Zachodniopomorskie" };
 const esc = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 const fold = (s) => String(s || "").toLowerCase().replace(/ł/g, "l").normalize("NFD").replace(/[̀-ͯ]/g, "");
-const WARN = /(^|[^a-z0-9])(?:ostrzez|ostrzeg|zagroz|ewakuac|alarm|pozar|powodz|podtopien|wichur|nawalnic|gololed|skazeni|wybuch|dron|rakiet|atak|grozb|zatruc|epidemi|brak pradu|brak wody|przerw w dostaw|awaria prad|awaria wodoc|awaria gazoc|cyberatak|sabota|dywersj|wypad|zablokowan|zamkniet|katastrof|ranni|rannych)/;
 
 /** Kategoria wiadomości: "droga" | "region" | "kraj" | "swiat". */
 export const categoryOf = (it) => (it.kind === "gddkia" ? "droga" : it.region === "all" ? "kraj" : it.region === "world" ? "swiat" : "region");
-/** Powaga: "danger" | "warn" | "info" (wiadomości) albo "closed" | "traffic" (drogi). */
+/** Powaga: "info" (wiadomości) albo "closed" | "traffic" (drogi). */
 export function levelOf(it) {
-  const t = `${it.title || ""}`;
-  if (it.kind === "gddkia") return /zamknie|zamknieta/.test(fold(t)) ? "closed" : "traffic";
-  if (strongIncident(t) || nationalThreat(t)) return "danger";
-  if (WARN.test(fold(t))) return "warn";
-  return "info";
+  if (it.kind === "gddkia") return /zamknie|zamknieta/.test(fold(it.title || "")) ? "closed" : "traffic";
+  return "info"; // wiadomości (województwo, kraj, świat) zawsze niebieskie, tak jak w aplikacji; pilne sprawy idą z RSO
 }
 const ICON = { danger: "🔴", warn: "🟠", info: "🔵", closed: "🟠", traffic: "🟡" };
 const LABEL = { danger: "PILNE", warn: "UWAGA", info: "INFORMACJA", closed: "DROGA ZAMKNIĘTA", traffic: "UTRUDNIENIA" };
@@ -39,16 +34,14 @@ const RULE = "──────────────";
 export function newsMessage(it, { appUrl = "" } = {}) {
   const cat = categoryOf(it), lv = levelOf(it);
   const place = cat === "region" || cat === "droga" ? `📍 <b>${esc(NAMES[it.region] || it.region)}</b>` : cat === "kraj" ? "🇵🇱 <b>Z kraju</b>" : "🌍 <b>Ze świata · wpływ na Polskę</b>";
-  const kind = cat === "droga" ? "🚧 Drogi krajowe" : it.kind === "media" ? "📰 Doniesienie medialne" : "";
+  const kind = cat === "droga" ? "🚧 Drogi krajowe" : it.kind === "media" ? "📰 doniesienie medialne" : "";
   const head = `${ICON[lv]} <b>${LABEL[lv]}</b>  ·  ${place}${kind ? `\n${kind}` : ""}`;
   const sum = it.summary ? `\n\n${esc(String(it.summary).slice(0, LIMITS.summaryChars))}` : "";
   const t = when(it.date), u = safeUrl(it.url);
   const src = esc(it.source || "źródło");
   const until = cat === "droga" && it.until && !isNaN(Date.parse(it.until)) ? `\n⏳ do ${esc(when(it.until))}` : "";
   const meta = `\n\n${t ? `🕒 ${esc(t)} · ` : ""}${u ? `<a href="${u}">${src}</a>` : src}${until}`;
-  const media = it.kind === "media" ? "\n<i>To doniesienie medialne, nie komunikat służb. Kieruj się syrenami i Alertem RCB.</i>" : "";
-  const emergency = lv === "danger" ? "\n🛡 W zagrożeniu życia dzwoń <b>112</b>." : "";
-  return `${head}\n${RULE}\n<b>${esc(String(it.title).slice(0, LIMITS.titleChars))}</b>${sum}${meta}${media}${emergency}\n${RULE}\n📲 ${appLink(appUrl)}${cat === "droga" ? "" : `\n${FOOT}`}`;
+  return `${head}\n${RULE}\n<b>${esc(String(it.title).slice(0, LIMITS.titleChars))}</b>${sum}${meta}\n${RULE}\n📲 ${appLink(appUrl)}${cat === "droga" ? "" : `\n${FOOT}`}`;
 }
 
 /**
@@ -98,11 +91,11 @@ export const channelsFor = (it, channels) => (categoryOf(it) === "kraj" || categ
 export function sampleItems(now = Date.now()) {
   const d = (m) => new Date(now - m * 6e4).toISOString();
   return [
-    { id: "sample-danger", kind: "media", region: "mazowieckie", source: "Przykładowe źródło", url: "https://example.com/", date: d(5), title: "PRÓBA: Zamach w centrum miasta, służby na miejscu", summary: "To jest wiadomość próbna, żebyś zobaczył wygląd powiadomienia. Nic się nie stało." },
-    { id: "sample-warn", kind: "rss", region: "mazowieckie", source: "Policja Mazowiecka", url: "https://example.com/", date: d(10), title: "PRÓBA: Ostrzeżenie przed wichurami w województwie", summary: "Wiadomość próbna z poziomem „UWAGA”." },
-    { id: "sample-info", kind: "rss", region: "mazowieckie", source: "Urząd Wojewódzki", url: "https://example.com/", date: d(15), title: "PRÓBA: Komunikat informacyjny dla mieszkańców", summary: "Wiadomość próbna z poziomem „INFORMACJA”." },
-    { id: "sample-kraj", kind: "html", region: "all", source: "RCB", url: "https://example.com/", date: d(20), title: "PRÓBA: Ogólnopolski komunikat o bezpieczeństwie", summary: "Tak wygląda wiadomość z kategorii „Z kraju”." },
-    { id: "sample-swiat", kind: "media", region: "world", source: "Polsat News Świat", url: "https://example.com/", date: d(25), title: "PRÓBA: Cyberatak na infrastrukturę w Europie, trop prowadzi do Rosji", summary: "Tak wygląda wiadomość z kategorii „Ze świata”." },
+    { id: "sample-danger", kind: "media", region: "mazowieckie", source: "Przykładowe źródło", url: "https://example.com/", date: d(5), title: "PRÓBA: Wiadomość z województwa", summary: "To jest wiadomość próbna, żebyś zobaczył wygląd powiadomienia. Nic się nie stało." },
+    { id: "sample-warn", kind: "media", region: "mazowieckie", source: "Policja Mazowiecka", url: "https://example.com/", date: d(10), title: "PRÓBA: Druga wiadomość z województwa", summary: "Wiadomość próbna z poziomem „UWAGA”." },
+    { id: "sample-info", kind: "media", region: "mazowieckie", source: "Urząd Wojewódzki", url: "https://example.com/", date: d(15), title: "PRÓBA: Komunikat informacyjny dla mieszkańców", summary: "Wiadomość próbna z poziomem „INFORMACJA”." },
+    { id: "sample-kraj", kind: "media", region: "all", source: "RCB", url: "https://example.com/", date: d(20), title: "PRÓBA: Ogólnopolski komunikat o bezpieczeństwie", summary: "Tak wygląda wiadomość z kategorii „Z kraju”." },
+    { id: "sample-swiat", kind: "media", region: "world", source: "Polsat News Świat", url: "https://example.com/", date: d(25), title: "PRÓBA: Wiadomość ze świata o wpływie na Polskę", summary: "Tak wygląda wiadomość z kategorii „Ze świata”." },
     { id: "sample-droga", kind: "gddkia", region: "mazowieckie", source: "GDDKiA (drogi krajowe)", url: "https://drogi.gddkia.gov.pl/informacje-drogowe/lista-utrudnien", date: d(30), until: new Date(now + 6 * H).toISOString(), title: "PRÓBA: 7 · Warszawa - Radom: droga zamknięta", summary: "Objazd prowadzony drogami lokalnymi." },
   ];
 }

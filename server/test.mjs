@@ -142,13 +142,15 @@ import { newsMessage, levelOf as nLevel, categoryOf as nCat, selectNews, markNew
   const NOW = Date.parse("2026-10-14T12:00:00Z"), ago = (m) => new Date(NOW - m * 6e4).toISOString();
   const mk = (id, o) => ({ id, kind: "rss", region: "mazowieckie", source: "Źr <b>", url: "https://x.pl/?a=1&b=2", date: ago(10), title: `Tytuł ${id} <i>`, summary: "", ...o });
   const m = newsMessage(mk("a", { title: "Ostrzeżenie przed wichurami & burzami" }), { appUrl: APP });
-  assert.ok(m.includes("🟠") && m.includes("Mazowieckie") && m.includes("&amp;") && !m.includes("<i>Tytuł") && m.includes("Więcej ważnych wiadomości") && !strip(m).includes("app.test"));
+  assert.ok(m.includes("🔵") && !m.includes("🟠") && m.includes("Mazowieckie") && m.includes("&amp;") && !m.includes("<i>Tytuł") && m.includes("Więcej ważnych wiadomości") && !strip(m).includes("app.test"));
   assert.ok(m.includes(`href="${APP}"`), "link do aplikacji ukryty w tekście");
   const mr = newsMessage(mk("r", { kind: "gddkia", title: "7 · A - B: droga zamknięta", until: new Date(NOW + 36e5).toISOString() }), { appUrl: APP });
   assert.ok(mr.includes("🟠") && mr.includes("Drogi krajowe") && !mr.includes("Więcej ważnych wiadomości"), "drogi bez stopki o wiadomościach");
   assert.ok(!strip(newsMessage(mk("n"), {})).includes("http"), "bez appUrl zwykłe zdanie bez adresu");
   assert.equal(nCat(mk("k", { region: "all" })), "kraj"); assert.equal(nCat(mk("w", { region: "world" })), "swiat"); assert.equal(nCat(mk("g", { kind: "gddkia" })), "droga");
   assert.equal(nLevel(mk("g", { kind: "gddkia", title: "Remont" })), "traffic");
+  for (const reg of ["mazowieckie", "all", "world"]) { const x = newsMessage(mk("b", { kind: "media", region: reg, title: "Pożar i wybuch, zamach" }), { appUrl: APP }); assert.ok(x.includes("🔵") && x.includes("doniesienie medialne") && !x.includes("🔴") && !x.includes("112"), "wiadomości zawsze niebieskie z dopiskiem medialnym: " + reg); }
+  assert.ok(!newsMessage(mk("b2", { kind: "rss" }), {}).includes("doniesienie medialne"), "dopisek tylko dla mediów, jak w aplikacji");
   // limity: kraj 10/h, świat 5/h, region bez limitu
   const uniqTitles = ["Sejm uchwalił budżet", "Premier spotkał się z prezydentem", "Pogoda nad morzem", "Zmiany w kodeksie pracy", "Rosną ceny paliw", "Nowa linia kolejowa", "Rząd przyjął strategię", "Debata o szkołach", "Rekord eksportu żywności", "Ceny mieszkań spadają", "Konkurs dla uczniów", "Otwarto nowy most"];
   const kr = uniqTitles.map((t, i) => mk("kr" + i, { region: "all", title: t + " " + "x".repeat(i) }));
