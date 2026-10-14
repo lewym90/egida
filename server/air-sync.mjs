@@ -4,7 +4,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { AIR_BASE, parseStations, parseIndex } from "./air-lib.mjs";
 
 const OUT = process.env.AIR_OUT || "air.json", MIN = Number(process.env.AIR_MIN || 30), PAUSE = Number(process.env.AIR_PAUSE_MS || 120), CONC = Number(process.env.AIR_CONC || 3);
-const UA = "EGIDA/1.0 (+https://github.com/lewym90/egida; nieoficjalna aplikacja bezpieczeństwa)";
+const UA = "EGIDA/1.0 (+https://github.com/lewym90/egida; unofficial safety app)";
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const getJson = async (path) => {
   const r = await fetch(AIR_BASE + path, { headers: { "User-Agent": UA, Accept: "application/json" }, signal: AbortSignal.timeout(15000) });

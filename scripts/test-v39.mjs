@@ -86,6 +86,7 @@ t("Pierwsza pomoc: rytm bez napisów, pętla audio, bloki RKO i Krwotoki, 112 po
   for (const id of ["krwotok", "rana-klatki"]) { const o = FIRST_AID.others.find((x) => x.id === id); assert.ok(!/112/.test(o.steps[0]), id + ": pierwszy krok nie jest telefonem"); assert.ok(o.steps.some((x) => /112/.test(x)), id + " nadal mówi o 112"); }
   assert.ok(FIRST_AID.others.find((x) => x.id === "rko-dziecko").steps.length >= 4);
 });
+t("serwer: nagłówek User-Agent w air-sync jest czystym ASCII (znaki spoza Latin-1 wywalają fetch)", () => { const src = readFileSync(new URL("../server/air-sync.mjs", import.meta.url), "utf8"); const ua = /const UA = "([^"]+)"/.exec(src)[1]; assert.ok(/^[\x20-\x7e]+$/.test(ua), ua); });
 t("źródła: GIOŚ jest wymieniony w Źródłach i licencjach", () => { assert.ok(SOURCES.some((x) => /GIOŚ/.test(x.n) && /^https:/.test(x.u))); });
 t("serwis: nowe pliki w SHELL, wersja v40, serwer publikuje air.json", () => {
   for (const f of readdirSync(new URL("../js", import.meta.url)).filter((x) => x.endsWith(".js"))) assert.ok(sw.includes(`"js/${f}"`), f + " w SHELL");
