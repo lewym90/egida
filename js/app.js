@@ -819,7 +819,7 @@ function screenWynik() {
 function screenWiecej() {
   const rows = MORE.map((n) => `<li><a href="${n.h}"><span class="mi">${n.i}</span><span class="mt"><b>${n.t}</b><span class="muted small">${n.d}</span></span>${I.chevr}</a></li>`).join("");
   return `<div class="hero"><h1>Więcej</h1><p>Wszystkie funkcje w jednym miejscu.</p></div>
-  <div class="card"><ul class="list morelist">${rows}</ul></div>
+  <div class="card flat"><ul class="list morelist">${rows}</ul></div>
   <p class="vers">EGIDA ${esc(APP_VERSION)} · ${esc(APP_BUILD)}</p>`;
 }
 function screenUstawienia() {
