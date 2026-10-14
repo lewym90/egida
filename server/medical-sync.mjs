@@ -21,11 +21,11 @@ const PAUSE_MS = Number(process.env.MEDICAL_PAUSE_MS ?? 3000), RETRY_MS = Number
 const MIN_AED = Number(process.env.MEDICAL_MIN_AED ?? 500), MIN_HOSP = Number(process.env.MEDICAL_MIN_HOSP ?? 100), MIN_WATER = Number(process.env.MEDICAL_MIN_WATER ?? 100);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-async function overpass(query, rounds = 3) {
+async function overpass(query, rounds = 3, ms = 120000) {
   for (let round = 0; round < rounds; round++) {
     for (const u of MIRRORS) {
       try {
-        const r = await fetch(u, { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded", "user-agent": UA }, body: "data=" + encodeURIComponent(query), signal: AbortSignal.timeout(120000) });
+        const r = await fetch(u, { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded", "user-agent": UA }, body: "data=" + encodeURIComponent(query), signal: AbortSignal.timeout(ms) });
         if (!r.ok) { console.log(u.split("/")[2], "→ HTTP", r.status); continue; }
         const j = await r.json();
         if (!Array.isArray(j?.elements)) { console.log(u.split("/")[2], "→ nieoczekiwany format"); continue; }
@@ -50,7 +50,7 @@ for (const job of JOBS) {
   const rows = new Map();
   // Kafelek, którego serwer nie chce oddać (zwykle gęsto zabudowany, np. duże miasto), dzielimy na 4 mniejsze – do dwóch poziomów.
   async function fetchTile(t, depth = 0) {
-    const json = await overpass(overpassQueryTile(t, job.what), depth ? 2 : 3);
+    const json = await overpass(overpassQueryTile(t, job.what), depth ? 2 : 2, job.what === "water" ? 60000 : 120000);
     if (json) { const got = job.parse(json); for (const r of got) rows.set(r[0], r); console.log(`  ${t.join(", ")}: ${job.label} ${got.length}${depth ? " (podkafelek)" : ""}`); await sleep(PAUSE_MS); return true; }
     if (depth >= 2) return false;
     console.log(`  ${t.join(", ")}: brak odpowiedzi – dzielę na 4 części`);
@@ -59,7 +59,7 @@ for (const job of JOBS) {
     for (const sub of [[s0, w0, sm, wm], [s0, wm, sm, e0], [sm, w0, n0, wm], [sm, wm, n0, e0]]) if (!(await fetchTile(sub.map((x) => Math.round(x * 1e5) / 1e5), depth + 1))) ok = false;
     return ok;
   }
-  const tiles = medicalTiles();
+  const tiles = job.what === "water" ? medicalTiles(6, 6) : medicalTiles(); // woda: mniejsze kafelki (36), krótsze zapytania – lżejsze dla przeciążonego Overpass
   let failedTiles = 0;
   console.log(`== ${job.label}`);
   for (const [i, t] of tiles.entries()) { console.log(`kafelek ${i + 1}/${tiles.length}`); if (!(await fetchTile(t))) failedTiles++; }

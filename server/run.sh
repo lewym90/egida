@@ -98,11 +98,11 @@ if [ ! -f "$MED_STAMP" ] || [ "$(( $(date +%s) - $(stat -c %Y "$MED_STAMP") ))" 
   touch "$MED_STAMP"
   ( export ADDR_CACHE="$BASE/addr-cache.json"; DATA_DIR="$DATA_DIR" flock "$BASE/medical.lock" timeout 1500 node medical-sync.mjs >> "$BASE/medical.log" 2>&1 || touch -d "-18 hours" "$MED_STAMP" ) 9>&- &
 fi
-# Raz na dobę punkty wody pitnej z OpenStreetMap → water.json (osobny, lekki przebieg w tle, ta sama blokada co reszta danych medycznych).
+# Raz na dobę punkty wody pitnej z OpenStreetMap → water.json (osobny, lekki przebieg w tle, własna blokada i log /opt/egida/water.log, żeby nie czekać za adresami AED; po porażce ponowna próba za ok. 2 h).
 WATER_STAMP="$BASE/water.checked"
 if [ ! -f "$WATER_STAMP" ] || [ "$(( $(date +%s) - $(stat -c %Y "$WATER_STAMP") ))" -gt 86400 ]; then
   touch "$WATER_STAMP"
-  ( DATA_DIR="$DATA_DIR" flock "$BASE/medical.lock" timeout 1500 node medical-sync.mjs --only=water >> "$BASE/medical.log" 2>&1 || touch -d "-18 hours" "$WATER_STAMP" ) 9>&- &
+  ( DATA_DIR="$DATA_DIR" flock "$BASE/water.lock" timeout 2700 node medical-sync.mjs --only=water >> "$BASE/water.log" 2>&1 || touch -d "-22 hours" "$WATER_STAMP" ) 9>&- &
 fi
 # Co ~50 min uzupełnianie adresów i rodzaju obiektu AED/szpitali (OSM; pierwsze przebiegi trwają godzinami, kolejne tylko dla nowych punktów). W tle, ze swoją blokadą.
 ADDR_STAMP="$BASE/medical.addr.checked"

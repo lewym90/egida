@@ -20,7 +20,7 @@ export const overpassQueryHospitals = () => `[out:json][timeout:120];area["ISO31
 /** Zapytanie dla jednego prostokąta [S, W, N, E]. what: "aed" | "hospitals" | "both". Zapytania po prostokątach są dużo lżejsze dla Overpass niż filtr „cała Polska”. */
 export const overpassQueryTile = ([so, we, no, ea], what = "both") => {
   const box = `(${so},${we},${no},${ea})`;
-  if (what === "water") return `[out:json][timeout:90];(nwr["amenity"="drinking_water"]${box};nwr["amenity"="water_point"]${box};nwr["natural"="spring"]["drinking_water"="yes"]${box};);out center tags;`;
+  if (what === "water") return `[out:json][timeout:50];(nwr["amenity"="drinking_water"]${box};nwr["amenity"="water_point"]${box};nwr["natural"="spring"]["drinking_water"="yes"]${box};);out center tags;`;
   const parts = [what !== "hospitals" ? `nwr["emergency"="defibrillator"]${box};` : "", what !== "aed" ? `nwr["amenity"="hospital"]${box};` : ""].join("");
   return `[out:json][timeout:90];(${parts});out center tags;`;
 };

@@ -269,7 +269,9 @@ export function parseGddkia(xml, nowMs, regionIds) {
 const MEDIA_SAFETY = ["alarm", "bomb", "ewakuac", "zagroz", "ostrzez", "grozb", "pozar", "wybuch", "wypad", "zablokowan", "zamkniet", "utrudnien", "powodz", "podtopien", "wichur", "nawalnic",
   "burz", "tornado", "gololed", "skazeni", "katastrof", "nie zyje", "nie zyja", "zgin", "smiertel", "ranni", "ranny", "rannych", "strzelani", "nozown", "atak", "zamach", "dron", "rakiet", "syren",
   "sabotaz", "dywersj", "szpieg", "wojn", "bron jadrow", "bron biolog", "bron chemicz", "zestrzel", "przestrzen powietrzn", "mobilizac", "inwazj", "agresj", "cyberatak",
-  "zabojstw", "morderstw", "napad", "porwan", "zaginion", "brak pradu", "brak wody", "przerw w dostaw", "awari", "zatruc", "epidemi"];
+  "zabojstw", "morderstw", "napad", "porwan", "zaginion", "brak pradu", "brak wody", "przerw w dostaw", "zatruc", "epidemi",
+  // awarie tylko tam, gdzie dotykają infrastruktury krytycznej (sama „awaria” łapała np. schody ruchome, windy, kasy biletowe)
+  "awaria prad", "awaria zasilan", "awaria sieci energ", "awaria sieci wodoc", "awaria wodoc", "awaria gazoc", "awaria sieci gaz", "awaria ciepl", "awaria kanalizac", "awaria elektrown", "awaria sieci komorkow", "awaria internet", "awaria telefon", "awaria numeru 112", "awaria systemu alarm", "awaria mostu", "awaria wiaduktu", "awaria tamy", "awaria zapory", "awaria reaktor", "awaria zbiornik", "awaria rurociag", "awaria magistral", "awaria stacji transformator"];
 const MEDIA_DENY = ["mecz", "liga", "ligi", "turniej", "puchar", "zawodnik", "zawodnicz", "pilkarz", "pilkark", "siatkar", "koszykar", "reprezentacj", "wyscig", "koncert", "festiwal", "wystaw", "premiera", "premiery",
   "kino", "teatr", "spektakl", "konkurs", "rocznic", "jubileusz", "horoskop", "rozmowa", "reportaz", "podcast", "felieton", "wideo", "quiz", "gosc", "wywiad", "ekspert", "pogoda na", "targi", "zwyciez", "pokonal", "przegral",
   // polityka i „burze” w przenośni, sądy, imprezy, remonty: nie dotyczą bezpieczeństwa

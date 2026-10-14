@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { parseIndex, pollutantOf } from "../server/air-lib.mjs";
 import { airAdvice, normalizeAir, AIR_POLL, AIR_ADVICE } from "../js/air.js";
+import { passesMedia } from "../server/news-lib.mjs";
 import { parseWater, unpackWater, overpassQueryTile, loadMedicalDb, WATER_KINDS } from "../js/medical.js";
 import { normalizeExpiry, normalizeExercise, exportState, importState } from "../js/personal.js";
 const src = (p) => readFileSync(new URL("../" + p, import.meta.url), "utf8");
@@ -67,7 +68,8 @@ t("woda: ekran, serwer i konfiguracja", () => {
   assert.match(s, /\["woda", "Woda"\]/); assert.match(s, /CONFIG\.waterUrl/); assert.match(s, /#0277BD/); assert.match(s, /Jakość wody nie jest tu badana/);
   assert.match(src("js/config.js"), /waterUrl: "https:\/\/raw\.githubusercontent\.com\/lewym90\/egida\/data\/water\.json"/);
   assert.match(src("server/publish.sh"), /git add water\.json/);
-  assert.match(src("server/run.sh"), /--only=water/);
+  assert.match(src("server/run.sh"), /--only=water/); assert.match(src("server/run.sh"), /water\.lock/); assert.ok(!/medical\.lock" timeout 2700/.test(src("server/run.sh")));
+  assert.match(src("server/medical-sync.mjs"), /medicalTiles\(6, 6\)/);
   assert.match(src("js/offline.js"), /waterUrl/);
 });
 
@@ -99,6 +101,12 @@ t("mapa zagrożeń: bez schronów, bez przycisku pozycji, GPS na stałe", () => 
   assert.match(m, /locate\(onPos/); assert.match(m, /zoom: 8/); assert.match(m, /< 0\.015/); assert.match(m, /20000/); assert.match(m, /120000/);
 });
 t("wersja i service worker", () => {
-  assert.match(src("js/version.js"), /APP_VERSION = "v42"/); assert.match(src("sw.js"), /const VERSION = "egida-v42"/);
+  assert.match(src("js/version.js"), /APP_VERSION = "v43"/); assert.match(src("sw.js"), /const VERSION = "egida-v43"/);
+});
+t("media: awaria schodów ruchomych nie jest wiadomością o bezpieczeństwie, awaria prądu jest", () => {
+  assert.equal(passesMedia("Awaria schodów ruchomych, jeżdżą tylko w górę"), false);
+  assert.equal(passesMedia("Awaria windy w bloku. Mieszkańcy utknęli"), false);
+  assert.equal(passesMedia("Awaria prądu w kilku powiatach. Bez zasilania 20 tys. odbiorców"), true);
+  assert.equal(passesMedia("Awaria wodociągu w Lublinie. Brak wody w całym osiedlu"), true);
 });
 console.log(`OK: v42 – ${n} testów`);
