@@ -36,10 +36,13 @@ await ok("polityka prywatności opisuje licznik jako działający", () => {
   const all = PRIVACY.sections.map((s) => s.p.join(" ")).join(" ");
   assert.match(all, /GoatCounter/); assert.ok(!/domyślnie wyłączony/.test(all));
 });
-await ok("Radio ZET i TVP Info są w źródłach wiadomości (media krajowe)", () => {
-  for (const id of ["media-radiozet", "media-tvpinfo"]) {
+await ok("Radio ZET i TVP Info usunięte; Polsat News – Świat i MON, MSWiA, PAA, GIS dodane", () => {
+  for (const id of ["media-radiozet", "media-tvpinfo"]) assert.ok(!SOURCES.find((y) => y.id === id), id + " ma być usunięte");
+  const sw = SOURCES.find((y) => y.id === "media-polsatnews-swiat");
+  assert.ok(sw && sw.region === "all" && sw.filter === "media" && sw.urls[0] === "https://www.polsatnews.pl/rss/swiat.xml");
+  for (const id of ["mon", "mswia", "paa", "gis"]) {
     const x = SOURCES.find((y) => y.id === id);
-    assert.ok(x, id); assert.equal(x.region, "all"); assert.equal(x.filter, "media"); assert.ok(x.urls.every((u) => /^https?:\/\//.test(u)));
+    assert.ok(x, id); assert.equal(x.region, "all"); assert.equal(x.kind, "html"); assert.ok(["civil", "safety"].includes(x.filter)); assert.ok(x.urls.every((u) => /^https:\/\/www\.gov\.pl\/web\//.test(u)));
   }
 });
 
@@ -126,7 +129,7 @@ await ok("nazwy zakładek i filtry: Zagrożenia, W pobliżu; filtry Schrony / De
   const app = src("app.js"), sh = src("sheltersscreen.js");
   assert.match(app, /t: "Zagrożenia"/); assert.match(app, /t: "W pobliżu"/); assert.match(app, /t: "Mapa zagrożeń"/); assert.match(app, /t: "Pomoc w pobliżu"/);
   assert.ok(!/t: "Mapa", i: I\.map/.test(app) && !/t: "Schrony", i: I\.shield/.test(app));
-  assert.match(sh, /\["schrony", "Schrony"\], \["aed", "Defibrylatory AED"\], \["szpitale", "Szpitale"\], \["mine", "Moje miejsca"\]/);
+  assert.match(sh, /\["schrony", "Schrony"\], \["aed", "Defibrylatory AED"\], \["szpitale", "Szpitale"\], \["woda", "Woda"\], \["mine", "Moje miejsca"\]/);
   assert.ok(!/Z opisem wejścia"\]|Do 10 min/.test(sh));
   assert.match(app, /#\/schrony\/aed/); assert.match(src("screens2.js"), /#\/schrony\/szpitale/);
   assert.match(readFileSync(new URL("../sw.js", import.meta.url), "utf8"), /js\/medical\.js/);

@@ -27,12 +27,10 @@ const NATIONAL = [
   // Wirtualna Polska (kanał Wiadomości, RSS 2.0 – sprawdzony 13.10.2026) i Onet (kandydat): portale „z kraju i ze świata”, więc tylko z polskim kontekstem w tytule.
   ["wp", "Wirtualna Polska", ["https://wiadomosci.wp.pl/rss.xml"]],
   ["onet", "Onet Wiadomości", ["https://wiadomosci.onet.pl/.feed"]],
-  // Radio ZET i TVP Info: adresy RSS podał użytkownik (12.10.2026). Działanie i zgodność z robots.txt sprawdza serwer przy każdym przebiegu
-  // (news-report.json); źródło odrzucone przez robots.txt lub błąd HTTP jest po prostu pomijane.
-  // 14.10.2026: oba adresy odpowiadały HTTP 200, ale bez wpisów (TVP zwraca stronę HTML z arkuszem XSLT, a nie kanał). Teraz serwer najpierw szuka kanału
-  // (<link rel="alternate" type="application/rss+xml">) na stronie głównej serwisu, a dopiero potem próbuje adresów kandydatów; zawartość pustej odpowiedzi trafia do news-report.json.
-  ["radiozet", "Radio ZET", ["https://wiadomosci.radiozet.pl/rss", "https://wiadomosci.radiozet.pl/rss.xml", "https://www.radiozet.pl/rss", "https://player.radiozet.pl/externals/xml/radio-zet-wiadomosci.xml"], "https://wiadomosci.radiozet.pl/"],
-  ["tvpinfo", "TVP Info", ["https://www.tvp.info/rss.xml", "https://www.tvp.info/rss", "https://www.tvp.info/feed", "https://www.tvp.info/informacje?xslt=tvp-info/news/rss.xslt"], "https://www.tvp.info/"],
+  // Radio ZET i TVP Info usunięte 14.10.2026: Radio ZET zwracało HTTP 404 (kanał RSS nie istnieje), a TVP Info stronę HTML z arkuszem XSLT zamiast kanału.
+  // Nie wracać do nich bez nowego, sprawdzonego adresu RSS.
+  // Polsat News – Świat: oficjalna lista kanałów (polsatnews.pl/kanaly-rss/). Wzmacnia grupę „Ze świata”; obowiązuje ten sam filtr tematu i związku z Polską.
+  ["polsatnews-swiat", "Polsat News", ["https://www.polsatnews.pl/rss/swiat.xml"], null, { polishOnly: false }],
   // Polskie Radio 24: robots.txt zabrania pobierania – pomijamy.
   ["info112", "Info112", ["https://info112.pl/feed/"], null, { polishOnly: true }],
 ];
@@ -59,6 +57,12 @@ export const SOURCES = [
   { id: "policja-pl", label: "Policja (portal krajowy)", region: "mixed", kind: "rss", filter: "safety", urls: ["https://policja.pl/dokumenty/rss/1-rss-1.rss"] },
   { id: "rcb", label: "Rządowe Centrum Bezpieczeństwa", region: "all", kind: "html", filter: "safety", urls: ["https://www.gov.pl/web/rcb/wiadomosci", "https://www.gov.pl/web/rcb"] },
   { id: "men", label: "Ministerstwo Edukacji Narodowej", region: "all", kind: "html", filter: "school", urls: ["https://www.gov.pl/web/edukacja/wiadomosci", "https://www.gov.pl/web/edukacja"] },
+  // Ogólnopolskie instytucje na gov.pl (ten sam mechanizm co RCB i urzędy wojewódzkie). Adresy poza MON są kandydatami: o działaniu decyduje news-report.json.
+  // MON i MSWiA: filtr „civil” (tylko ochrona ludności, alarmy, ostrzeżenia, drony, rakiety), bo ogólne „bezpieczeństwo” to głównie rozmowy dyplomatyczne.
+  { id: "mon", label: "Ministerstwo Obrony Narodowej", region: "all", kind: "html", filter: "civil", urls: ["https://www.gov.pl/web/obrona-narodowa/wiadomosci", "https://www.gov.pl/web/obrona-narodowa"] },
+  { id: "mswia", label: "MSWiA", region: "all", kind: "html", filter: "civil", urls: ["https://www.gov.pl/web/mswia/wiadomosci", "https://www.gov.pl/web/mswia"] },
+  { id: "paa", label: "Państwowa Agencja Atomistyki", region: "all", kind: "html", filter: "safety", urls: ["https://www.gov.pl/web/paa/wiadomosci", "https://www.gov.pl/web/paa"] },
+  { id: "gis", label: "Główny Inspektorat Sanitarny", region: "all", kind: "html", filter: "safety", urls: ["https://www.gov.pl/web/gis/wiadomosci", "https://www.gov.pl/web/gis"] },
   // Drogi krajowe: oficjalny plik XML GDDKiA (zdarzenia i zamknięcia dróg, z województwem). Źródło: Generalna Dyrekcja Dróg Krajowych i Autostrad.
   { id: "gddkia", label: "GDDKiA (drogi krajowe)", region: "all", kind: "gddkia", filter: "all", noCap: true, urls: ["https://www.archiwum.gddkia.gov.pl/dane/zima_html/utrdane.xml"] },
   // Województwo: Policja (kanał RSS „Aktualności” wyszukiwany na stronie głównej jednostki)

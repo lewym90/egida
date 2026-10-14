@@ -27,7 +27,7 @@ async function worker() {
     try {
       const ix = parseIndex(await getJson(`/aqindex/getIndex/${s.id}`));
       failStreak = 0;
-      if (ix) out.push({ id: s.id, n: s.name, la: s.lat, lo: s.lon, i: ix.idx, t: ix.at }); else noIdx++;
+      if (ix) out.push({ id: s.id, n: s.name, la: s.lat, lo: s.lon, i: ix.idx, t: ix.at, ...(ix.p ? { p: ix.p } : {}) }); else noIdx++;
     } catch (e) {
       fails++; failStreak++;
       if (prev[s.id]) out.push(prev[s.id]);
@@ -37,7 +37,7 @@ async function worker() {
   }
 }
 await Promise.all(Array.from({ length: CONC }, worker));
-console.log(`Z indeksem: ${out.length}, bez indeksu: ${noIdx}, błędy: ${fails}`);
+console.log(`Z indeksem: ${out.length}, bez indeksu: ${noIdx}, błędy: ${fails}, ze wskazanym zanieczyszczeniem: ${out.filter((x) => x.p).length}`);
 if (abort || out.length < MIN) { console.log(`Za mało danych (< ${MIN}) – nie zapisuję ${OUT}.`); process.exit(1); }
 writeFileSync(OUT, JSON.stringify({ updated: new Date().toISOString(), source: "GIOŚ – Państwowy Monitoring Środowiska", stations: out }));
 console.log("Zapisano " + OUT);

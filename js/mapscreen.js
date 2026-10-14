@@ -4,10 +4,9 @@
 import { CONFIG } from "./config.js";
 import { createFeed } from "./neptun-feed.js";
 import { ThreatStore, buildView, coneOutline, fmtKmPl, ageText, TYPES, LIMITS } from "./neptun.js";
-import { compassPl, destination } from "./geo.js";
+import { compassPl, destination, haversineKm } from "./geo.js";
 import { shadeAreas, shadeSignature } from "./ua-shade.js";
 import { demoThreats, demoAlerts, demoRaions, demoMessages, DEMO_USER } from "./demo.js";
-import { dirUrl, loadShelterDb, loadPspAround, makePspCache, mergeSources } from "./shelters.js";
 
 export const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
@@ -132,12 +131,11 @@ export function renderMapHtml(ctx, { demo = false, diag = false } = {}) {
   const official = !st.region ? "" : ctx.alertsFresh?.()
     ? `<a class="note ${list.length ? "warn" : "neutral"}" style="display:block;text-decoration:none;margin-bottom:12px" href="#/alerty"><b>Oficjalne komunikaty dla województwa ${esc(ctx.regionById(st.region)?.name)}: ${list.length ? `aktywnych ${list.length}. Zobacz w Alertach.` : "brak aktywnych."}</b></a>`
     : `<div class="note warn" style="margin-bottom:12px"><b>Brak aktualnych danych o komunikatach oficjalnych.</b> To nie znaczy, że jest bezpiecznie. Słuchaj syren i sprawdzaj Alerty RCB.</div>`;
-  return `<div class="hero"><h1>Mapa zagrożeń</h1><p>Schrony oraz (opcjonalnie) nieoficjalne informacje o obiektach latających przy granicy.</p></div>
+  return `<div class="hero"><h1>Mapa zagrożeń</h1><p>Twoja pozycja na żywo oraz (opcjonalnie) nieoficjalne informacje o obiektach latających przy granicy. Schrony, AED i szpitale są w zakładce W pobliżu.</p></div>
   ${demo ? `<div class="demo-banner" role="alert"><b>TRYB DEMONSTRACYJNY – DANE WYMYŚLONE.</b> Obiekty i pozycja „Ty” na tej mapie są sztuczne i służą tylko do pokazania, jak będzie wyglądać mapa. To nie jest ostrzeżenie. <a href="#/mapa">Wyjdź z trybu demo</a></div>` : ""}
   ${official}
   <div class="chips" role="group" aria-label="Podkład mapy">${chips}</div>
   <div class="card" style="padding:4px 16px">
-    <label class="switch"><input type="checkbox" id="lyShelters" ${lay.shelters !== false ? "checked" : ""}><span><b>Schrony i ukrycia</b><span class="muted small">Punkty schronienia z Rejestru PSP oraz Twoje zapisane miejsca. Widoczne po przybliżeniu mapy. Lista z czasem dojścia jest w zakładce W pobliżu.</span><span id="shHint" class="muted small" aria-live="polite"></span></span></label>
     ${nepEnabled() ? `<label class="switch"><input type="checkbox" id="lyNeptun" ${nepOn ? "checked" : ""} ${demo ? "disabled" : ""}><span><b>Obiekty znad Ukrainy <span class="badge unofficial">nieoficjalne · beta</span></b><span class="muted small">Drony i rakiety w pobliżu granicy wg NEPTUN. Domyślnie włączone (możesz wyłączyć tutaj lub w Ustawieniach). Przeglądarka łączy się bezpośrednio z neptun.in.ua, a serwis widzi Twój adres IP.</span></span></label>` : ""}
   </div>
   <div id="nepConsent" class="card" hidden role="dialog" aria-label="Zgoda na połączenie z NEPTUN">
@@ -150,8 +148,8 @@ export function renderMapHtml(ctx, { demo = false, diag = false } = {}) {
   </div>
   <p id="tileMsg" class="note warn" hidden role="status"></p>
   ${diag ? '<pre id="tileDiag" class="note neutral" style="white-space:pre-wrap;word-break:break-all;font-size:.75rem" aria-live="off">Diagnostyka podkładu: czekam na kafelki…</pre>' : ""}
-  <div class="mapwrap"><div id="map" class="map" role="region" aria-label="Mapa. Obiekty i schrony są też wypisane w listach poniżej."><p class="muted" style="padding:16px">Ładuję mapę…</p></div></div>
-  <div class="maptools"><button class="btn sm" id="btnLocate">${ctx.I.pin}Pokaż mnie</button><button class="btn sm" id="btnBorder">Granica wschodnia</button><button class="btn sm" id="btnObjects" hidden>Pokaż obiekty</button></div>
+  <div class="mapwrap"><div id="map" class="map" role="region" aria-label="Mapa. Obiekty są też wypisane w liście poniżej."><p class="muted" style="padding:16px">Ładuję mapę…</p></div></div>
+  <div class="maptools"><button class="btn sm" id="btnBorder">Granica wschodnia</button><button class="btn sm" id="btnObjects" hidden>Pokaż obiekty</button></div>
   <p id="locMsg" class="muted small" aria-live="polite"></p>
   <div id="nepBox" ${nepOn ? "" : "hidden"}>
     <div id="nepStatus" class="note neutral" aria-live="polite"></div>
@@ -175,7 +173,7 @@ export function renderMapHtml(ctx, { demo = false, diag = false } = {}) {
     <p class="src">${NEPTUN_ATTR}</p>
     <div class="note warn" style="margin-top:8px">${NEPTUN_NOTICE}</div>
   </div>
-  <p class="src">Pozycja „Ty” jest tylko w pamięci przeglądarki i nigdzie nie jest wysyłana. Kafelki mapy pobiera Twoja przeglądarka od dostawcy mapy (zobacz Źródła i licencje).</p>`;
+  <p class="src">Pozycja „Ty” (niebieska kropka) jest tylko w pamięci przeglądarki i nigdzie nie jest wysyłana. Kafelki mapy pobiera Twoja przeglądarka od dostawcy mapy (zobacz Źródła i licencje).</p>`;
 }
 
 export function initMapScreen(ctx, { demo = false, diag = false } = {}) {
@@ -191,13 +189,13 @@ export function initMapScreen(ctx, { demo = false, diag = false } = {}) {
   loadLeaflet().then((L) => {
     if (dead) return;
     const st = () => ctx.state;
-    if (!st().map) st().map = { base: "map", layers: { shelters: true, neptun: true } };
-    const ml = () => (st().map.layers ||= { shelters: true, neptun: true });
+    if (!st().map) st().map = { base: "map", layers: { neptun: true } };
+    const ml = () => (st().map.layers ||= { neptun: true });
     const $ = (id) => document.getElementById(id);
 
     root.innerHTML = "";
     let user = demo ? { ...DEMO_USER } : getUser();
-    const map = L.map(root, { center: [51.6, 22.8], zoom: 6, minZoom: 4, worldCopyJump: false });
+    const map = L.map(root, { center: [51.6, 22.8], zoom: 8, minZoom: 4, worldCopyJump: false });
     cleanups.push(() => map.remove());
     const failNote = (k) => { const n = $("tileMsg"); if (n) { n.hidden = false; n.textContent = `Podkład „${(CONFIG.tiles[k] || {}).name || k}” nie odpowiada. Wybierz inny albo spróbuj później.`; } };
     let baseL = baseLayer(L, st().map.base || "map", failNote).addTo(map);
@@ -207,7 +205,7 @@ export function initMapScreen(ctx, { demo = false, diag = false } = {}) {
     }
     map.createPane("uaAlerts").style.zIndex = 380; // cieniowanie obwodów pod torami i obiektami (overlayPane ma 400)
     const gAlerts = L.layerGroup().addTo(map);
-    const gShelters = L.layerGroup().addTo(map), gThreats = L.layerGroup().addTo(map), gUser = L.layerGroup().addTo(map);
+    const gThreats = L.layerGroup().addTo(map), gUser = L.layerGroup().addTo(map);
     let shadeSig = null; // podpis ostatnio narysowanego cieniowania: przerysowujemy tylko przy zmianie
     setTimeout(() => { if (!dead) map.invalidateSize(); }, 0);
 
@@ -218,72 +216,43 @@ export function initMapScreen(ctx, { demo = false, diag = false } = {}) {
       document.querySelectorAll("[data-base]").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
     }));
 
-    /* użytkownik */
+    /* użytkownik: pozycja na żywo, jak w zakładce W pobliżu (kropka jedzie razem z Tobą, obiekty oceniane względem bieżącej pozycji) */
+    let userAt = user ? Date.now() : 0, stale = false;
     const drawUser = () => {
       gUser.clearLayers();
       if (!user) return;
-      if (user.accKm > 0.1 && user.accKm < 30) L.circle([user.lat, user.lon], { radius: user.accKm * 1000, color: "#2A4DA0", weight: 1, fillColor: "#2A4DA0", fillOpacity: 0.08, interactive: false }).addTo(gUser);
-      L.circleMarker([user.lat, user.lon], { radius: 8, color: "#fff", weight: 3, fillColor: "#2A4DA0", fillOpacity: 1 }).bindTooltip(demo ? "Ty (demo)" : "Ty", { direction: "top" }).addTo(gUser);
+      const col = stale ? "#6B7280" : "#2A4DA0";
+      if (!stale && user.accKm > 0.1 && user.accKm < 30) L.circle([user.lat, user.lon], { radius: user.accKm * 1000, color: col, weight: 1, fillColor: col, fillOpacity: 0.08, interactive: false }).addTo(gUser);
+      L.circleMarker([user.lat, user.lon], { radius: 8, color: "#fff", weight: 3, fillColor: col, fillOpacity: 1 }).bindTooltip(demo ? "Ty (demo)" : stale ? "Ty (ostatnia znana pozycja)" : "Ty", { direction: "top" }).addTo(gUser);
     };
     drawUser();
-    let firstFix = !user;
+    let firstFix = !user, lastTouch = 0, popupOpen = false, lastTick = 0;
     if (demo) map.setView([DEMO_USER.lat, DEMO_USER.lon], 7, { animate: false });
     else if (user) map.setView([user.lat, user.lon], 8, { animate: false });
+    map.on("dragstart zoomstart", () => { lastTouch = Date.now(); });
+    map.on("popupopen", () => { popupOpen = true; lastTouch = Date.now(); });
+    map.on("popupclose", () => { popupOpen = false; lastTouch = Date.now(); });
     let stopLoc = null;
     cleanups.push(() => stopLoc?.());
-    // W trybie demo nie używamy prawdziwej pozycji (nie mieszamy jej z wymyślonymi obiektami).
-    if (demo && $("btnLocate")) $("btnLocate").hidden = true;
-    $("btnLocate")?.addEventListener("click", () => {
-      $("locMsg").textContent = "Ustalam pozycję…";
-      stopLoc?.();
-      stopLoc = locate((p) => {
-        if (dead) return;
-        user = p; drawUser(); $("locMsg").textContent = "";
-        if (firstFix) { map.setView([p.lat, p.lon], Math.max(map.getZoom(), 8), { animate: false }); firstFix = false; }
-        scheduleRefresh();
-      }, () => { $("locMsg").textContent = "Nie udało się ustalić pozycji. Sprawdź, czy lokalizacja jest włączona i dozwolona dla tej strony."; }, true);
-    });
-    $("btnBorder")?.addEventListener("click", () => map.fitBounds([[49.0, 21.6], [54.6, 24.6]], { animate: false }));
-
-    /* schrony na mapie */
-    let dbItems = [], pspItems = [];
-    const pspMemo = new Map(), pspCache = demo ? null : makePspCache(CONFIG.pspUrl);
-    const canvas = L.canvas({ padding: 0.3 });
-    const drawShelters = () => {
+    const onPos = (p) => {
       if (dead) return;
-      gShelters.clearLayers();
-      if (ml().shelters === false) return;
-      const mine = st().shelters || [];
-      const pop = (s, kind, extra) => `<div class="pop"><b>${esc(s.name)}</b><br><span class="small muted">${kind}</span>${extra || ""}<p class="small" style="margin:6px 0"><a href="${esc(dirUrl(s, "walking"))}" target="_blank" rel="noopener noreferrer">Trasa pieszo</a> · <a href="${esc(dirUrl(s, "driving"))}" target="_blank" rel="noopener noreferrer">Autem</a></p></div>`;
-      const z = map.getZoom(), bounds = map.getBounds().pad(0.1);
-      const hint = $("shHint");
-      const list = mergeSources(pspItems, dbItems);
-      let n = 0;
-      if (z >= 12) {
-        for (const s of list) {
-          if (!bounds.contains([s.lat, s.lon]) || n++ > 1500) continue;
-          if (s.src === "osm") L.marker([s.lat, s.lon], { icon: shelterIcon(L, false), keyboard: false }).bindPopup(pop(s, "OpenStreetMap · niezweryfikowane", s.access ? `<br><span class="small">Dostęp: ${esc(s.access)}</span>` : "")).addTo(gShelters);
-          else L.circleMarker([s.lat, s.lon], { renderer: canvas, radius: 7, color: "#fff", weight: 2, fillColor: "#E65100", fillOpacity: 1 }).bindPopup(pop(s, "Punkt schronienia · Rejestr PSP", s.access ? `<br><span class="small">Dostępność: ${esc(s.access)}</span>` : "")).addTo(gShelters);
-        }
-      }
-      if (hint) hint.textContent = z < 12 && ml().shelters !== false ? "Przybliż mapę (zoom 12 lub więcej), aby zobaczyć punkty schronienia." : "";
-      for (const s of mine) L.marker([s.lat, s.lon], { icon: shelterIcon(L, true), keyboard: false }).bindPopup(pop(s, "Twoje miejsce", s.how ? `<br><span class="small">Jak wejść: ${esc(s.how)}</span>` : "")).addTo(gShelters);
+      const now = Date.now();
+      // bez migotania: drobne zmiany (< 15 m) w krótkim czasie ignorujemy
+      if (!firstFix && user && !stale && haversineKm(user, p) < 0.015 && now - lastTick < 5000) return;
+      lastTick = now; userAt = now; stale = false;
+      user = p; drawUser(); $("locMsg").textContent = "";
+      if (firstFix) { map.setView([p.lat, p.lon], Math.max(map.getZoom(), 8), { animate: false }); firstFix = false; }
+      else if (!popupOpen && now - lastTouch > 20000) map.panTo([p.lat, p.lon], { animate: true, duration: 0.6 }); // mapa jedzie z Tobą, dopóki jej nie przesuwasz
+      scheduleRefresh();
     };
-    let pspTimer = null;
-    const loadView = () => {
-      if (dead || demo || map.getZoom() < 12 || ml().shelters === false) return;
-      const c = map.getCenter();
-      loadPspAround(CONFIG.pspUrl, c.lat, c.lng, { cache: pspCache, memo: pspMemo }).then((r) => {
-        if (dead) return;
-        pspItems = [...new Map([...pspItems, ...r.items].map((x) => [x.id, x])).values()]; drawShelters();
-      }).catch(() => {});
-    };
-    drawShelters();
-    map.on("moveend", () => { drawShelters(); clearTimeout(pspTimer); pspTimer = setTimeout(loadView, 400); });
-    cleanups.push(() => clearTimeout(pspTimer));
-    if (!demo) loadShelterDb(CONFIG.sheltersUrl).then((db) => { if (db && !dead) { dbItems = db.items; drawShelters(); } }).catch(() => {});
-    loadView();
-    $("lyShelters")?.addEventListener("change", (e) => { ml().shelters = e.target.checked; ctx.save(); drawShelters(); loadView(); });
+    // W trybie demo nie używamy prawdziwej pozycji (nie mieszamy jej z wymyślonymi obiektami).
+    if (!demo) {
+      stopLoc = locate(onPos, () => { if (!dead && !user) $("locMsg").textContent = "Nie udało się ustalić pozycji. Sprawdź, czy lokalizacja jest włączona i dozwolona dla tej strony."; }, true);
+      // brak odczytu dłużej niż 2 minuty: kropka robi się szara (to ostatnia znana pozycja, nie bieżąca)
+      const sale = setInterval(() => { if (dead || !user || stale || Date.now() - userAt < 120000) return; stale = true; drawUser(); scheduleRefresh(); }, 15000);
+      cleanups.push(() => clearInterval(sale));
+    }
+    $("btnBorder")?.addEventListener("click", () => map.fitBounds([[49.0, 21.6], [54.6, 24.6]], { animate: false }));
 
     /* NEPTUN */
     let feed = null, timer = null, pending = null, lastRows = [], nepFilter = "all";
@@ -323,7 +292,7 @@ export function initMapScreen(ctx, { demo = false, diag = false } = {}) {
       if (!on) { redrawing = false; openId = null; $("btnObjects").hidden = true; drawShade([], false); return; }
       if (demo) { store.applySnapshot(demoThreats(Date.now())); store.applyAlerts(demoAlerts(), demoRaions()); store.applyMessages(demoMessages(Date.now())); }
       const s = demo ? store : feed.store;
-      const view = buildView(s, user, feedFresh(), { nearOnly: ml().nepNear === true, filter: nepFilter });
+      const view = buildView(s, stale ? null : user, feedFresh(), { nearOnly: ml().nepNear === true, filter: nepFilter });
       lastRows = view.rows;
       const fs = demo ? { state: "live", via: "demo" } : feed.status();
       // status źródła
@@ -444,7 +413,7 @@ export function initMapScreen(ctx, { demo = false, diag = false } = {}) {
     cleanups.push(() => { clearInterval(timer); if (pending) clearTimeout(pending); });
   }).catch((e) => {
     console.error("EGIDA mapa:", e);
-    if (!dead && root) root.innerHTML = `<p class="note warn" style="margin:16px">Nie udało się załadować mapy (brak internetu?). Schrony zapisane w telefonie znajdziesz w zakładce W pobliżu.</p>`;
+    if (!dead && root) root.innerHTML = `<p class="note warn" style="margin:16px">Nie udało się załadować mapy (brak internetu?). Schrony i punkty pomocy znajdziesz w zakładce W pobliżu.</p>`;
   });
   return screen;
 }

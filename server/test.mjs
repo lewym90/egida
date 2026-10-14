@@ -49,7 +49,7 @@ assert.equal(parseWarsaw("2026-01-15 12:00:00").toISOString(), "2026-01-15T11:00
 
 /* ---------- reguły Telegram wg wagi (tg-policy.mjs) ---------- */
 import { selectForTelegram, tgText, hadDanger } from "./tg-policy.mjs";
-import { evaluate, decide, LIMITS as WD } from "./watchdog.mjs";
+import { evaluate, decide, dueReminders, parseDeadlines, DEADLINES, LIMITS as WD } from "./watchdog.mjs";
 const NOW = Date.parse("2026-10-10T16:00:00Z");
 const ago = (min) => new Date(NOW - min * 6e4).toISOString();
 const it = (id, o) => ({ id, source: "RSO", voivodeship: "lubelskie", published: ago(30), validTo: null, alarm: false, ...o });
@@ -95,6 +95,34 @@ assert.equal(evaluate({ pushAgeMin: 5, remoteAgeMin: 10, newsAgeMin: WD.newsMin 
 assert.equal(evaluate({ pushAgeMin: 5, remoteAgeMin: 10, newsSources: 72, newsOk: 30 }).problem, true, "większość źródeł wiadomości nie odpowiada");
 assert.equal(evaluate({ pushAgeMin: 5, remoteAgeMin: 10, newsSources: 72, newsOk: 60 }).problem, false, "kilka błędnych źródeł to jeszcze nie awaria");
 assert.equal(evaluate({ pushAgeMin: 5, remoteAgeMin: 10, newsAgeMin: null }).problem, false, "brak odpowiedzi GitHuba nie jest alarmem serwera");
+assert.equal(evaluate({ pushAgeMin: 5, remoteAgeMin: 10, airAgeMin: 60 }).problem, false, "powietrze świeże");
+assert.equal(evaluate({ pushAgeMin: 5, remoteAgeMin: 10, airAgeMin: WD.airMin + 1 }).problem, true, "stary air.json");
+assert.equal(evaluate({ pushAgeMin: 5, remoteAgeMin: 10, dailyAgesH: { "aed.json": 20, "hospitals.json": 30 } }).problem, false, "pliki dobowe w normie");
+assert.match(evaluate({ pushAgeMin: 5, remoteAgeMin: 10, dailyAgesH: { "aed.json": WD.dailyH + 1 } }).reasons[0], /aed\.json/, "stary plik dobowy");
+assert.equal(evaluate({ pushAgeMin: 5, remoteAgeMin: 10, gddkiaBadH: 2 }).problem, false);
+assert.equal(evaluate({ pushAgeMin: 5, remoteAgeMin: 10, gddkiaBadH: WD.gddkiaH + 1 }).problem, true, "GDDKiA długo bez danych");
+assert.equal(evaluate({ pushAgeMin: 5, remoteAgeMin: 10, addrPct: 69, addrStallH: 10 }).problem, false, "adresy: krótko stoją");
+assert.equal(evaluate({ pushAgeMin: 5, remoteAgeMin: 10, addrPct: 69, addrStallH: WD.addrStallH + 1 }).problem, true, "adresy AED stoją za długo");
+assert.equal(evaluate({ pushAgeMin: 5, remoteAgeMin: 10, addrPct: 95, addrStallH: 500 }).problem, false, "adresy prawie komplet");
+{
+  const T = Date.parse("2026-10-14T10:00:00Z");
+  const dl = [{ date: "2026-10-30", label: "VPS" }];
+  let r = dueReminders(dl, {}, T);
+  assert.equal(r.messages.length, 0, "16 dni: za wcześnie");
+  r = dueReminders(dl, {}, Date.parse("2026-10-17T10:00:00Z"));
+  assert.equal(r.messages.length, 1, "13 dni: próg 14");
+  assert.deepEqual(r.sent["2026-10-30"], [14]);
+  assert.equal(dueReminders(dl, r.sent, Date.parse("2026-10-18T10:00:00Z")).messages.length, 0, "próg 14 tylko raz");
+  const r3 = dueReminders(dl, r.sent, Date.parse("2026-10-28T10:00:00Z"));
+  assert.equal(r3.messages.length, 1, "próg 3");
+  assert.deepEqual(r3.sent["2026-10-30"], [14, 3].sort((a, b) => b - a));
+  assert.match(dueReminders(dl, {}, Date.parse("2026-10-29T10:00:00Z")).messages[0].text, /jutro/);
+  assert.match(dueReminders(dl, {}, Date.parse("2026-10-30T09:00:00Z")).messages[0].text, /dziś/);
+  assert.equal(dueReminders(dl, {}, Date.parse("2026-11-02T10:00:00Z")).messages.length, 0, "termin minął");
+  assert.deepEqual(parseDeadlines(""), DEADLINES);
+  assert.deepEqual(parseDeadlines("2026-12-01|Test;zła|x"), [{ date: "2026-12-01", label: "Test" }]);
+  assert.deepEqual(parseDeadlines("śmieci"), DEADLINES);
+}
 let w = decide(false, {}, NOW); assert.equal(w.action, "none");
 w = decide(true, w.state, NOW); assert.equal(w.action, "down", "pierwszy alarm");
 w = decide(true, w.state, NOW + 36e5); assert.equal(w.action, "none", "bez powtarzania co 10 min");

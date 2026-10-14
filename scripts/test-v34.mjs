@@ -34,7 +34,6 @@ await ok("encje HTML w tytule są zamieniane na znaki (serwer i aplikacja)", () 
 await ok("schrony mają pomarańczowy kolor, inny niż niebieska kropka GPS", () => {
   const m = src("js/mapscreen.js"), s = src("js/sheltersscreen.js");
   assert.match(m, /"#0B6B63" : "#E65100"/);
-  assert.match(m, /radius: 7[^}]*fillColor: "#E65100"/);
   assert.match(s, /radius: 8[^}]*fillColor: "#E65100"/);
 });
 await ok("rozgłośnia regionalna nie wypycha wiadomości do innego województwa ani do całego kraju (PiK Bydgoszcz nie w Lubelskiem)", () => {

@@ -116,7 +116,7 @@ async function runSource(src) {
   const why = [], info = [], items = raws.map((r) => toItem(r, src, now, why, info)).filter(Boolean);
   if (info.length) { rep.groups = {}; for (const x of info) rep.groups[x.group] = (rep.groups[x.group] || 0) + 1; rep.placed = info.slice(0, 12); }
   rep.held = why.filter((x) => /miejsc/.test(x.why)).length; // wstrzymane: brak pewnego miejsca albo konflikt województw
-  if (src.kind === "media" && why.length) { rep.droppedCount = why.length; rep.dropped = why.filter((x) => x.why !== "data").slice(0, 10); } // próbka odrzuconych tytułów: do strojenia filtrów
+  if (why.length) { rep.droppedCount = why.length; rep.dropped = why.filter((x) => x.why !== "data").slice(0, src.kind === "media" ? 10 : 6); } // próbka odrzuconych tytułów (dla wszystkich źródeł): do strojenia filtrów
   if (src.noCap) items.noCap = true;
   rep.kept = items.length;
   return { rep, items };

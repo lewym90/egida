@@ -44,7 +44,7 @@ t("powietrze: parsowanie GIOŚ, poziomy, najbliższa stacja, przeterminowane dan
   assert.equal(st.length, 1); assert.equal(st[0].id, 114);
   const st2 = parseStations({ "Lista stacji pomiarowych": [{ "Identyfikator stacji": 11, "Nazwa stacji": "Czerniawa", "WGS84 \u03d5 N": "50.912475", "WGS84 \u03bb E": "15.312190" }] }); assert.equal(st2.length, 1, "oba warianty greckiej litery");
   assert.match(readFileSync(new URL("../server/air-sync.mjs", import.meta.url), "utf8"), /Accept: "\*\/\*"/); assert.equal(st[0].lat, 51.1159);
-  assert.deepEqual(parseIndex({ AqIndex: { "Nazwa kategorii indeksu": "Dobry", "Data wykonania obliczeń indeksu": "2026-10-14 10:30:00" } }), { idx: 1, at: "2026-10-14 10:30:00" });
+  assert.deepEqual(parseIndex({ AqIndex: { "Nazwa kategorii indeksu": "Dobry", "Data wykonania obliczeń indeksu": "2026-10-14 10:30:00" } }), { idx: 1, at: "2026-10-14 10:30:00", p: null });
   assert.equal(parseIndex({ AqIndex: { "Nazwa kategorii indeksu": null } }), null); assert.equal(parseIndex(null), null);
   const now = Date.parse("2026-10-14T12:00:00Z");
   const raw = { updated: "2026-10-14T11:00:00Z", stations: [{ id: 1, n: "A", la: 51.11, lo: 17.14, i: 2 }, { id: 2, n: "B", la: 52.23, lo: 21.01, i: 4 }, { id: 3, n: "zła", la: 1, lo: 1, i: 9 }] };
@@ -92,7 +92,7 @@ t("serwer: nagłówek User-Agent w air-sync jest czystym ASCII (znaki spoza Lati
 t("źródła: GIOŚ jest wymieniony w Źródłach i licencjach", () => { assert.ok(SOURCES.some((x) => /GIOŚ/.test(x.n) && /^https:/.test(x.u))); });
 t("serwis: nowe pliki w SHELL, wersja v40, serwer publikuje air.json", () => {
   for (const f of readdirSync(new URL("../js", import.meta.url)).filter((x) => x.endsWith(".js"))) assert.ok(sw.includes(`"js/${f}"`), f + " w SHELL");
-  assert.match(sw, /egida-v41/);
+  assert.match(sw, /egida-v42/);
   assert.match(readFileSync(new URL("../server/publish.sh", import.meta.url), "utf8"), /git add air\.json/);
   assert.match(readFileSync(new URL("../server/run.sh", import.meta.url), "utf8"), /air-sync\.mjs/);
   assert.match(readFileSync(new URL("../js/config.js", import.meta.url), "utf8"), /airUrl: "https:\/\/raw\.githubusercontent\.com\/lewym90\/egida\/data\/air\.json"/);

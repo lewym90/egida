@@ -5,7 +5,7 @@
 //   node medical-addr.mjs --dump    – tylko statystyki
 // Dane: © współtwórcy OpenStreetMap, licencja ODbL.
 import { readFileSync, writeFileSync, renameSync, existsSync } from "node:fs";
-import { join } from "node:path";
+import { join, dirname } from "node:path";
 import { buildBatchQuery, pickAddress, nominatimAddr, applyCache, ADDR_INDEX, AED_RADIUS_M, HOSP_RADIUS_M } from "./medical-addr-lib.mjs";
 
 const MIRRORS = (process.env.OVERPASS_URLS || "https://overpass-api.de/api/interpreter,https://overpass.private.coffee/api/interpreter,https://overpass.kumi.systems/api/interpreter").split(",");
@@ -63,6 +63,7 @@ function flush() {
   for (const kind of ["szpitale", "aed"]) {
     const cur = readJson(files[kind]); if (!cur || !Array.isArray(cur.rows)) continue; // czytamy świeżą wersję tuż przed zapisem
     applyCache(kind, cur.rows, cache);
+    if (kind === "aed") cur.addr = { n: cur.rows.filter((r) => r[ADDR_INDEX.aed]).length, of: cur.rows.length }; // ile punktów ma adres (nagłówek pliku; klient to ignoruje)
     writeAtomic(files[kind], JSON.stringify(cur));
   }
 }
@@ -107,3 +108,10 @@ for (const m of missing) {
 }
 flush();
 console.log(`Nominatim: ${nm} zapytań. Z adresem po przebiegu: szpitale ${withAddr("szpitale")}/${total("szpitale")}, AED ${withAddr("aed")}/${total("aed")}.`);
+// Stan adresów AED dla strażnika (obok pamięci podręcznej): ile punktów ma adres. Strażnik zgłasza, gdy odsetek długo nie rośnie.
+{
+  const stat = { at: new Date().toISOString(), n: withAddr("aed"), of: total("aed") };
+  stat.pct = stat.of ? Math.round((1000 * stat.n) / stat.of) / 10 : 0;
+  try { writeAtomic(join(dirname(CACHE_FILE), "aed-addr.json"), JSON.stringify(stat)); } catch { /* katalog tylko do odczytu – pomijamy */ }
+  console.log(`Adresy AED: ${stat.n}/${stat.of} (${stat.pct}%).`);
+}

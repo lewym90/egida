@@ -122,9 +122,16 @@ export function kitDue(list, today = todayYmd()) {
 }
 /** Sortowanie: po terminie, potem według daty, na końcu bez terminu. */
 export const kitSorted = (list) => normalizeKit(list).slice().sort((a, b) => (a.expires || "9999") < (b.expires || "9999") ? -1 : (a.expires || "9999") > (b.expires || "9999") ? 1 : a.name.localeCompare(b.name, "pl"));
+/** Terminy ważności pozycji z list Plecak i Zapas: { idPozycji: "RRRR-MM-DD" } (tylko poprawne daty i identyfikatory). */
+export function normalizeExpiry(raw) {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
+  return Object.fromEntries(Object.entries(raw).filter(([k, v]) => /^[\w-]{1,40}$/.test(k) && ymd(v)).slice(0, 200));
+}
+/** Ćwiczenie rodzinne: data ostatniego ćwiczenia. */
+export const normalizeExercise = (raw) => ({ last: ymd(raw?.last) });
 /** Treść pliku kopii: tylko dane użytkownika (bez pamięci podręcznej i znaczników technicznych). */
 export function exportState(state, now = new Date()) {
-  const keys = ["onboarded", "consent", "region", "shelters", "checked", "plan", "places", "test", "fs", "contrast", "map", "myKit", "senior"];
+  const keys = ["onboarded", "consent", "region", "shelters", "checked", "plan", "places", "test", "fs", "contrast", "map", "myKit", "senior", "expiry", "exercise", "theme"];
   const data = {}; for (const k of keys) if (k in state) data[k] = state[k];
   return { egida: 1, exportedAt: now.toISOString(), ...data };
 }
@@ -137,7 +144,7 @@ const bool = (v) => v === true;
  */
 export function importState(raw, { validRegions = [] } = {}) {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return { ok: false, error: "To nie wygląda na plik z danymi EGIDY." };
-  const known = ["onboarded", "consent", "region", "shelters", "checked", "plan", "places", "test", "fs", "contrast", "map", "myKit", "senior"];
+  const known = ["onboarded", "consent", "region", "shelters", "checked", "plan", "places", "test", "fs", "contrast", "map", "myKit", "senior", "expiry", "exercise", "theme"];
   if (!known.some((k) => k in raw)) return { ok: false, error: "W pliku nie ma żadnych danych EGIDY." };
   const out = {};
   if ("consent" in raw && raw.consent && typeof raw.consent === "object") out.consent = { gps: bool(raw.consent.gps), counter: bool(raw.consent.counter), ack: bool(raw.consent.ack), neptun: bool(raw.consent.neptun) };
@@ -148,6 +155,9 @@ export function importState(raw, { validRegions = [] } = {}) {
   if ("places" in raw) out.places = normalizePlaces(raw.places);
   if (raw.test && typeof raw.test === "object" && num(raw.test.score) != null) out.test = { answers: Object.fromEntries(Object.entries(raw.test.answers && typeof raw.test.answers === "object" ? raw.test.answers : {}).filter(([k, v]) => /^[\w-]{1,40}$/.test(k) && typeof v === "boolean")), score: raw.test.score, at: clean(raw.test.at, 40) };
   if ("myKit" in raw) out.myKit = normalizeKit(raw.myKit);
+  if ("expiry" in raw) out.expiry = normalizeExpiry(raw.expiry);
+  if ("exercise" in raw) out.exercise = normalizeExercise(raw.exercise);
+  if (["light", "dark", "auto"].includes(raw.theme)) out.theme = raw.theme;
   if (typeof raw.senior === "boolean") out.senior = raw.senior;
   if (["normal", "large", "xlarge"].includes(raw.fs)) out.fs = raw.fs;
   if (["normal", "high"].includes(raw.contrast)) out.contrast = raw.contrast;

@@ -46,6 +46,7 @@ export const CONFIG = {
   // Defibrylatory (AED) i szpitale z OpenStreetMap, odświeżane raz na dobę przez serwer EGIDA (gałąź data).
   aedUrl: "https://raw.githubusercontent.com/lewym90/egida/data/aed.json",
   hospitalsUrl: "https://raw.githubusercontent.com/lewym90/egida/data/hospitals.json",
+  waterUrl: "https://raw.githubusercontent.com/lewym90/egida/data/water.json", // punkty wody pitnej z OpenStreetMap, odświeżane raz na dobę
   // Drugie źródło defibrylatorów: publiczna mapa „Ratuj z sercem – Mapa AED” (ratujzsercem.pl), odczytywana przez serwer EGIDA raz na dobę. Brak pliku = pomijane.
   // Jakość powietrza (indeks GIOŚ), odświeżana co godzinę przez serwer EGIDA (gałąź data). Brak pliku = karta jest ukryta.
   airUrl: "https://raw.githubusercontent.com/lewym90/egida/data/air.json",

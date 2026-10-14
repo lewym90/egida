@@ -466,3 +466,61 @@ h3.grp{margin:18px 2px 8px;font-family:var(--font-h);font-size:.95rem;color:var(
 .aptlist li.n{list-style:none;margin-left:-20px}
 .tile[style*="flex-direction:row"]{min-height:72px}
 :root[data-senior="1"] .shell[data-route="pulpit"] .fab112,:root[data-senior="1"] .tagline{display:none}
+
+/* Tryb ciemny: wybierany w Ustawieniach (Ciemny albo Jak w telefonie). Domyślnie jasny. */
+:root[data-theme="dark"]{--bg:#0F1720;--card:#17212C;--line:#2B3947;--line-in:#223040;--text:#E8EEF4;--muted:#A9B7C5;--text-card:#D3DDE7;--brand:#12877B;--brand-tint:#12352F;--brand-ink:#8FDDD0;--warn:#E0A04A;--warn-bg:#3A2A10;--warn-ink:#F3C987;--danger:#C9362E;--danger-head:#B3261E;--danger-bg:#3B1C1B;--danger-ink:#F5A9A4;--info:#8CA9F5;--info-bg:#1C2A4A;--note:#1F2B38;color-scheme:dark}
+:root[data-theme="dark"] .sel,:root[data-theme="dark"] .kitform input[type=text],:root[data-theme="dark"] .kitform input[type=date],:root[data-theme="dark"] .expiry input[type=date]{background:var(--card);color:var(--text)}
+:root[data-theme="dark"] .srcchip{background:var(--card);border-color:var(--line)}
+:root[data-theme="dark"] .btn.info,:root[data-theme="dark"] .updbar button{background:#2A4DA0;border-color:#2A4DA0;color:#fff}
+:root[data-theme="dark"] .status.ok{background:#12301F;border-color:#1F8F6B;color:#BDEBD3}
+:root[data-theme="dark"] .status.warn{background:#3A3010;border-color:#E0A800;color:#F5DC8A}
+:root[data-theme="dark"] .status.alert{background:#3B1716;border-color:#C62828;color:#F7B4AE}
+:root[data-theme="dark"] .goodtoknow{background:#33261A;border-color:#6B4A22;color:#F0D5B0}
+:root[data-theme="dark"] .goodtoknow h2,:root[data-theme="dark"] .goodtoknow .gall{color:#F0B070}
+:root[data-theme="dark"] .goodtoknow .slist li+li{border-top-color:#6B4A22}
+:root[data-theme="dark"] .tile .ti.t-purple,:root[data-theme="dark"] .guidehead .gi.purple{background:#2C2343}
+:root[data-theme="dark"] .tile .ti.t-green{background:#12352F}
+:root[data-theme="dark"] .tile .ti.t-red{background:#3B1C1B;color:#F08A83}
+:root[data-theme="dark"] .tile .ti.t-blue{background:#1C2A4A}
+:root[data-theme="dark"] .tile .ti.t-amber{background:#3A2A10;color:#F0A850}
+:root[data-theme="dark"] .morelist .mi{background:#243140}
+:root[data-theme="dark"] .guidehead .gi{background:#3A2A10}
+:root[data-theme="dark"] .kitdue.red{border-color:#7A2B28}
+:root[data-theme="dark"] .aircard .aq{background:#1C2A4A}
+:root[data-theme="dark"] .updbar{background:#1C2A4A;border-color:#2F4575;color:#BFD0FA}
+:root[data-theme="dark"] .tri{color:#F0A850}
+:root[data-theme="dark"] .leaflet-popup-content-wrapper,:root[data-theme="dark"] .leaflet-popup-tip,:root[data-theme="dark"] .thr-tip{background:#fff;color:#0E1B2B}
+:root[data-theme="dark"] .leaflet-container{color:#0E1B2B}
+@media (prefers-color-scheme:dark){
+:root[data-theme="auto"]{--bg:#0F1720;--card:#17212C;--line:#2B3947;--line-in:#223040;--text:#E8EEF4;--muted:#A9B7C5;--text-card:#D3DDE7;--brand:#12877B;--brand-tint:#12352F;--brand-ink:#8FDDD0;--warn:#E0A04A;--warn-bg:#3A2A10;--warn-ink:#F3C987;--danger:#C9362E;--danger-head:#B3261E;--danger-bg:#3B1C1B;--danger-ink:#F5A9A4;--info:#8CA9F5;--info-bg:#1C2A4A;--note:#1F2B38;color-scheme:dark}
+:root[data-theme="auto"] .sel,:root[data-theme="auto"] .kitform input[type=text],:root[data-theme="auto"] .kitform input[type=date],:root[data-theme="auto"] .expiry input[type=date]{background:var(--card);color:var(--text)}
+:root[data-theme="auto"] .srcchip{background:var(--card);border-color:var(--line)}
+:root[data-theme="auto"] .btn.info,:root[data-theme="auto"] .updbar button{background:#2A4DA0;border-color:#2A4DA0;color:#fff}
+:root[data-theme="auto"] .status.ok{background:#12301F;border-color:#1F8F6B;color:#BDEBD3}
+:root[data-theme="auto"] .status.warn{background:#3A3010;border-color:#E0A800;color:#F5DC8A}
+:root[data-theme="auto"] .status.alert{background:#3B1716;border-color:#C62828;color:#F7B4AE}
+:root[data-theme="auto"] .goodtoknow{background:#33261A;border-color:#6B4A22;color:#F0D5B0}
+:root[data-theme="auto"] .goodtoknow h2,:root[data-theme="auto"] .goodtoknow .gall{color:#F0B070}
+:root[data-theme="auto"] .goodtoknow .slist li+li{border-top-color:#6B4A22}
+:root[data-theme="auto"] .tile .ti.t-purple,:root[data-theme="auto"] .guidehead .gi.purple{background:#2C2343}
+:root[data-theme="auto"] .tile .ti.t-green{background:#12352F}
+:root[data-theme="auto"] .tile .ti.t-red{background:#3B1C1B;color:#F08A83}
+:root[data-theme="auto"] .tile .ti.t-blue{background:#1C2A4A}
+:root[data-theme="auto"] .tile .ti.t-amber{background:#3A2A10;color:#F0A850}
+:root[data-theme="auto"] .morelist .mi{background:#243140}
+:root[data-theme="auto"] .guidehead .gi{background:#3A2A10}
+:root[data-theme="auto"] .kitdue.red{border-color:#7A2B28}
+:root[data-theme="auto"] .aircard .aq{background:#1C2A4A}
+:root[data-theme="auto"] .updbar{background:#1C2A4A;border-color:#2F4575;color:#BFD0FA}
+:root[data-theme="auto"] .tri{color:#F0A850}
+:root[data-theme="auto"] .leaflet-popup-content-wrapper,:root[data-theme="auto"] .leaflet-popup-tip,:root[data-theme="auto"] .thr-tip{background:#fff;color:#0E1B2B}
+:root[data-theme="auto"] .leaflet-container{color:#0E1B2B}
+}
+.checkwrap{border-top:1px solid var(--line-in)}
+.checkwrap:first-child{border-top:0}
+.checkwrap .check{border-top:0}
+.expiry{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:0 16px 12px 56px}
+.expiry label{font-size:.8125rem;color:var(--muted)}
+.expiry input[type=date]{min-height:44px;border:1px solid var(--line);border-radius:12px;padding:0 10px;font:inherit;background:#fff;color:var(--text)}
+.expiry .kst{margin:0}
+.expiry button.kdel{min-height:44px;min-width:44px;border:1px solid var(--line);background:var(--card);border-radius:12px;font-weight:700;font-family:var(--font-h);color:var(--danger-ink);padding:0 12px}

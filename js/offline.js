@@ -30,10 +30,10 @@ export function offlineCenters({ gps = null, places = [], shelters = [], regionC
  * że część kafelków się nie pobrała (brak sieci lub błąd serwera); wcześniej zapisane kafelki zostają.
  * onProgress({ done, total, label }) – do paska postępu.
  */
-export async function downloadOffline({ centers, pspUrl, sheltersUrl, aedUrl = "", aedExtraUrl = "", hospitalsUrl = "", cache = null, fetchImpl = (...a) => fetch(...a), storage = globalThis.localStorage, onProgress = () => {}, now = () => new Date() }) {
+export async function downloadOffline({ centers, pspUrl, sheltersUrl, aedUrl = "", aedExtraUrl = "", hospitalsUrl = "", waterUrl = "", cache = null, fetchImpl = (...a) => fetch(...a), storage = globalThis.localStorage, onProgress = () => {}, now = () => new Date() }) {
   const memo = new Map(), ids = new Set();
   let tiles = 0, failed = 0, done = 0;
-  const total = centers.length + 1 + (aedUrl ? 1 : 0) + (hospitalsUrl ? 1 : 0);
+  const total = centers.length + 1 + (aedUrl ? 1 : 0) + (hospitalsUrl ? 1 : 0) + (waterUrl ? 1 : 0);
   for (const c of centers) {
     onProgress({ done, total, label: c.label });
     const res = await loadPspAround(pspUrl, c.lat, c.lon, { fetchImpl, cache, memo, r: c.r || 2 });
@@ -44,11 +44,12 @@ export async function downloadOffline({ centers, pspUrl, sheltersUrl, aedUrl = "
   onProgress({ done, total, label: "Schrony z OpenStreetMap" });
   const db = await loadShelterDb(sheltersUrl, storage, fetchImpl);
   done++;
-  let aed = 0, hospitals = 0;
+  let aed = 0, hospitals = 0, water = 0;
   if (aedUrl) { onProgress({ done, total, label: "Defibrylatory AED" }); const d = await loadMedicalDb("aed", aedUrl, storage, fetchImpl, aedExtraUrl); aed = d && !d.stale ? d.count : 0; done++; }
   if (hospitalsUrl) { onProgress({ done, total, label: "Szpitale" }); const d = await loadMedicalDb("szpitale", hospitalsUrl, storage, fetchImpl); hospitals = d && !d.stale ? d.count : 0; done++; }
+  if (waterUrl) { onProgress({ done, total, label: "Woda pitna" }); const d = await loadMedicalDb("woda", waterUrl, storage, fetchImpl); water = d && !d.stale ? d.count : 0; done++; }
   onProgress({ done, total, label: "" });
-  return { at: now().toISOString(), centers: centers.length, tiles: memo.size || tiles, failed, points: ids.size, shelterDb: db && !db.stale ? db.count : 0, aed, hospitals };
+  return { at: now().toISOString(), centers: centers.length, tiles: memo.size || tiles, failed, points: ids.size, shelterDb: db && !db.stale ? db.count : 0, aed, hospitals, water };
 }
 
 /** Jedno zdanie o wyniku, po polsku. */
@@ -58,5 +59,6 @@ export function offlineSummary(r) {
   if (r.shelterDb) parts.push(`${r.shelterDb} wpisów z OpenStreetMap`);
   if (r.aed) parts.push(`${r.aed} defibrylatorów AED`);
   if (r.hospitals) parts.push(`${r.hospitals} szpitali`);
+  if (r.water) parts.push(`${r.water} punktów wody`);
   return parts.join(", ") + (r.failed ? `. Nie wszystkie obszary udało się pobrać (${r.failed}) – spróbuj ponownie z lepszym zasięgiem.` : ".");
 }

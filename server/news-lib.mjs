@@ -22,10 +22,12 @@ const SCHOOL_SAFETY = ["bezpiecz", "zagroz", "grozb", "alarm", "ewakuac", "przem
 const OFFICIAL_DENY_HARD = ["remont", "uroczyst", "studi", "podyplom", "wyroznien", "briefing", "zapowiedz", "nabor", "ubezpiecze", "targ", "poleco", "szczepie", "nagrod", "jubileusz", "konkurs", "absolwent", "stypendi", "dziecinstwo bez przemocy", "wspieramy dziecinstwo", "kosmiczn", "energetycz"];
 const OFFICIAL_DENY_SOFT = ["technologi", "wspolprac", "inwestycj", "mln zl", "mld zl", "konferencj", "armii"];
 const CIVIL = ["ochron ludnosci", "ochrony ludnosci", "ochrone ludnosci", "obron cywiln", "obrone cywiln", "schron", "alarm", "ostrzez", "ewakuac", "komunikat"];
+// Filtr „civil” (MON, MSWiA): tylko ochrona ludności i bezpośrednie zagrożenia, bez ogólnych wpisów o „bezpieczeństwie” (rozmowy, wizyty).
+const CIVIL_STRICT = ["ochron ludnosci", "ochrony ludnosci", "ochrone ludnosci", "obron cywiln", "obrone cywiln", "schron", "alarm", "ostrzez", "ostrzeg", "ewakuac", "komunikat", "dron", "rakiet", "przestrzen powietrzn", "przestrzeni powietrzn", "sabota", "cyberatak", "zagrozeni", "powodz", "pozar", "skazeni"];
 const fold = (s) => String(s || "").toLowerCase().replace(/ł/g, "l").normalize("NFD").replace(/[̀-ͯ]/g, "");
 const matches = (text, words) => { const t = fold(text); return words.some((w) => new RegExp("(^|[^a-z0-9])" + fold(w)).test(t)); }; // dopasowanie od początku wyrazu
 
-/** Filtr: "all" (bez filtra), "safety" (słowa bezpieczeństwa), "school" (węższy zestaw dla MEN/kuratoriów). */
+/** Filtr: "all" (bez filtra), "safety" (słowa bezpieczeństwa), "school" (węższy zestaw dla MEN/kuratoriów), "civil" (MON/MSWiA: ochrona ludności i bezpośrednie zagrożenia). */
 export function passesFilter(mode, title, summary = "") {
   if (mode === "all") return true;
   if (mode === "media") return passesMedia(title); // tylko tytuł
@@ -33,6 +35,7 @@ export function passesFilter(mode, title, summary = "") {
   if (matches(title, OFFICIAL_DENY_HARD)) return false;
   if (matches(title, OFFICIAL_DENY_SOFT) && !matches(title, CIVIL)) return false;
   if (mode === "school") return matches(text, SCHOOL_SAFETY);
+  if (mode === "civil") return matches(text, CIVIL_STRICT);
   return matches(text, SAFETY);
 }
 

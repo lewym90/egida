@@ -1,5 +1,5 @@
 // Service worker: offline dla treści (powłoka aplikacji z cache), komunikaty zawsze najpierw z sieci.
-const VERSION = "egida-v41";
+const VERSION = "egida-v42";
 const SHELL = [
   "./", "index.html", "manifest.webmanifest", "css/style.css",
   "js/app.js", "js/content.js", "js/config.js",
@@ -26,9 +26,17 @@ self.addEventListener("fetch", (e) => {
   if (req.method !== "GET") return;
   const url = new URL(req.url);
   if (url.origin !== location.origin) return; // nie dotykamy zewnętrznych żądań
-  // Dane o komunikatach: sieć najpierw, w razie braku ostatnia kopia.
+  // Pliki JSON z tego samego adresu: sieć najpierw (limit 10 s), w razie braku sieci albo błędu serwera ostatnia dobra kopia.
+  // Do pamięci trafiają tylko poprawne odpowiedzi (kod 200), żeby błąd serwera nie nadpisał dobrej kopii.
   if (url.pathname.endsWith(".json")) {
-    e.respondWith(fetch(req).then((r) => { const cp = r.clone(); caches.open(VERSION).then((c) => c.put(req, cp)); return r; }).catch(() => caches.match(req)));
+    e.respondWith((async () => {
+      try {
+        const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 10000);
+        const r = await fetch(req, { signal: ctl.signal }); clearTimeout(t);
+        if (r.ok) { const cp = r.clone(); caches.open(VERSION).then((c) => c.put(req, cp)); return r; }
+        return (await caches.match(req)) || r;
+      } catch { return (await caches.match(req)) || Response.error(); }
+    })());
     return;
   }
   // Kod i style aplikacji: sieć najpierw (krótki limit), żeby nowa wersja wchodziła od razu; bez sieci – kopia z cache.

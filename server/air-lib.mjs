@@ -21,12 +21,32 @@ export function parseStations(json) {
   }
   return out;
 }
-/** Odpowiedź /aqindex/getIndex/{id} → { idx, at } albo null (brak indeksu). */
+/** Kod zanieczyszczenia z napisu (np. "PM2.5", "PM25", "pm10", "O3") → kanoniczny kod albo null. */
+export function pollutantOf(raw) {
+  const c = String(raw ?? "").toUpperCase().replace(/[\s._-]/g, "");
+  const map = { PM25: "PM2.5", PM10: "PM10", NO2: "NO2", SO2: "SO2", O3: "O3", CO: "CO", C6H6: "C6H6" };
+  return map[c] || null;
+}
+/** Odpowiedź /aqindex/getIndex/{id} → { idx, at, p } albo null (brak indeksu). p = zanieczyszczenie decydujące o ogólnym poziomie (albo null, gdy nie da się ustalić). */
 export function parseIndex(json) {
   const a = json?.AqIndex;
   if (!a || typeof a !== "object") return null;
   const idx = levelOf(a["Nazwa kategorii indeksu"]);
   if (idx == null) return null;
   const at = String(a["Data wykonania obliczeń indeksu"] ?? a["Data danych źródłowych, z których policzono wartość indeksu dla wskaźnika st"] ?? "").slice(0, 19);
-  return { idx, at };
+  // 1) wprost podany kod zanieczyszczenia krytycznego; 2) w razie braku – wskaźnik, którego kategoria równa się ogólnej (najwyższa)
+  let p = null;
+  const critKey = Object.keys(a).find((k) => /krytyczn/i.test(k) && /kod|wskaźnik|zanieczyszcz/i.test(k));
+  if (critKey) p = pollutantOf(a[critKey]);
+  if (!p && idx >= 2) {
+    let best = -1;
+    for (const k of Object.keys(a)) {
+      const m = /^Nazwa kategorii indeksu dla wskaźnika\s+(.+)$/i.exec(k);
+      const code = m && pollutantOf(m[1]);
+      const lv = code ? levelOf(a[k]) : null;
+      if (lv != null && lv > best) { best = lv; p = code; }
+    }
+    if (best !== idx) p = null; // brak zgodności z poziomem ogólnym – nie zgadujemy
+  }
+  return { idx, at, p };
 }

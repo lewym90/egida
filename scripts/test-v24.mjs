@@ -51,7 +51,7 @@ ok("RSS: adresy względne w pliku (Radio Opole) są rozwiązywane względem kana
   const xml = `<rss version="2.0"><channel><title>x</title><link>https://radio.opole.pl</link><item><title>Pożar w Opolu</title><link>100,925163,pozar-w-opolu</link><pubDate>Sun, 11 Oct 2026 19:00:00 +0200</pubDate></item></channel></rss>`;
   const r = parseRss(xml); assert.equal(r.length, 1); assert.equal(r[0].url, "https://radio.opole.pl/100,925163,pozar-w-opolu");
 });
-ok("źródła: Radio ZET i TVP Info mają wyszukiwanie kanału, Polskie Radio 24 usunięte (robots.txt)", () => {
+ok("źródła: Polskie Radio 24 usunięte (robots.txt), KW PSP Katowice ma adres /wiadomosci", () => {
   
   assert.ok(!SOURCES.find((x) => x.id === "media-polskieradio24"));
   assert.ok(SOURCES.find((x) => x.id === "kwpsp-slaskie").urls.some((u) => u.endsWith("/wiadomosci")));

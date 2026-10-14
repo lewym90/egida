@@ -8,6 +8,7 @@ git add alerts.json
 [ -f shelters.json ] && git add shelters.json
 [ -f aed.json ] && git add aed.json
 [ -f hospitals.json ] && git add hospitals.json
+[ -f water.json ] && git add water.json
 [ -f aed-ratuj.json ] && git add aed-ratuj.json
 [ -f ratuj-probe.json ] && git add ratuj-probe.json
 [ -f neptun-schema.json ] && git add neptun-schema.json

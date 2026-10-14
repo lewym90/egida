@@ -8,7 +8,7 @@
 import { writeFileSync, renameSync } from "node:fs";
 import { join } from "node:path";
 import { readFileSync } from "node:fs";
-import { overpassQueryTile, medicalTiles, parseAed, parseHospitals, tidyHospitalRows, addNearHospital } from "../js/medical.js";
+import { overpassQueryTile, medicalTiles, parseAed, parseHospitals, parseWater, tidyHospitalRows, addNearHospital } from "../js/medical.js";
 import { applyCache } from "./medical-addr-lib.mjs";
 import { POLAND_RING } from "../js/poland-border.js";
 import { pointInRing, distToRingKm } from "../js/geo.js";
@@ -18,7 +18,7 @@ const DIR = process.env.DATA_DIR || ".";
 const UA = "EGIDA/0.2 (unofficial PWA; daily OSM defibrillator and hospital sync; repo lewym90/egida)";
 const dump = process.argv.includes("--dump");
 const PAUSE_MS = Number(process.env.MEDICAL_PAUSE_MS ?? 3000), RETRY_MS = Number(process.env.MEDICAL_RETRY_MS ?? 15000);
-const MIN_AED = Number(process.env.MEDICAL_MIN_AED ?? 500), MIN_HOSP = Number(process.env.MEDICAL_MIN_HOSP ?? 100);
+const MIN_AED = Number(process.env.MEDICAL_MIN_AED ?? 500), MIN_HOSP = Number(process.env.MEDICAL_MIN_HOSP ?? 100), MIN_WATER = Number(process.env.MEDICAL_MIN_WATER ?? 100);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 async function overpass(query, rounds = 3) {
@@ -38,12 +38,13 @@ async function overpass(query, rounds = 3) {
 }
 
 const inPoland = (r) => { const p = { lat: r[1], lon: r[2] }; return pointInRing(p, POLAND_RING) || distToRingKm(p, POLAND_RING) < 1.5; };
-const only = (process.argv.find((x) => x.startsWith("--only=")) || "").slice(7); // aed | hospitals | (puste = oba)
+const only = (process.argv.find((x) => x.startsWith("--only=")) || "").slice(7); // aed | hospitals | water | (puste = aed i szpitale)
 // Szpitali jest niewiele, więc pobieramy je osobno i najpierw – plik hospitals.json powstaje nawet wtedy, gdy ciężki import defibrylatorów się nie uda (i odwrotnie).
 const JOBS = [
   { what: "hospitals", file: "hospitals.json", label: "szpitali", min: MIN_HOSP, parse: parseHospitals },
   { what: "aed", file: "aed.json", label: "defibrylatorów", min: MIN_AED, parse: parseAed },
-].filter((j) => !only || j.what === only);
+  { what: "water", file: "water.json", label: "punktów wody", min: MIN_WATER, parse: parseWater },
+].filter((j) => (only ? j.what === only : j.what !== "water")); // wodę pobiera osobne wywołanie (--only=water) z run.sh
 let exitCode = 0;
 for (const job of JOBS) {
   const rows = new Map();
@@ -69,7 +70,7 @@ for (const job of JOBS) {
   if (dump) { console.log(JSON.stringify(list.slice(0, 2))); continue; }
   // niepełne pobranie albo podejrzanie mało wyników: nie nadpisuj dobrego pliku
   if (failedTiles > 0 || list.length < job.min) { console.log(`${job.file}: pobranie niepełne lub podejrzanie małe – zostaje poprzedni plik.`); exitCode = 1; continue; }
-  try { applyCache(job.what === "aed" ? "aed" : "szpitale", list, JSON.parse(readFileSync(process.env.ADDR_CACHE || join(DIR, "..", "addr-cache.json"), "utf8"))); } catch { /* brak pamięci adresów – uzupełni medical-addr.mjs */ }
+  if (job.what !== "water") try { applyCache(job.what === "aed" ? "aed" : "szpitale", list, JSON.parse(readFileSync(process.env.ADDR_CACHE || join(DIR, "..", "addr-cache.json"), "utf8"))); } catch { /* brak pamięci adresów – uzupełni medical-addr.mjs */ }
   const out = join(DIR, job.file);
   const body = JSON.stringify({ at: new Date().toISOString(), source: "OpenStreetMap", license: "ODbL, © współtwórcy OpenStreetMap", count: list.length, rows: list });
   writeFileSync(out + ".tmp", body); renameSync(out + ".tmp", out);

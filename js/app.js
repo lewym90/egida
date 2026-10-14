@@ -4,11 +4,11 @@ import {
 } from "./content.js";
 import { APTECZKA, BEZPRADU, HYBRYDOWE } from "./content.js";
 import { C } from "./icons.js";
-import { AIR_NAMES, AIR_TONE, AIR_ADVICE, normalizeAir, nearestStation } from "./air.js";
+import { AIR_NAMES, AIR_TONE, airAdvice, normalizeAir, nearestStation } from "./air.js";
 import { analyze, statusOf, summarize, compose } from "./classify.js";
 import { APP_VERSION, APP_BUILD } from "./version.js";
 import { storyTokens, sameStory } from "./similar.js";
-import { emptyPlan, normalizePlan, normalizePlaces, importState, normalizeKit, kitDue, kitSorted, kitStatus, kitDays, todayYmd, exportState, KIT_LIMIT } from "./personal.js";
+import { emptyPlan, normalizePlan, normalizePlaces, importState, normalizeKit, normalizeExpiry, normalizeExercise, kitDue, kitSorted, kitStatus, kitDays, todayYmd, exportState, KIT_LIMIT } from "./personal.js";
 import { renderEmergency, initEmergency, renderPlan, initPlan, renderPlaces, initPlaces, renderPrivacy, shareText, shareNote, printSheet, planPrintHtml, packPrintHtml, guidePrintHtml } from "./screens2.js";
 import { renderMapHtml, initMapScreen, destroyScreens } from "./mapscreen.js";
 import { renderSheltersHtml, initSheltersScreen } from "./sheltersscreen.js";
@@ -65,6 +65,9 @@ const defaults = () => ({
   test: null, // {answers:{}, score, at}
   fs: "normal", contrast: "normal",
   myKit: [], // własna apteczka: leki i środki z terminem ważności (tylko w urządzeniu)
+  expiry: {}, // terminy ważności pozycji z list Plecak i Zapas domowy: { id: "RRRR-MM-DD" }
+  exercise: { last: "" }, // data ostatniego ćwiczenia rodzinnego
+  theme: "light", // wygląd: light | dark | auto (jak w telefonie)
   senior: false, // tryb seniora: większy tekst, uproszczony Pulpit, wielki przycisk 112
   lastBackup: "", // data ostatniej kopii danych (RRRR-MM-DD)
 });
@@ -78,22 +81,27 @@ if (!state.mig?.neptunOn) {
   state.map = { ...(state.map || { base: "map" }), layers: { shelters: true, ...(state.map?.layers || {}), neptun: true } };
   try { localStorage.setItem(KEY, JSON.stringify(state)); } catch { /* */ }
 }
-state.plan = normalizePlan(state.plan); state.places = normalizePlaces(state.places); state.myKit = normalizeKit(state.myKit); state.senior = state.senior === true;
+state.plan = normalizePlan(state.plan); state.places = normalizePlaces(state.places); state.myKit = normalizeKit(state.myKit); state.expiry = normalizeExpiry(state.expiry); state.exercise = normalizeExercise(state.exercise); state.theme = ["light", "dark", "auto"].includes(state.theme) ? state.theme : "light"; state.senior = state.senior === true;
 const save = () => { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch { /* tryb prywatny */ } };
 const applyPrefs = () => {
   document.documentElement.dataset.fs = state.fs === "normal" ? "" : state.fs;
   document.documentElement.dataset.contrast = state.contrast === "high" ? "high" : "";
   document.documentElement.dataset.senior = state.senior ? "1" : "";
+  document.documentElement.dataset.theme = state.theme === "dark" || state.theme === "auto" ? state.theme : "";
 };
 
 /* ---------- komunikaty ---------- */
+/* Pobieranie JSON z limitem czasu (10 s, razem z odczytem treści). Zawieszone połączenie nie blokuje odświeżania: po limicie bierzemy ostatnią kopię i próbujemy znowu. */
+const FETCH_LIMIT_MS = 10 * 1000;
+async function getJsonT(url, ms = FETCH_LIMIT_MS) {
+  const c = new AbortController(), t = setTimeout(() => c.abort(), ms);
+  try { const r = await fetch(url, { cache: "no-store", signal: c.signal }); if (!r.ok) throw new Error(r.status); return await r.json(); } finally { clearTimeout(t); }
+}
 let alertsData = { loaded: false, ok: false, updated: null, items: [] };
 const ALERTS_CACHE = "egida.alerts.v1";
 async function loadAlerts() {
   try {
-    const r = await fetch(`${CONFIG.alertsUrl}${CONFIG.alertsUrl.includes("?") ? "&" : "?"}t=${Math.floor(Date.now() / 60000)}`, { cache: "no-store" });
-    if (!r.ok) throw new Error(r.status);
-    const j = await r.json();
+    const j = await getJsonT(`${CONFIG.alertsUrl}${CONFIG.alertsUrl.includes("?") ? "&" : "?"}t=${Math.floor(Date.now() / 60000)}`);
     alertsData = { loaded: true, ok: true, live: true, checkedAt: Date.now(), updated: j.updated || null, items: Array.isArray(j.items) ? j.items : [], telegram: j.telegram && typeof j.telegram === "object" ? j.telegram : {} };
     try { localStorage.setItem(ALERTS_CACHE, JSON.stringify({ updated: alertsData.updated, items: alertsData.items, telegram: alertsData.telegram })); } catch { /* brak miejsca / tryb prywatny */ }
   } catch {
@@ -115,9 +123,7 @@ const NEWS_CACHE = "egida.news.v1";
 async function loadNews() {
   if (!CONFIG.newsUrl) return;
   try {
-    const r = await fetch(`${CONFIG.newsUrl}${CONFIG.newsUrl.includes("?") ? "&" : "?"}t=${Math.floor(Date.now() / 60000)}`, { cache: "no-store" });
-    if (!r.ok) throw new Error(r.status);
-    const j = await r.json();
+    const j = await getJsonT(`${CONFIG.newsUrl}${CONFIG.newsUrl.includes("?") ? "&" : "?"}t=${Math.floor(Date.now() / 60000)}`);
     const n = normalizeNews(j);
     if (!n) throw new Error("format");
     newsData = n;
@@ -310,7 +316,7 @@ async function runOffline(btn) {
     const vv = VOIVODESHIPS.find((v) => v.id === state.region);
     const centers = offlineCenters({ gps, places: state.places || [], shelters: state.shelters || [], regionCenter: vv ? { lat: vv.lat, lon: vv.lon } : null });
     if (!centers.length) { msg.textContent = "Najpierw wybierz województwo w Ustawieniach albo dodaj Ważne miejsce (dom, praca, rodzina)."; return; }
-    const r = await downloadOffline({ centers, pspUrl: CONFIG.pspUrl, sheltersUrl: CONFIG.sheltersUrl, aedUrl: CONFIG.aedUrl, aedExtraUrl: CONFIG.aedRatujUrl, hospitalsUrl: CONFIG.hospitalsUrl, cache: makePspCache(CONFIG.pspUrl),
+    const r = await downloadOffline({ centers, pspUrl: CONFIG.pspUrl, sheltersUrl: CONFIG.sheltersUrl, aedUrl: CONFIG.aedUrl, aedExtraUrl: CONFIG.aedRatujUrl, hospitalsUrl: CONFIG.hospitalsUrl, waterUrl: CONFIG.waterUrl, cache: makePspCache(CONFIG.pspUrl),
       onProgress: ({ done, total, label }) => { msg.textContent = `Pobieranie ${Math.min(done + 1, total)} z ${total}${label ? ": " + label : ""}…`; } });
     await Promise.allSettled([loadAlerts(), loadNews()]);
     if (r.failed && !r.points && !r.shelterDb && !r.aed && !r.hospitals) { msg.style.color = "var(--danger-ink)"; msg.textContent = "Nie udało się pobrać danych. Sprawdź połączenie i spróbuj ponownie."; return; }
@@ -366,9 +372,7 @@ async function loadAir() {
   if (!CONFIG.airUrl) return;
   airAt = Date.now();
   try {
-    const r = await fetch(`${CONFIG.airUrl}${CONFIG.airUrl.includes("?") ? "&" : "?"}t=${Math.floor(Date.now() / 600000)}`, { cache: "no-store" });
-    if (!r.ok) throw new Error(r.status);
-    const j = await r.json();
+    const j = await getJsonT(`${CONFIG.airUrl}${CONFIG.airUrl.includes("?") ? "&" : "?"}t=${Math.floor(Date.now() / 600000)}`);
     const a = normalizeAir(j, { maxAgeH: 6 });
     airData = a;
     if (a) { try { localStorage.setItem(AIR_CACHE, JSON.stringify(j)); } catch { /* */ } }
@@ -386,7 +390,8 @@ function airCardHtml() {
   if (!st) return "";
   const km = st.km < 1 ? "poniżej 1" : `ok. ${Math.round(st.km)}`;
   const where = home ? `${km} km od Twojego domu` : `${km} km od środka województwa. Dodaj „Dom” w Ważnych miejscach, by wynik był dokładniejszy`;
-  return `<div class="aircard"><span class="aq">${C.air}</span><div><h2>Jakość powietrza</h2><span class="lvl ${AIR_TONE[st.i]}">${AIR_NAMES[st.i]}</span><p>${AIR_ADVICE[st.i]}</p><p class="muted small">Stacja: ${esc(st.n)} (${where}). Dane: GIOŚ, ${esc(hhmm(Date.parse(airData.updated)))}.</p></div></div>`;
+  const adv = airAdvice(st);
+  return `<div class="aircard"><span class="aq">${C.air}</span><div><h2>Jakość powietrza</h2><span class="lvl ${AIR_TONE[st.i]}">${AIR_NAMES[st.i]}</span><p>${adv.text}</p>${adv.pollutant ? `<p><strong>Najgorsze: ${esc(adv.pollutant)}.</strong> ${esc(adv.extra)}</p>` : ""}<p class="muted small">Stacja: ${esc(st.n)} (${where}). Dane: GIOŚ, ${esc(hhmm(Date.parse(airData.updated)))}.</p></div></div>`;
 }
 
 /* ---------- przypomnienie o terminach w Mojej apteczce ---------- */
@@ -773,26 +778,53 @@ function screenPierwszaPomoc(openId) {
 }
 
 let plecakTab = "plecak";
-function checkRow(x) {
+function expiryRow(x) {
+  const v = state.expiry[x.id] || "", st = kitStatus({ expires: v }), d = kitDays(v);
+  const lbl = { expired: "Po terminie", soon: "Kończy się termin", ok: "Ważne", none: "" }[st];
+  return `<div class="expiry"><label for="exp-${esc(x.id)}">Ważne do</label><input type="date" id="exp-${esc(x.id)}" data-exp="${esc(x.id)}" value="${esc(v)}">${v ? `<span class="kst ${st}">${lbl}</span><span class="muted small">${esc(kitWhen({ days: d }))}</span><button type="button" class="kdel" data-expclear="${esc(x.id)}" aria-label="Wyczyść termin: ${esc(x.t)}">Wyczyść</button>` : ""}</div>`;
+}
+const expiryDue = () => Object.entries(state.expiry).map(([id, expires]) => { const it = [...PLECAK.start, ...PLECAK.later, ...PLECAK.zapas].find((x) => x.id === id); return it ? { name: it.t, expires, st: kitStatus({ expires }), days: kitDays(expires) } : null; }).filter((x) => x && (x.st === "expired" || x.st === "soon")).sort((a, b) => a.days - b.days);
+function checkRow(x, withExpiry = false) {
+  if (withExpiry) return `<div class="checkwrap">${checkRow(x)}${expiryRow(x)}</div>`;
   return `<label class="check"><input type="checkbox" data-check="${x.id}" ${state.checked[x.id] ? "checked" : ""}><span><b>${esc(x.t)}</b><br><span class="muted small">${esc(x.d)}</span></span></label>`;
+}
+const EXERCISE = [
+  ["ex1", "Przeszliśmy razem trasę do najbliższego schronu lub ukrycia"],
+  ["ex2", "Każdy wie, gdzie stoi plecak i co w nim jest"],
+  ["ex3", "Sprawdziliśmy, że każdy zna numer 112 i numer osoby kontaktowej"],
+  ["ex4", "Przećwiczyliśmy wyłączenie prądu, gazu i wody"],
+  ["ex5", "Umówiliśmy się, gdzie spotykamy się, gdy nie ma łączności"],
+];
+function exerciseHtml() {
+  const last = state.exercise?.last || "", d = last ? -kitDays(last) : null;
+  const when = !last ? "Jeszcze nie ćwiczyliście." : d === 0 ? "Ostatnie ćwiczenie: dziś." : `Ostatnie ćwiczenie: ${esc(plDate(last))} (${d === 1 ? "wczoraj" : `${d} dni temu`}).`;
+  const old = last && d > 180 ? ` <b>Minęło ponad pół roku, warto powtórzyć.</b>` : "";
+  const rows = EXERCISE.map(([id, t]) => `<label class="check"><input type="checkbox" data-check="${id}" ${state.checked[id] ? "checked" : ""}><span><b>${esc(t)}</b></span></label>`).join("");
+  return `<h2 style="margin-top:20px">Ćwiczenie rodzinne</h2><p class="muted small" style="margin:4px 0 0">Raz na pół roku przejdźcie to razem, ok. 20 minut. ${when}${old}</p>
+  <div class="card flat" style="margin-top:8px">${rows}</div><button class="btn" id="exerciseDone" style="margin-top:8px">Ćwiczenie odbyło się – zapisz datę</button>`;
+}
+function expiryDueHtml() {
+  const due = expiryDue();
+  if (!due.length) return "";
+  return `<div class="note warn" style="margin:12px 0"><b>Do wymiany lub sprawdzenia:</b><ul style="margin:6px 0 0;padding-left:1.2rem">${due.slice(0, 6).map((x) => `<li>${esc(x.name)}: ${esc(kitWhen(x))} (${esc(plDate(x.expires))})</li>`).join("")}</ul></div>`;
 }
 function screenPlecak() {
   const n = plecakDone(), total = PLECAK.start.length, pct = Math.round((n / total) * 100);
   const tabs = [["plecak", "Plecak"], ["zapas", "Zapas domowy"], ["dokumenty", "Dokumenty"], ["rodzina", "Rodzina"]].map(([k, t]) => `<button class="chip" data-ptab="${k}" aria-pressed="${plecakTab === k}">${t}</button>`).join("");
   let body;
   if (plecakTab === "plecak") {
-    body = `<h2>Na start: pięć rzeczy</h2><div class="card flat" style="margin-top:8px">${PLECAK.start.map(checkRow).join("")}</div>
-    <h2 style="margin-top:20px">Gdy masz czas</h2><div class="card flat" style="margin-top:8px">${PLECAK.later.map(checkRow).join("")}</div>`;
+    body = `<h2>Na start: pięć rzeczy</h2><div class="card flat" style="margin-top:8px">${PLECAK.start.map((x) => checkRow(x, true)).join("")}</div>
+    <h2 style="margin-top:20px">Gdy masz czas</h2><div class="card flat" style="margin-top:8px">${PLECAK.later.map((x) => checkRow(x, true)).join("")}</div>`;
   } else if (plecakTab === "zapas") {
-    body = `<h2>Zapas domowy na min. 3 dni</h2><div class="card flat" style="margin-top:8px">${PLECAK.zapas.map(checkRow).join("")}</div>`;
+    body = `<h2>Zapas domowy na min. 3 dni</h2><div class="card flat" style="margin-top:8px">${PLECAK.zapas.map((x) => checkRow(x, true)).join("")}</div>`;
   } else if (plecakTab === "rodzina") {
-    body = `<h2>Plan rodzinny</h2><p class="muted small" style="margin:4px 0 0">Ustalcie to wspólnie, zanim coś się wydarzy.</p><div class="card flat" style="margin-top:8px">${PLECAK.rodzina.map(checkRow).join("")}</div>`;
+    body = `<h2>Plan rodzinny</h2><p class="muted small" style="margin:4px 0 0">Ustalcie to wspólnie, zanim coś się wydarzy.</p><div class="card flat" style="margin-top:8px">${PLECAK.rodzina.map(checkRow).join("")}</div>${exerciseHtml()}`;
   } else {
     body = `<h2>Dokumenty i informacje</h2><div class="card flat" style="margin-top:8px">${PLECAK.dokumenty.map(checkRow).join("")}</div>`;
   }
   return `<div class="hero"><h1>Plecak i zapasy</h1><p>Plecak dla każdego domownika i zapas domowy na min. 3 dni. Bez przesady.</p></div>
   <div class="card"><div class="row"><b style="font-family:var(--font-h)">Na start: ${n} z ${total}</b><span class="spacer"></span><b>${pct}%</b></div><div class="progress" style="margin-top:8px"><i style="width:${pct}%"></i></div></div>
-  <div class="chips" role="group" aria-label="Sekcje">${tabs}</div>${body}
+  ${expiryDueHtml()}<div class="chips" role="group" aria-label="Sekcje">${tabs}</div>${body}
   <div class="note" style="margin-top:12px">${esc(PLECAK.note)}</div>
   <button class="btn" id="printPack" style="margin-top:12px">Drukuj listę plecaka i zapasów</button>
   <p class="src">Źródło: ${esc(PLECAK.source)}. Każdy domownik, także dziecko, ma własny plecak. Zaznaczenia zapisują się tylko w tym urządzeniu. Ostatni przegląd: ${esc(PLECAK.reviewed)}.</p>`;
@@ -842,7 +874,7 @@ function screenUstawienia() {
   <p style="margin-top:6px"><a href="#/prywatnosc">Polityka prywatności</a></p></div>
   <div class="card"><h2>Tryb seniora</h2><label class="switch"><input type="checkbox" id="setSenior" ${state.senior ? "checked" : ""}><span><b>Duże litery i prostszy Pulpit</b><span class="muted small">Większy tekst, na Pulpicie wielki przycisk 112 i tylko najważniejsze kafelki. Wszystkie funkcje zostają w zakładce Więcej.</span></span></label></div>
   <div class="card"><h2>Wygląd</h2><div class="grid2" style="margin-top:8px"><div class="field"><label for="setFs" class="muted small">Rozmiar tekstu</label><select class="sel" id="setFs">${opt("normal", state.fs, "Normalny")}${opt("large", state.fs, "Duży")}${opt("xlarge", state.fs, "Bardzo duży")}</select></div>
-  <div class="field"><label for="setContrast" class="muted small">Kontrast</label><select class="sel" id="setContrast">${opt("normal", state.contrast, "Normalny")}${opt("high", state.contrast, "Wysoki")}</select></div></div></div>
+  <div class="field"><label for="setContrast" class="muted small">Kontrast</label><select class="sel" id="setContrast">${opt("normal", state.contrast, "Normalny")}${opt("high", state.contrast, "Wysoki")}</select></div><div class="field"><label for="setTheme" class="muted small">Motyw</label><select class="sel" id="setTheme">${opt("light", state.theme, "Jasny")}${opt("dark", state.theme, "Ciemny")}${opt("auto", state.theme, "Jak w telefonie")}</select></div></div></div>
   <div class="card"><h2>Twoje dane</h2><p class="muted">Wszystko, co ustawisz, jest tylko w tym urządzeniu: województwo, plecak, plan rodziny, karty ICE, ważne miejsca, Moja apteczka. Zrób kopię przed zmianą telefonu albo gdy czyścisz dane przeglądarki.</p>
   <p class="small" id="backupInfo">${state.lastBackup ? `Ostatnia kopia: ${esc(plDate(state.lastBackup))}.` : "Nie zrobiono jeszcze kopii danych."}</p>
   <div class="grid2"><button class="btn" id="exportData">${C.backup}Zapisz kopię</button><button class="btn" id="wipeData">Usuń dane</button></div>
@@ -985,6 +1017,8 @@ document.addEventListener("change", (e) => {
   else if (t.id === "setContrast") { state.contrast = t.value; save(); applyPrefs(); }
   else if (t.dataset.check) { state.checked[t.dataset.check] = t.checked; save(); render(); const el = document.querySelector(`[data-check="${t.dataset.check}"]`); el?.focus(); }
   else if (t.dataset.q) testAnswers[t.dataset.q] = t.checked;
+  else if (t.dataset.exp) { const v = normalizeExpiry({ [t.dataset.exp]: t.value })[t.dataset.exp]; if (v) state.expiry[t.dataset.exp] = v; else delete state.expiry[t.dataset.exp]; save(); softRender(); }
+  else if (t.id === "setTheme") { state.theme = ["light", "dark", "auto"].includes(t.value) ? t.value : "light"; save(); applyPrefs(); }
 });
 document.addEventListener("input", (e) => {
   if (e.target.id === "alertQ") { alertQuery = e.target.value; const l = $("#alertList"); if (l) l.innerHTML = alertListHtml(); }
@@ -997,7 +1031,7 @@ async function importFromFile(input) {
     const res = importState(JSON.parse(await f.text()), { validRegions: VOIVODESHIPS.map((v) => v.id) });
     if (!res.ok) { msg.style.color = "var(--danger-ink)"; msg.textContent = res.error; return; }
     if (!confirm("Wczytać kopię z pliku? Zastąpi ona odpowiadające jej dane w tej aplikacji (ustawienia, plan rodziny, miejsca, Moja apteczka).")) return;
-    Object.assign(state, res.state); state.plan = normalizePlan(state.plan); state.places = normalizePlaces(state.places); state.myKit = normalizeKit(state.myKit);
+    Object.assign(state, res.state); state.plan = normalizePlan(state.plan); state.places = normalizePlaces(state.places); state.myKit = normalizeKit(state.myKit); state.expiry = normalizeExpiry(state.expiry); state.exercise = normalizeExercise(state.exercise);
     save(); applyPrefs(); render();
     const m2 = $("#importMsg"); if (m2) { m2.style.color = ""; m2.textContent = "Dane wczytane."; }
   } catch (err) { msg.style.color = "var(--danger-ink)"; msg.textContent = err?.message && !/JSON/i.test(err.message) ? err.message : "Nie udało się odczytać pliku. Wybierz plik zapisany wcześniej przyciskiem „Zapisz kopię”."; }
@@ -1043,6 +1077,8 @@ document.addEventListener("click", (e) => {
   else if (b.id === "importBtn") $("#importFile")?.click();
   else if (b.id === "refreshApp") { b.disabled = true; b.textContent = "Odświeżam…"; refreshApp(); }
   else if (b.dataset.gtab) { const [k, id] = b.dataset.gtab.split(":"); if (k in guideTabs) { guideTabs[k] = id; softRender(); } }
+  else if (b.dataset.expclear) { delete state.expiry[b.dataset.expclear]; save(); softRender(); }
+  else if (b.id === "exerciseDone") { state.exercise = { last: todayYmd() }; for (const [id] of EXERCISE) delete state.checked[id]; save(); softRender(); }
   else if (b.dataset.kitfill) { kitFill = b.dataset.kitfill; render(); document.getElementById("kitDate")?.focus(); }
   else if (b.dataset.kitdel) { const x = state.myKit.find((k) => k.id === b.dataset.kitdel); if (x && confirm(`Usunąć „${x.name}” z apteczki?`)) { state.myKit = state.myKit.filter((k) => k.id !== x.id); save(); softRender(); } }
   else if (b.id === "updNow") { b.disabled = true; location.reload(); }

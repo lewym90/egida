@@ -11,7 +11,7 @@ const r5 = (x) => Math.round(x * 1e5) / 1e5;
 const TYPE_LETTER = { node: "n", way: "w", relation: "r" };
 const LETTER_TYPE = { n: "node", w: "way", r: "relation" };
 
-export const AED_CACHE = "egida.aed.v1", HOSP_CACHE = "egida.hosp.v1";
+export const AED_CACHE = "egida.aed.v1", HOSP_CACHE = "egida.hosp.v1", WATER_CACHE = "egida.water.v1";
 
 /** Zapytania dla całej Polski – używa ich TYLKO serwer (raz na dobę). */
 export const overpassQueryAed = () => `[out:json][timeout:150];area["ISO3166-1"="PL"][admin_level=2]->.pl;nwr["emergency"="defibrillator"](area.pl);out center tags;`;
@@ -20,6 +20,7 @@ export const overpassQueryHospitals = () => `[out:json][timeout:120];area["ISO31
 /** Zapytanie dla jednego prostokąta [S, W, N, E]. what: "aed" | "hospitals" | "both". Zapytania po prostokątach są dużo lżejsze dla Overpass niż filtr „cała Polska”. */
 export const overpassQueryTile = ([so, we, no, ea], what = "both") => {
   const box = `(${so},${we},${no},${ea})`;
+  if (what === "water") return `[out:json][timeout:90];(nwr["amenity"="drinking_water"]${box};nwr["amenity"="water_point"]${box};nwr["natural"="spring"]["drinking_water"="yes"]${box};);out center tags;`;
   const parts = [what !== "hospitals" ? `nwr["emergency"="defibrillator"]${box};` : "", what !== "aed" ? `nwr["amenity"="hospital"]${box};` : ""].join("");
   return `[out:json][timeout:90];(${parts});out center tags;`;
 };
@@ -56,6 +57,24 @@ export function parseAed(json) {
   return out;
 }
 
+/** Odpowiedź Overpass → wiersze punktów wody pitnej [id, lat, lon, nazwa, rodzaj(0 kranik/poidełko, 1 punkt poboru, 2 źródło), dostęp, sezonowo(0/1), opis miejsca].
+ *  Pomijamy wpisy oznaczone jako niezdatne do picia (drinking_water=no) lub wycofane. */
+export function parseWater(json) {
+  const out = [], seen = new Set();
+  for (const e of Array.isArray(json?.elements) ? json.elements : []) {
+    const t = e?.tags && typeof e.tags === "object" ? e.tags : {};
+    const kind = t.amenity === "drinking_water" ? 0 : t.amenity === "water_point" ? 1 : t.natural === "spring" && t.drinking_water === "yes" ? 2 : -1;
+    if (kind < 0 || isDead(t)) continue;
+    if (["no", "untested"].includes(clean(t.drinking_water, 20).toLowerCase()) || ["no", "private"].includes(clean(t.access, 20).toLowerCase())) continue;
+    const p = posOf(e); if (!okPos(p)) continue;
+    const id = idOf(e); if (seen.has(id)) continue; seen.add(id);
+    const acc = clean(t.access, 20).toLowerCase();
+    const where = clean(t.description || t["description:pl"] || t.note || t.location || "", 160);
+    out.push([id, r5(p.lat), r5(p.lon), clean(t.name || t["name:pl"] || "", 80), kind, ACCESS[acc] || "", ["yes", "seasonal"].includes(clean(t.seasonal, 12)) ? 1 : 0, where]);
+  }
+  return out;
+}
+export const WATER_KINDS = ["Kranik lub poidełko", "Punkt poboru wody", "Źródło"];
 /** Odpowiedź Overpass → wiersze szpitali [id, lat, lon, nazwa, SOR(0/1), adres, telefon]. */
 export function parseHospitals(json) {
   const out = [], seen = new Set();
@@ -120,16 +139,20 @@ export const sanitizeHow = (how, name, obj) => (MED_DESC.test(how || "") && !MED
 export function unpackAed(r) {
   return { id: String(r[0]), lat: r[1], lon: r[2], name: clean(r[3], 80) || "Defibrylator AED", how: sanitizeHow(clean(r[4], 200), r[3], r[13]), access: clean(r[5], 40), hours: clean(r[6], 80), addr: clean(r[7], 100), checked: clean(r[8], 12), indoor: r[9] === 1, operator: clean(r[10], 60), level: clean(r[11], 12), near: clean(r[12], 120), obj: clean(r[13], 100), addrD: Number.isFinite(r[14]) ? r[14] : 0, kind: "aed", src: String(r[0])[0] === "r" ? "ratuj" : String(r[0])[0] === "x" ? "miejsce" : "osm", osmUrl: osmUrl(String(r[0])) };
 }
+export function unpackWater(r) {
+  const k = Number.isInteger(r[4]) && r[4] >= 0 && r[4] < WATER_KINDS.length ? r[4] : 0;
+  return { id: String(r[0]), lat: r[1], lon: r[2], name: clean(r[3], 80) || WATER_KINDS[k], wtype: WATER_KINDS[k], access: clean(r[5], 40), seasonal: r[6] === 1, where: clean(r[7], 160), how: "", kind: "woda", src: "osm", osmUrl: osmUrl(String(r[0])) };
+}
 export function unpackHospital(r) {
   return { id: String(r[0]), lat: r[1], lon: r[2], name: clean(r[3], 100) || NONAME, sor: r[4] === 1, addr: clean(r[5], 100), addrD: Number.isFinite(r[7]) ? r[7] : 0, phone: clean(r[6], 30), how: "", kind: "szpital", src: "osm", osmUrl: osmUrl(String(r[0])) };
 }
 
 /**
- * Pobiera aed.json / hospitals.json i zapisuje kopię w telefonie. kind: "aed" | "szpitale".
+ * Pobiera aed.json / hospitals.json / water.json i zapisuje kopię w telefonie. kind: "aed" | "szpitale" | "woda".
  * Zwraca { at, count, items, stale } albo null. Przy błędzie sieci oddaje ostatnią kopię (stale:true).
  */
 export async function loadMedicalDb(kind, url, storage = globalThis.localStorage, fetchImpl = (...a) => fetch(...a), extraUrl = "") {
-  const key = kind === "aed" ? AED_CACHE : HOSP_CACHE, unpack = kind === "aed" ? unpackAed : unpackHospital;
+  const key = { aed: AED_CACHE, szpitale: HOSP_CACHE, woda: WATER_CACHE }[kind], unpack = { aed: unpackAed, szpitale: unpackHospital, woda: unpackWater }[kind];
   // Dopisuje punkty z innego źródła tylko tam, gdzie w promieniu 30 m nie ma już defibrylatora.
   const addNew = (base, extra) => {
     const cell = (la, lo) => Math.floor(la / 0.001) + "," + Math.floor(lo / 0.0016), idx = new Map();
@@ -137,7 +160,7 @@ export async function loadMedicalDb(kind, url, storage = globalThis.localStorage
     return extra.filter((x) => { const ci = Math.floor(x[1] / 0.001), cj = Math.floor(x[2] / 0.0016); for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) for (const g of idx.get(`${ci + a},${cj + b}`) || []) if (haversineKm({ lat: g[1], lon: g[2] }, { lat: x[1], lon: x[2] }) < 0.03) return false; return true; });
   };
   const build = (j) => {
-    const good = j.rows.filter(goodPos); let rows = kind === "aed" ? good : tidyHospitalRows(good), extra = 0, ratuj = 0;
+    const good = j.rows.filter(goodPos); let rows = kind === "szpitale" ? tidyHospitalRows(good) : good, extra = 0, ratuj = 0;
     if (kind === "aed") {
       const manual = addNew(good, AED_EXTRA), rt = addNew(good.concat(manual), (Array.isArray(j.ratuj) ? j.ratuj : []).filter(goodPos));
       rows = good.concat(manual, rt); extra = manual.length; ratuj = rt.length;
