@@ -59,6 +59,6 @@ ok("logo: pliki istnieją i są w SHELL, stare SVG usunięte, wersja podbita", (
   const sw = fs.readFileSync(path.join(root, "sw.js"), "utf8");
   assert.match(sw, /icons\/logo\.png/); assert.match(sw, /icons\/favicon\.png/);
   assert.ok(!/icon\.svg|maskable\.svg/.test(sw + fs.readFileSync(path.join(root, "index.html"), "utf8") + fs.readFileSync(path.join(root, "manifest.webmanifest"), "utf8")));
-  assert.equal(APP_VERSION, "v39"); assert.match(sw, /egida-v39/);
+  assert.equal(APP_VERSION, "v40"); assert.match(sw, /egida-v40/);
 });
 console.log(`OK: ${n} grup testów v19 przeszło`);

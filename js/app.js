@@ -408,8 +408,7 @@ function kitDueHtml() {
   return `<div class="kitdue ${red ? "red" : ""}"><h2>${red ? C.danger : C.warn}Sprawdź apteczkę</h2><ul>${lis}</ul>${due.length > 4 ? `<p class="small">i jeszcze ${due.length - 4}</p>` : ""}<a class="gall" href="#/moja-apteczka">Otwórz Moją apteczkę ${I.chevr}</a></div>`;
 }
 /* Czerwony kafelek na górze Pulpitu i Poradnika: od razu widać, gdzie szukać pomocy przy krwotoku i zatrzymaniu krążenia */
-const aidHero = () => `<section class="aidhero" aria-label="Pierwsza pomoc"><a class="aidmain" href="#/pierwsza-pomoc"><span class="aidic">${C.heart}</span><span><b>Pierwsza pomoc</b><span class="aidsub">Krwotok, RKO, zadławienie. Działa bez internetu</span></span>${I.chevr}</a>
-  <div class="aidq"><a href="#/pierwsza-pomoc/krwotok">${C.drop}Krwotok</a><a href="#/pierwsza-pomoc/rko">${C.heart}RKO</a></div></section>`;
+const aidHero = () => `<section class="aidhero" aria-label="Pierwsza pomoc"><a class="aidmain" href="#/pierwsza-pomoc"><span class="aidic">${C.heart}</span><span><b>Pierwsza pomoc</b><span class="aidsub">Krwotok, RKO, zadławienie. Działa bez internetu</span></span>${I.chevr}</a></section>`;
 
 const DOT = { rcb: "#B3261E", pogoda: "#B45309", drogi: "#2A4DA0", woda: "#0B6B63" };
 function nearestMinutes() { try { const j = JSON.parse(sessionStorage.getItem("egida.nearest") || "null"); return j && Date.now() - j.t < 600000 && Number.isFinite(j.min) ? j.min : null; } catch { return null; } }
@@ -688,59 +687,89 @@ function screenCoRobic(id) {
 
 let metro = null;
 function stopMetro() {
-  if (metro) { clearTimeout(metro.t); metro.stopped = true; try { metro.ctx?.close(); } catch { /* */ } metro = null; }
-  $("#pulse")?.classList.remove("on"); const ph = $("#phase"); if (ph) ph.textContent = "";
+  if (metro) {
+    clearTimeout(metro.t); cancelAnimationFrame(metro.raf); metro.stopped = true;
+    try { metro.a?.pause(); } catch { /* */ }
+    try { metro.ctx?.close(); } catch { /* */ }
+    metro = null;
+  }
+  $("#pulse")?.classList.remove("on");
 }
-/* Krótki sygnał jako plik WAV zbudowany w pamięci. Odtwarzany jak zwykłe audio, więc działa też na iPhonie z włączonym trybem cichym (Web Audio jest tam wyciszane). */
+/* Rytm RKO jako JEDEN plik dźwiękowy z całą pętlą (ucisk co okres, reszta cisza), odtwarzany w pętli jako zwykłe audio.
+   Dlaczego tak: iPhone wycisza Web Audio przy włączonym trybie cichym, a zwykłe odtwarzanie mediów nie jest wyciszane. Jedno play()
+   uruchamiane dotknięciem przycisku nie wymaga kolejnych zgód przeglądarki, a tempo wyznacza zegar dźwięku (bez dryfu). Dioda idzie za dźwiękiem. */
 let beepUrl = null;
-function beepSrc() {
+const rkoPeriod = () => 60 / FIRST_AID.rko.bpm;
+function loopSrc() {
   if (beepUrl) return beepUrl;
-  const rate = 22050, n = Math.round(rate * 0.07), buf = new ArrayBuffer(44 + n * 2), v = new DataView(buf);
+  const rate = 11025, per = Math.round(rate * rkoPeriod()), beats = 20, n = per * beats;
+  const buf = new ArrayBuffer(44 + n), v = new DataView(buf);
   const w = (o, t) => { for (let i = 0; i < t.length; i++) v.setUint8(o + i, t.charCodeAt(i)); };
-  w(0, "RIFF"); v.setUint32(4, 36 + n * 2, true); w(8, "WAVE"); w(12, "fmt "); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
-  v.setUint32(24, rate, true); v.setUint32(28, rate * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true); w(36, "data"); v.setUint32(40, n * 2, true);
-  for (let i = 0; i < n; i++) { const env = Math.min(1, i / 120, (n - i) / 300); v.setInt16(44 + i * 2, Math.round(Math.sin((2 * Math.PI * 880 * i) / rate) * 0.6 * env * 32767), true); }
+  w(0, "RIFF"); v.setUint32(4, 36 + n, true); w(8, "WAVE"); w(12, "fmt "); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+  v.setUint32(24, rate, true); v.setUint32(28, rate, true); v.setUint16(32, 1, true); v.setUint16(34, 8, true); w(36, "data"); v.setUint32(40, n, true);
+  const len = Math.round(rate * 0.09); // 90 ms sygnału 880 Hz na początku każdego okresu
+  for (let i = 0; i < n; i++) {
+    const k = i % per; let x = 0;
+    if (k < len) { const env = Math.min(1, k / 80, (len - k) / 200); x = Math.sin((2 * Math.PI * 880 * k) / rate) * 0.85 * env; }
+    v.setUint8(44 + i, Math.round(128 + x * 127));
+  }
   beepUrl = URL.createObjectURL(new Blob([buf], { type: "audio/wav" }));
   return beepUrl;
 }
 function startMetro() {
   stopMetro();
-  const bpm = FIRST_AID.rko.bpm, period = 60000 / bpm;
-  let ctx = null, pool = [], pi = 0, useAudioEl = true;
-  try { pool = [new Audio(beepSrc()), new Audio(beepSrc())]; pool.forEach((a) => { a.preload = "auto"; a.volume = 1; }); } catch { useAudioEl = false; }
-  try { ctx = new (window.AudioContext || window.webkitAudioContext)(); ctx.resume?.(); } catch { /* brak audio */ }
-  const pulse = $("#pulse"), phase = $("#phase");
-  const beep = () => {
-    if (useAudioEl) {
-      const a = pool[pi++ % pool.length]; try { a.currentTime = 0; const pr = a.play(); if (pr && pr.catch) pr.catch(() => { useAudioEl = false; }); return; } catch { useAudioEl = false; }
-    }
-    if (ctx) { try { const o = ctx.createOscillator(), g = ctx.createGain(); o.frequency.value = 880; g.gain.value = 0.3; o.connect(g); g.connect(ctx.destination); o.start(); o.stop(ctx.currentTime + 0.07); } catch { /* */ } }
+  const period = rkoPeriod();
+  const pulse = $("#pulse");
+  const m = { stopped: false, t: null, raf: 0, ctx: null, a: null };
+  metro = m;
+  try { if (navigator.audioSession) navigator.audioSession.type = "playback"; } catch { /* starsze przeglądarki */ }
+  const fallback = () => { // bez pliku audio: sygnał z Web Audio (na iPhonie w trybie cichym bywa niemy) i dioda z timera
+    if (m.stopped || m.t) return;
+    try { m.ctx = new (window.AudioContext || window.webkitAudioContext)(); m.ctx.resume?.(); } catch { /* brak audio */ }
+    const t0 = performance.now(); let k = 0;
+    const tick = () => {
+      if (m.stopped) return;
+      pulse?.classList.add("on");
+      if (m.ctx) { try { const o = m.ctx.createOscillator(), g = m.ctx.createGain(); o.frequency.value = 880; g.gain.value = 0.4; o.connect(g); g.connect(m.ctx.destination); o.start(); o.stop(m.ctx.currentTime + 0.09); } catch { /* */ } }
+      setTimeout(() => { if (!m.stopped) pulse?.classList.remove("on"); }, period * 500);
+      k++; m.t = setTimeout(tick, Math.max(0, t0 + k * period * 1000 - performance.now()));
+    };
+    tick();
   };
-  const m = { stopped: false, t: null, ctx };
-  const t0 = performance.now(); let k = 0;
-  const tick = () => {
-    if (m.stopped) return;
-    pulse?.classList.add("on"); if (phase) phase.textContent = "UCISKAJ";
-    beep(); if (navigator.vibrate) navigator.vibrate(30);
-    setTimeout(() => { if (!m.stopped) { pulse?.classList.remove("on"); if (phase) phase.textContent = "PUŚĆ CAŁKOWICIE"; } }, period / 2); // dioda świeci przy ucisku i gaśnie przy puszczaniu
-    k++; m.t = setTimeout(tick, Math.max(0, t0 + k * period - performance.now())); // bez narastającego opóźnienia
-  };
-  metro = m; tick();
+  try {
+    const a = new Audio(loopSrc()); a.loop = true; a.preload = "auto"; a.volume = 1; a.setAttribute("playsinline", ""); m.a = a;
+    const pr = a.play();
+    if (pr && pr.catch) pr.catch(fallback);
+    const frame = () => {
+      if (m.stopped || m.t) return;
+      const on = !a.paused && a.currentTime > 0 && (a.currentTime % period) < period / 2; // dioda świeci przy ucisku, gaśnie przy puszczaniu
+      pulse?.classList.toggle("on", on);
+      m.raf = requestAnimationFrame(frame);
+    };
+    m.raf = requestAnimationFrame(frame);
+    a.addEventListener("error", fallback);
+  } catch { fallback(); }
+  if (navigator.vibrate) { try { navigator.vibrate(30); } catch { /* */ } }
 }
 function screenPierwszaPomoc(openId) {
   const R = FIRST_AID.rko;
-  const steps = R.steps.map((s, i) => `<li style="display:flex;gap:12px;margin:.8rem 0"><span class="dot done" style="flex:none">${i + 1}</span><span><b>${esc(s.t)}</b><br>${esc(s.d)}</span></li>`).join("");
-  const AIC = { krwotok: C.drop, opaska: C.drop, "rana-klatki": C.drop, "rko-dziecko": C.heart, zawal: C.heart };
-  const acc = (o) => `<details class="acc${o.id === openId ? " hl" : ""}" id="fa-${esc(o.id)}" ${o.id === openId ? "open" : ""}><summary><span class="accl">${AIC[o.id] || ""}${esc(o.t)}</span><span class="muted">${I.chev}</span></summary><div class="body"><ol>${o.steps.map((s) => `<li>${esc(s)}</li>`).join("")}</ol></div></details>`;
-  const others = groupBy(FIRST_AID.others, acc).map((o) => `<h3 class="grp">${esc(o.g)}</h3><div class="card flat">${o.list.join("")}</div>`).join("");
+  const AIC = { rko: C.heart, "rko-dziecko": C.heart, krwotok: C.drop, opaska: C.drop, "rana-klatki": C.drop };
+  const accRaw = (o, bodyHtml) => `<details class="acc${o.id === openId ? " hl" : ""}" id="fa-${esc(o.id)}" ${o.id === openId ? "open" : ""}><summary><span class="accl">${AIC[o.id] || ""}${esc(o.t)}</span><span class="muted">${I.chev}</span></summary><div class="body">${bodyHtml}</div></details>`;
+  const acc = (o) => accRaw(o, `<ol>${o.steps.map((x) => `<li>${esc(x)}</li>`).join("")}</ol>`);
+  const rkoBody = `<ol>${R.steps.map((x) => `<li><b>${esc(x.t)}.</b> ${esc(x.d)}</li>`).join("")}</ol>
+    <a class="btn112" style="justify-content:center;min-height:52px;width:100%;margin-top:10px" href="tel:112">${I.phone}Zadzwoń 112</a>
+    <a class="btn" style="width:100%;margin-top:10px" href="#/schrony/aed">${I.pin}Znajdź najbliższy defibrylator (AED)</a>`;
+  const byId = (id) => FIRST_AID.others.find((o) => o.id === id);
+  const BLEED = ["krwotok", "opaska", "rana-klatki"], CPR = ["rko-dziecko"];
+  const cpr = `<h3 class="grp">Resuscytacja krążeniowo-oddechowa</h3><div class="card flat">${accRaw({ id: "rko", t: "RKO: resuscytacja dorosłego" }, rkoBody)}${CPR.map((id) => acc(byId(id))).join("")}</div>`;
+  const bleed = `<h3 class="grp">Krwotoki</h3><div class="card flat">${BLEED.map((id) => acc(byId(id))).join("")}</div>`;
+  const rest = FIRST_AID.others.filter((o) => ![...BLEED, ...CPR].includes(o.id));
+  const others = groupBy(rest, acc).map((o) => `<h3 class="grp">${esc(o.g)}</h3><div class="card flat">${o.list.join("")}</div>`).join("");
   return `<div class="hero"><div class="guidehead"><span class="gi" style="background:#FDE8E6">${C.heart}</span><h1>Pierwsza pomoc</h1></div><p>Działa bez internetu.</p></div>
-  <section class="rko" id="fa-rko"><h2>Nie oddycha? Rozpocznij RKO</h2>
-  <div class="row" style="margin:12px 0"><span class="pulse" id="pulse"></span><div><div class="bpm">~${R.bpm}<span style="font-size:1rem"> /min</span></div><div>uciśnięć na minutę</div><div id="phase" style="font-weight:800;letter-spacing:.04em;min-height:1.4em"></div></div></div>
-  <button class="btn" id="metroBtn" aria-pressed="false">Włącz rytm</button><p class="small" style="margin:8px 0 0;opacity:.9">Dioda świeci, gdy uciskasz, i gaśnie, gdy puszczasz klatkę. Rytm 100/min (dopuszczalne 100–120) zostawia czas na pełne puszczenie. Brak dźwięku? Wyłącz tryb cichy i podgłośnij telefon. Wibracja nie działa na iPhonie.</p></section>
-  <div class="card"><ol style="list-style:none;padding:0;margin:0">${steps}</ol>
-  <a class="btn112" style="justify-content:center;min-height:52px;width:100%;margin-top:10px" href="tel:112">${I.phone}Zadzwoń 112</a>
-  <a class="btn" style="width:100%;margin-top:10px" href="#/schrony/aed">${I.pin}Znajdź najbliższy defibrylator (AED)</a></div>
-  <h2 style="margin-top:20px">Inne sytuacje</h2>${others}${reviewLine(FIRST_AID)}`;
+  <section class="rko"><h2>Nie oddycha? Rozpocznij RKO</h2>
+  <div class="row" style="margin:12px 0"><span class="pulse" id="pulse"></span><div><div class="bpm">~${R.bpm}<span style="font-size:1rem"> /min</span></div><div>uciśnięć na minutę</div></div></div>
+  <button class="btn" id="metroBtn" aria-pressed="false">Włącz rytm</button><p class="small" style="margin:8px 0 0;opacity:.9">Dioda świeci, gdy uciskasz, i gaśnie, gdy puszczasz klatkę. Rytm 100/min (dopuszczalne 100–120) zostawia czas na pełne puszczenie. Dźwięk gra także przy włączonym trybie cichym, ale głośność telefonu musi być podniesiona. Instrukcja RKO jest zaraz poniżej.</p></section>
+  ${cpr}${bleed}${others}${reviewLine(FIRST_AID)}`;
 }
 
 let plecakTab = "plecak";

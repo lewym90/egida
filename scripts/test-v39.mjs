@@ -4,7 +4,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import { normalizeKit, kitStatus, kitDays, kitDue, kitSorted, exportState, importState, todayYmd } from "../js/personal.js";
 import { normalizeAir, nearestStation, distKm, AIR_NAMES, AIR_ADVICE, AIR_TONE } from "../js/air.js";
 import { C } from "../js/icons.js";
-import { BEZPRADU, HYBRYDOWE, SOURCES } from "../js/content.js";
+import { BEZPRADU, HYBRYDOWE, SOURCES, FIRST_AID } from "../js/content.js";
 import { levelOf, parseStations, parseIndex } from "../server/air-lib.mjs";
 
 let n = 0; const t = (name, fn) => { fn(); n++; console.log("  ok " + name); };
@@ -66,7 +66,7 @@ t("przewodniki: Bez prądu i Zagrożenia hybrydowe mają treść, źródło „o
 t("aplikacja: trasy, menu, ikony kolorowe, kafelek Pierwsza pomoc, krwotok, tryb seniora, baner", () => {
   for (const r of ["bez-pradu", "hybrydowe", "moja-apteczka"]) { assert.match(app, new RegExp(`case "${r}":`)); assert.match(app, new RegExp(`h: "#/${r}"`)); assert.match(app, new RegExp(`"${r}"[:,]|${r.replace("-", "")}:`)); }
   assert.match(app, /import \{ C \} from "\.\/icons\.js"/); assert.match(app, /h: "#\/pulpit", k: "pulpit", t: "Pulpit", i: C\.home/);
-  assert.match(app, /aidHero\(\)/); assert.match(app, /#\/pierwsza-pomoc\/krwotok/); assert.match(app, /krwotok: C\.drop/);
+  assert.match(app, /aidHero\(\)/); assert.ok(!/aidq/.test(app), "kafelek Pierwsza pomoc bez przycisków Krwotok/RKO"); assert.match(app, /krwotok: C\.drop/); assert.ok(!/zawal: C/.test(app), "zawał bez ikony");
   assert.match(app, /state\.senior/); assert.match(app, /setSenior/); assert.match(app, /sen112/); assert.match(app, /dataset\.senior/);
   assert.match(app, /updBar/); assert.match(app, /controllerchange/); assert.match(app, /id="updNow"/);
   assert.match(app, /exportBackup/); assert.match(app, /navigator\.share/); assert.match(app, /id="kitForm"/); assert.match(app, /airCardHtml\(\)/);
@@ -78,10 +78,18 @@ t("układ: dolny pasek bez zmiany geometrii, baner nie jest fixed, senior nie ru
   const upd = css.match(/\.updbar\{[^}]*\}/)[0]; assert.ok(!/fixed|sticky/.test(upd));
   assert.match(css, /:root\[data-senior="1"\] \.tabbar a\{font-size:\.6rem\}/);
 });
+t("Pierwsza pomoc: rytm bez napisów, pętla audio, bloki RKO i Krwotoki, 112 po zatamowaniu", () => {
+  assert.ok(!/UCISKAJ|PUŚĆ CAŁKOWICIE|id="phase"/.test(app), "bez napisów Uciskaj/Puść");
+  assert.match(app, /loop = true/); assert.match(app, /audioSession/); assert.match(app, /Resuscytacja krążeniowo-oddechowa/); assert.match(app, /<h3 class="grp">Krwotoki<\/h3>/);
+  const sec = app.slice(app.indexOf("function screenPierwszaPomoc"), app.indexOf('let plecakTab'));
+  assert.ok(sec.indexOf('class="rko"') < sec.indexOf("${cpr}") && sec.indexOf("${cpr}") < sec.indexOf("${bleed}") && sec.indexOf("${bleed}") < sec.indexOf("${others}"));
+  for (const id of ["krwotok", "rana-klatki"]) { const o = FIRST_AID.others.find((x) => x.id === id); assert.ok(!/112/.test(o.steps[0]), id + ": pierwszy krok nie jest telefonem"); assert.ok(o.steps.some((x) => /112/.test(x)), id + " nadal mówi o 112"); }
+  assert.ok(FIRST_AID.others.find((x) => x.id === "rko-dziecko").steps.length >= 4);
+});
 t("źródła: GIOŚ jest wymieniony w Źródłach i licencjach", () => { assert.ok(SOURCES.some((x) => /GIOŚ/.test(x.n) && /^https:/.test(x.u))); });
-t("serwis: nowe pliki w SHELL, wersja v39, serwer publikuje air.json", () => {
+t("serwis: nowe pliki w SHELL, wersja v40, serwer publikuje air.json", () => {
   for (const f of readdirSync(new URL("../js", import.meta.url)).filter((x) => x.endsWith(".js"))) assert.ok(sw.includes(`"js/${f}"`), f + " w SHELL");
-  assert.match(sw, /egida-v39/);
+  assert.match(sw, /egida-v40/);
   assert.match(readFileSync(new URL("../server/publish.sh", import.meta.url), "utf8"), /git add air\.json/);
   assert.match(readFileSync(new URL("../server/run.sh", import.meta.url), "utf8"), /air-sync\.mjs/);
   assert.match(readFileSync(new URL("../js/config.js", import.meta.url), "utf8"), /airUrl: "https:\/\/raw\.githubusercontent\.com\/lewym90\/egida\/data\/air\.json"/);
