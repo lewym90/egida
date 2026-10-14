@@ -1,7 +1,7 @@
 name: Monitor świeżości danych
 
 # Niezależna kontrola z zewnątrz: działa nawet wtedy, gdy padnie cały serwer (VPS), którego strażnik nie ma jak zgłosić.
-# Co godzinę sprawdza, czy alerts.json i news.json na gałęzi „data” są świeże. Gdy nie – przebieg kończy się błędem,
+# Co godzinę sprawdza, czy alerts.json, news.json i air.json na gałęzi „data” są świeże. Gdy nie – przebieg kończy się błędem,
 # a GitHub wysyła e-mail do właściciela repozytorium.
 on:
   schedule:
@@ -12,7 +12,7 @@ jobs:
   sprawdz:
     runs-on: ubuntu-latest
     steps:
-      - name: Sprawdź alerts.json i news.json
+      - name: Sprawdź alerts.json, news.json i air.json
         run: |
           base="https://raw.githubusercontent.com/${{ github.repository }}/data"
           now=$(date +%s)
@@ -30,4 +30,5 @@ jobs:
           }
           check alerts.json updated 90
           check news.json generatedAt 120
+          check air.json updated 240
           exit $fail
