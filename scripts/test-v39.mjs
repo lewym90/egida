@@ -41,7 +41,9 @@ t("kopia danych: eksport zawiera dane użytkownika, import je przywraca i czyśc
 t("powietrze: parsowanie GIOŚ, poziomy, najbliższa stacja, przeterminowane dane", () => {
   assert.equal(levelOf("Bardzo dobry"), 0); assert.equal(levelOf(" zły "), 4); assert.equal(levelOf("Bardzo zły"), 5); assert.equal(levelOf("?"), null);
   const st = parseStations({ "Lista stacji pomiarowych": [{ "Identyfikator stacji": 114, "Nazwa stacji": "Wrocław - Bartnicza", "WGS84 φ N": "51.115933", "WGS84 λ E": "17.141125" }, { "Identyfikator stacji": 2, "WGS84 φ N": "0", "WGS84 λ E": "0" }, {}] });
-  assert.equal(st.length, 1); assert.equal(st[0].id, 114); assert.equal(st[0].lat, 51.1159);
+  assert.equal(st.length, 1); assert.equal(st[0].id, 114);
+  const st2 = parseStations({ "Lista stacji pomiarowych": [{ "Identyfikator stacji": 11, "Nazwa stacji": "Czerniawa", "WGS84 \u03d5 N": "50.912475", "WGS84 \u03bb E": "15.312190" }] }); assert.equal(st2.length, 1, "oba warianty greckiej litery");
+  assert.match(readFileSync(new URL("../server/air-sync.mjs", import.meta.url), "utf8"), /Accept: "\*\/\*"/); assert.equal(st[0].lat, 51.1159);
   assert.deepEqual(parseIndex({ AqIndex: { "Nazwa kategorii indeksu": "Dobry", "Data wykonania obliczeń indeksu": "2026-10-14 10:30:00" } }), { idx: 1, at: "2026-10-14 10:30:00" });
   assert.equal(parseIndex({ AqIndex: { "Nazwa kategorii indeksu": null } }), null); assert.equal(parseIndex(null), null);
   const now = Date.parse("2026-10-14T12:00:00Z");

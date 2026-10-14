@@ -13,7 +13,9 @@ export function parseStations(json) {
   const out = [];
   for (const s of list) {
     const id = Number(s?.["Identyfikator stacji"]);
-    const lat = Number(String(s?.["WGS84 φ N"] ?? "").replace(",", ".")), lon = Number(String(s?.["WGS84 λ E"] ?? "").replace(",", "."));
+    // Klucze współrzędnych szukamy po wzorcu: GIOŚ używa greckiej litery, a jej dwa warianty (φ i ϕ) wyglądają prawie tak samo.
+    const kv = (re) => { const k = Object.keys(s || {}).find((x) => re.test(x)); return k ? s[k] : ""; };
+    const lat = Number(String(kv(/^WGS84\s.*\sN$/)).replace(",", ".")), lon = Number(String(kv(/^WGS84\s.*\sE$/)).replace(",", "."));
     if (!Number.isInteger(id) || !(lat >= 48 && lat <= 56 && lon >= 13 && lon <= 25)) continue;
     out.push({ id, name: String(s?.["Nazwa stacji"] ?? "").trim().slice(0, 80), lat: Math.round(lat * 1e4) / 1e4, lon: Math.round(lon * 1e4) / 1e4 });
   }

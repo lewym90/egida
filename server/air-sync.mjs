@@ -7,7 +7,7 @@ const OUT = process.env.AIR_OUT || "air.json", MIN = Number(process.env.AIR_MIN 
 const UA = "EGIDA/1.0 (+https://github.com/lewym90/egida; unofficial safety app)";
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const getJson = async (path) => {
-  const r = await fetch(AIR_BASE + path, { headers: { "User-Agent": UA, Accept: "application/json" }, signal: AbortSignal.timeout(15000) });
+  const r = await fetch(AIR_BASE + path, { headers: { "User-Agent": UA, Accept: "*/*" }, signal: AbortSignal.timeout(15000) });
   if (!r.ok) throw new Error("HTTP " + r.status);
   return r.json();
 };
