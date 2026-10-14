@@ -29,8 +29,10 @@ const NATIONAL = [
   ["onet", "Onet Wiadomości", ["https://wiadomosci.onet.pl/.feed"]],
   // Radio ZET i TVP Info: adresy RSS podał użytkownik (12.10.2026). Działanie i zgodność z robots.txt sprawdza serwer przy każdym przebiegu
   // (news-report.json); źródło odrzucone przez robots.txt lub błąd HTTP jest po prostu pomijane.
-  ["radiozet", "Radio ZET", ["https://player.radiozet.pl/externals/xml/radio-zet-wiadomosci.xml"]],
-  ["tvpinfo", "TVP Info", ["https://www.tvp.info/informacje?xslt=tvp-info/news/rss.xslt"]],
+  // 14.10.2026: oba adresy odpowiadały HTTP 200, ale bez wpisów (TVP zwraca stronę HTML z arkuszem XSLT, a nie kanał). Teraz serwer najpierw szuka kanału
+  // (<link rel="alternate" type="application/rss+xml">) na stronie głównej serwisu, a dopiero potem próbuje adresów kandydatów; zawartość pustej odpowiedzi trafia do news-report.json.
+  ["radiozet", "Radio ZET", ["https://wiadomosci.radiozet.pl/rss", "https://wiadomosci.radiozet.pl/rss.xml", "https://www.radiozet.pl/rss", "https://player.radiozet.pl/externals/xml/radio-zet-wiadomosci.xml"], "https://wiadomosci.radiozet.pl/"],
+  ["tvpinfo", "TVP Info", ["https://www.tvp.info/rss.xml", "https://www.tvp.info/rss", "https://www.tvp.info/feed", "https://www.tvp.info/informacje?xslt=tvp-info/news/rss.xslt"], "https://www.tvp.info/"],
   // Polskie Radio 24: robots.txt zabrania pobierania – pomijamy.
   ["info112", "Info112", ["https://info112.pl/feed/"], null, { polishOnly: true }],
 ];

@@ -191,7 +191,7 @@ ok("Apteczka: pięć zakładek, pełna treść, źródło i data przeglądu, pop
   for (const bad of ["alpha", "wolf", "tom ii", "tomie ii", "rozdział 7", "podrozdział", "tccc"]) assert.ok(!txt.includes(bad), "nie ujawniamy źródła: " + bad);
   for (const must of ["opaska uciskowa", "hemostatyczn", "okluzyjn", "nożyczki ratownicze", "112"]) assert.ok(txt.includes(must), must);
   const a = readFileSync(new URL("../js/app.js", import.meta.url), "utf8");
-  assert.match(a, /case "apteczka": inner = screenApteczka\(\)/); assert.match(a, /data-apttab/); assert.match(a, /href="#\/apteczka"/);
+  assert.match(a, /case "apteczka": inner = screenApteczka\(\)/); assert.match(a, /data-gtab/); assert.match(a, /href="#\/apteczka"/);
 });
 ok("pasek dolny: W pobliżu zaraz po Zagrożeniach, przed Poradnikiem; wszędzie „Poradnik”", () => {
   const a = readFileSync(new URL("../js/app.js", import.meta.url), "utf8");
@@ -199,6 +199,6 @@ ok("pasek dolny: W pobliżu zaraz po Zagrożeniach, przed Poradnikiem; wszędzie
   const order = [...nav.matchAll(/t: "([^"]+)"/g)].map((m) => m[1]);
   assert.deepEqual(order, ["Pulpit", "Alerty", "Zagrożenia", "W pobliżu", "Poradnik"]);
   assert.ok(!/t: "Co robić"/.test(a), "w menu bocznym nie ma „Co robić”");
-  assert.match(a, /t: "Poradnik", i: I\.list/);
+  assert.match(a, /t: "Poradnik", i: C\.book/);
 });
 console.log(`test-v37: OK (${n} grup)`);

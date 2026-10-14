@@ -56,7 +56,7 @@ async function runSource(src) {
   try {
     let urls = src.urls || [];
     if (src.discover) { // kanały RSS Policji różnią się adresem między jednostkami: szukamy raz, potem pamiętamy
-      if (cache[src.id]?.length) { urls = cache[src.id]; rep.fromCache = true; }
+      if (cache[src.id]?.length) { urls = [...cache[src.id], ...(src.urls || [])]; rep.fromCache = true; }
       else {
         try {
           const html = await get(src.discover);
@@ -71,7 +71,7 @@ async function runSource(src) {
           }
           found = found.slice(0, 3);
           rep.discovered = found.length;
-          if (found.length) { urls = found; cache[src.id] = found; }
+          if (found.length) { urls = [...found, ...(src.urls || [])]; cache[src.id] = found; }
         } catch (e) { rep.discoverError = String(e.message || e); }
       }
       if (!urls.length && !src.htmlFallback) throw new Error(rep.discoverError || "nie znaleziono kanału RSS na stronie");
@@ -81,7 +81,7 @@ async function runSource(src) {
         if (src.kind === "media" && !(await robotsOk(u))) throw new Error("robots.txt rozgłośni zabrania pobierania – pomijam");
         const body = await get(u);
         const items = src.scrape ? stamp(src.id, parseMediaHtml(body, u, src.scrape)) : src.kind === "gddkia" ? parseGddkia(body, now, VOIVODESHIPS.map((v) => v.id)) : src.kind === "rss" || src.kind === "media" ? parseRss(body) : parseHtmlList(body, u);
-        rep.urls.push({ url: u, status: 200, items: items.length });
+        rep.urls.push({ url: u, status: 200, items: items.length, ...(items.length ? {} : { head: String(body).replace(/\s+/g, " ").slice(0, 160) }) }); // pusta odpowiedź: zapisz początek do diagnozy
         raws.push(...items);
         if (items.length && !src.scrape) break; // pierwszy działający adres wystarcza (strony rozgłośni czytamy wszystkie podane)
       } catch (e) { rep.urls.push({ url: u, error: String(e.message || e) }); }

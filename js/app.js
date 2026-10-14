@@ -2,11 +2,13 @@ import { CONFIG } from "./config.js";
 import {
   VOIVODESHIPS, LEGAL_HTML, ALERT_FILTERS, PLECAK, FIRST_AID, WHAT_TO_DO, READINESS_QUESTIONS, SOURCES,
 } from "./content.js";
-import { APTECZKA } from "./content.js";
+import { APTECZKA, BEZPRADU, HYBRYDOWE } from "./content.js";
+import { C } from "./icons.js";
+import { AIR_NAMES, AIR_TONE, AIR_ADVICE, normalizeAir, nearestStation } from "./air.js";
 import { analyze, statusOf, summarize, compose } from "./classify.js";
 import { APP_VERSION, APP_BUILD } from "./version.js";
 import { storyTokens, sameStory } from "./similar.js";
-import { emptyPlan, normalizePlan, normalizePlaces, importState } from "./personal.js";
+import { emptyPlan, normalizePlan, normalizePlaces, importState, normalizeKit, kitDue, kitSorted, kitStatus, kitDays, todayYmd, exportState, KIT_LIMIT } from "./personal.js";
 import { renderEmergency, initEmergency, renderPlan, initPlan, renderPlaces, initPlaces, renderPrivacy, shareText, shareNote, printSheet, planPrintHtml, packPrintHtml, guidePrintHtml } from "./screens2.js";
 import { renderMapHtml, initMapScreen, destroyScreens } from "./mapscreen.js";
 import { renderSheltersHtml, initSheltersScreen } from "./sheltersscreen.js";
@@ -62,6 +64,9 @@ const defaults = () => ({
   checked: {},
   test: null, // {answers:{}, score, at}
   fs: "normal", contrast: "normal",
+  myKit: [], // własna apteczka: leki i środki z terminem ważności (tylko w urządzeniu)
+  senior: false, // tryb seniora: większy tekst, uproszczony Pulpit, wielki przycisk 112
+  lastBackup: "", // data ostatniej kopii danych (RRRR-MM-DD)
 });
 let state = defaults();
 try { state = { ...defaults(), ...JSON.parse(localStorage.getItem(KEY) || "{}") }; } catch { /* brak/uszkodzone dane */ }
@@ -73,11 +78,12 @@ if (!state.mig?.neptunOn) {
   state.map = { ...(state.map || { base: "map" }), layers: { shelters: true, ...(state.map?.layers || {}), neptun: true } };
   try { localStorage.setItem(KEY, JSON.stringify(state)); } catch { /* */ }
 }
-state.plan = normalizePlan(state.plan); state.places = normalizePlaces(state.places);
+state.plan = normalizePlan(state.plan); state.places = normalizePlaces(state.places); state.myKit = normalizeKit(state.myKit); state.senior = state.senior === true;
 const save = () => { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch { /* tryb prywatny */ } };
 const applyPrefs = () => {
   document.documentElement.dataset.fs = state.fs === "normal" ? "" : state.fs;
   document.documentElement.dataset.contrast = state.contrast === "high" ? "high" : "";
+  document.documentElement.dataset.senior = state.senior ? "1" : "";
 };
 
 /* ---------- komunikaty ---------- */
@@ -197,52 +203,58 @@ const topbar = () => `<header class="topbar">
   <span class="spacer"></span>${regionSelect()}${btn112()}</header>`;
 
 const NAV = [
-  { h: "#/pulpit", k: "pulpit", t: "Pulpit", i: I.home },
-  { h: "#/alerty", k: "alerty", t: "Alerty", i: I.bell },
-  { h: "#/mapa", k: "mapa", t: "Zagrożenia", i: I.map },
-  { h: "#/schrony", k: "schrony", t: "W pobliżu", i: I.shield },
-  { h: "#/poradnik", k: "poradnik", t: "Poradnik", i: I.book },
+  { h: "#/pulpit", k: "pulpit", t: "Pulpit", i: C.home },
+  { h: "#/alerty", k: "alerty", t: "Alerty", i: C.bell },
+  { h: "#/mapa", k: "mapa", t: "Zagrożenia", i: C.map },
+  { h: "#/schrony", k: "schrony", t: "W pobliżu", i: C.shield },
+  { h: "#/poradnik", k: "poradnik", t: "Poradnik", i: C.book },
 ];
-const TABS = [...NAV, { h: "#/wiecej", k: "wiecej", t: "Więcej", i: I.more }];
+const TABS = [...NAV, { h: "#/wiecej", k: "wiecej", t: "Więcej", i: C.more }];
 const MORE = [
-  { h: "#/wazne", t: "Wiadomości", d: "Policja, MEN, RCB i urzędy: bezpieczeństwo", i: I.bell },
-  { h: "#/ustawienia", t: "Ustawienia", d: "Województwo, zgody, wygląd, Twoje dane", i: I.gear },
-  { h: "#/plan-rodziny", t: "Plan rodziny", d: "Kontakty, miejsce spotkania, karty ICE", i: I.users },
-  { h: "#/plecak", t: "Plecak i zapasy", d: "Zestaw na 72 godziny, zapas domowy, dokumenty", i: I.bag },
-  { h: "#/pierwsza-pomoc", t: "Pierwsza pomoc", d: "Krok po kroku, działa offline", i: I.heart },
-  { h: "#/apteczka", t: "Apteczka", d: "Co mieć, jak przechowywać, do czego służy", i: I.bag },
-  { h: "#/test", t: "Test gotowości", d: "Sprawdź, jak jesteś przygotowany", i: I.test },
-  { h: "#/zagrozenie", t: "Tryb zagrożenia", d: "112, schron i trzy kroki", i: I.alert },
-  { h: "#/miejsca", t: "Ważne miejsca", d: "Dom, praca, rodzina", i: I.pin },
-  { h: "#/telegram", t: "Powiadomienia Telegram", d: "Kanał dla Twojego województwa", i: I.send },
-  { h: "#/zrodla", t: "Źródła i licencje", d: "Skąd mamy dane", i: I.book },
-  { h: "#/prywatnosc", t: "Polityka prywatności", d: "Co zostaje w telefonie", i: I.list },
+  { h: "#/pierwsza-pomoc", t: "Pierwsza pomoc", d: "Krwotok, RKO, zadławienie. Działa offline", i: C.heart },
+  { h: "#/wazne", t: "Wiadomości", d: "Policja, MEN, RCB i urzędy: bezpieczeństwo", i: C.news },
+  { h: "#/bez-pradu", t: "Bez prądu", d: "Plan na pierwsze 72 godziny", i: C.bolt },
+  { h: "#/hybrydowe", t: "Zagrożenia hybrydowe", d: "Dezinformacja, oszustwa, awarie sieci", i: C.hybrid },
+  { h: "#/plan-rodziny", t: "Plan rodziny", d: "Kontakty, miejsce spotkania, karty ICE", i: C.users },
+  { h: "#/plecak", t: "Plecak i zapasy", d: "Zestaw na 72 godziny, zapas domowy, dokumenty", i: C.bag },
+  { h: "#/apteczka", t: "Apteczka", d: "Co mieć, jak przechowywać, do czego służy", i: C.kit },
+  { h: "#/moja-apteczka", t: "Moja apteczka", d: "Twoje leki i terminy ważności", i: C.list },
+  { h: "#/test", t: "Test gotowości", d: "Sprawdź, jak jesteś przygotowany", i: C.test },
+  { h: "#/zagrozenie", t: "Tryb zagrożenia", d: "112, schron i trzy kroki", i: C.danger },
+  { h: "#/miejsca", t: "Ważne miejsca", d: "Dom, praca, rodzina", i: C.pin },
+  { h: "#/telegram", t: "Powiadomienia Telegram", d: "Kanał dla Twojego województwa", i: C.tg },
+  { h: "#/ustawienia", t: "Ustawienia", d: "Województwo, zgody, wygląd, tryb seniora, kopia danych", i: C.gear },
+  { h: "#/zrodla", t: "Źródła i licencje", d: "Skąd mamy dane", i: C.book },
+  { h: "#/prywatnosc", t: "Polityka prywatności", d: "Co zostaje w telefonie", i: C.list },
 ];
 const SIDE = [
   ...NAV.slice(0, 2),
-  { h: "#/wazne", k: "wazne", t: "Wiadomości", i: I.bell },
-  { h: "#/telegram", k: "telegram", t: "Powiadomienia Telegram", i: I.send },
-  { h: "#/mapa", k: "mapa", t: "Mapa zagrożeń", i: I.map },
-  { h: "#/schrony", k: "schrony", t: "Pomoc w pobliżu", i: I.shield },
-  { h: "#/poradnik", k: "poradnik", t: "Poradnik", i: I.list },
-  { h: "#/pierwsza-pomoc", k: "pierwsza-pomoc", t: "Pierwsza pomoc", i: I.heart },
-  { h: "#/apteczka", k: "apteczka", t: "Apteczka", i: I.bag },
-  { h: "#/plecak", k: "plecak", t: "Plecak i zapasy", i: I.bag },
-  { h: "#/test", k: "test", t: "Test gotowości", i: I.test },
-  { h: "#/zagrozenie", k: "zagrozenie", t: "Tryb zagrożenia", i: I.alert },
-  { h: "#/plan-rodziny", k: "plan-rodziny", t: "Plan rodziny", i: I.users },
-  { h: "#/miejsca", k: "miejsca", t: "Ważne miejsca", i: I.pin },
-  { h: "#/ustawienia", k: "ustawienia", t: "Ustawienia", i: I.gear },
-  { h: "#/zrodla", k: "zrodla", t: "Źródła i licencje", i: I.book },
+  { h: "#/wazne", k: "wazne", t: "Wiadomości", i: C.news },
+  { h: "#/telegram", k: "telegram", t: "Powiadomienia Telegram", i: C.tg },
+  { h: "#/mapa", k: "mapa", t: "Mapa zagrożeń", i: C.map },
+  { h: "#/schrony", k: "schrony", t: "Pomoc w pobliżu", i: C.shield },
+  { h: "#/poradnik", k: "poradnik", t: "Poradnik", i: C.book },
+  { h: "#/pierwsza-pomoc", k: "pierwsza-pomoc", t: "Pierwsza pomoc", i: C.heart },
+  { h: "#/bez-pradu", k: "bez-pradu", t: "Bez prądu", i: C.bolt },
+  { h: "#/hybrydowe", k: "hybrydowe", t: "Zagrożenia hybrydowe", i: C.hybrid },
+  { h: "#/apteczka", k: "apteczka", t: "Apteczka", i: C.kit },
+  { h: "#/moja-apteczka", k: "moja-apteczka", t: "Moja apteczka", i: C.list },
+  { h: "#/plecak", k: "plecak", t: "Plecak i zapasy", i: C.bag },
+  { h: "#/test", k: "test", t: "Test gotowości", i: C.test },
+  { h: "#/zagrozenie", k: "zagrozenie", t: "Tryb zagrożenia", i: C.danger },
+  { h: "#/plan-rodziny", k: "plan-rodziny", t: "Plan rodziny", i: C.users },
+  { h: "#/miejsca", k: "miejsca", t: "Ważne miejsca", i: C.pin },
+  { h: "#/ustawienia", k: "ustawienia", t: "Ustawienia", i: C.gear },
+  { h: "#/zrodla", k: "zrodla", t: "Źródła i licencje", i: C.book },
 ];
-const GROUP = { ustawienia: "wiecej", zrodla: "wiecej", prywatnosc: "wiecej", telegram: "alerty", "co-robic": "poradnik", "pierwsza-pomoc": "poradnik", apteczka: "poradnik", test: "poradnik", plecak: "wiecej", "plan-rodziny": "pulpit", zagrozenie: "pulpit", miejsca: "pulpit" };
+const GROUP = { ustawienia: "wiecej", zrodla: "wiecej", prywatnosc: "wiecej", telegram: "alerty", "co-robic": "poradnik", "pierwsza-pomoc": "poradnik", apteczka: "poradnik", "moja-apteczka": "poradnik", "bez-pradu": "poradnik", hybrydowe: "poradnik", test: "poradnik", plecak: "wiecej", "plan-rodziny": "pulpit", zagrozenie: "pulpit", miejsca: "pulpit" };
 
 function shell(route, inner) {
   const cur = GROUP[route] || route;
   const side = SIDE.map((n) => `<a class="nav ${n.soon ? "soon" : ""}" href="${n.h}" ${n.k === route || (n.k === "poradnik" && route === "co-robic") ? 'aria-current="page"' : ""}>${n.i}<span>${n.t}</span>${n.soon ? '<span class="badge soon">wkrótce</span>' : ""}</a>`).join("");
   const tabs = TABS.map((n) => `<a href="${n.h}" ${n.k === cur ? 'aria-current="page"' : ""}>${n.i}<span>${n.t}</span></a>`).join("");
-  return `<div class="shell"><nav class="side" aria-label="Menu główne"><a class="brand" href="#/pulpit">${LOGO}<span><span class="wordmark">EGIDA</span><span class="tagline">Twoje centrum bezpieczeństwa</span></span></a>${side}</nav>
-  <main class="main" id="main" tabindex="-1">${topbar()}${inner}${legal()}</main>
+  return `<div class="shell" data-route="${esc(route || "pulpit")}"><nav class="side" aria-label="Menu główne"><a class="brand" href="#/pulpit">${LOGO}<span><span class="wordmark">EGIDA</span><span class="tagline">Twoje centrum bezpieczeństwa</span></span></a>${side}</nav>
+  <main class="main" id="main" tabindex="-1">${topbar()}${updBar()}${inner}${legal()}</main>
   <a class="fab112" href="tel:112" aria-label="Zagrożenie życia? Zadzwoń 112">${I.phone}112</a>
   <nav class="tabbar" aria-label="Menu dolne">${tabs}</nav></div>`;
 }
@@ -343,6 +355,62 @@ function screenStart() {
 const alertLevel = (list) => statusOf(list);
 const sentence = (t) => { const x = String(t || "").replace(/\s+/g, " ").trim(); const m = /^(.{40,}?[.!?])(\s|$)/.exec(x); const r = m ? m[1] : x; return r.length > 150 ? r.slice(0, 147).trimEnd() + "…" : r; };
 const hhmm = (ms) => new Date(ms).toLocaleTimeString("pl-PL", { hour: "2-digit", minute: "2-digit" });
+/* ---------- baner „Dostępna nowa wersja” ---------- */
+let updateReady = false;
+const updBar = () => updateReady ? `<div class="updbar" role="status">${C.refresh}<span class="ut">Dostępna nowa wersja aplikacji</span><button type="button" id="updNow">Odśwież</button></div>` : "";
+
+/* ---------- jakość powietrza (GIOŚ) ---------- */
+let airData = null, airAt = 0;
+const AIR_CACHE = "egida.air.v1";
+async function loadAir() {
+  if (!CONFIG.airUrl) return;
+  airAt = Date.now();
+  try {
+    const r = await fetch(`${CONFIG.airUrl}${CONFIG.airUrl.includes("?") ? "&" : "?"}t=${Math.floor(Date.now() / 600000)}`, { cache: "no-store" });
+    if (!r.ok) throw new Error(r.status);
+    const j = await r.json();
+    const a = normalizeAir(j, { maxAgeH: 6 });
+    airData = a;
+    if (a) { try { localStorage.setItem(AIR_CACHE, JSON.stringify(j)); } catch { /* */ } }
+  } catch {
+    try { airData = normalizeAir(JSON.parse(localStorage.getItem(AIR_CACHE) || "null"), { maxAgeH: 6 }) || airData; } catch { /* */ }
+  }
+}
+function airCardHtml() {
+  if (!airData) return "";
+  const home = state.places.find((p) => p.label === "Dom");
+  const reg = regionById(state.region);
+  const pos = home ? { la: home.lat, lo: home.lon } : reg ? { la: reg.lat, lo: reg.lon } : null;
+  if (!pos) return "";
+  const st = nearestStation(airData, pos.la, pos.lo, home ? 40 : 80);
+  if (!st) return "";
+  const km = st.km < 1 ? "poniżej 1" : `ok. ${Math.round(st.km)}`;
+  const where = home ? `${km} km od Twojego domu` : `${km} km od środka województwa. Dodaj „Dom” w Ważnych miejscach, by wynik był dokładniejszy`;
+  return `<div class="aircard"><span class="aq">${C.air}</span><div><h2>Jakość powietrza</h2><span class="lvl ${AIR_TONE[st.i]}">${AIR_NAMES[st.i]}</span><p>${AIR_ADVICE[st.i]}</p><p class="muted small">Stacja: ${esc(st.n)} (${where}). Dane: GIOŚ, ${esc(hhmm(Date.parse(airData.updated)))}.</p></div></div>`;
+}
+
+/* ---------- przypomnienie o terminach w Mojej apteczce ---------- */
+const plDate = (ymd) => { const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(ymd || ""); return m ? `${m[3]}.${m[2]}.${m[1]}` : ""; };
+function kitWhen(x) {
+  const d = x.days ?? kitDays(x.expires);
+  if (d == null) return "";
+  if (d < -1) return `po terminie od ${-d} dni`;
+  if (d === -1) return "termin minął wczoraj";
+  if (d === 0) return "termin mija dziś";
+  if (d === 1) return "termin mija jutro";
+  return `termin za ${d} dni`;
+}
+function kitDueHtml() {
+  const due = kitDue(state.myKit);
+  if (!due.length) return "";
+  const red = due.some((x) => x.st === "expired");
+  const lis = due.slice(0, 4).map((x) => `<li><b>${esc(x.name)}</b>: ${esc(kitWhen(x))} (${esc(plDate(x.expires))})</li>`).join("");
+  return `<div class="kitdue ${red ? "red" : ""}"><h2>${red ? C.danger : C.warn}Sprawdź apteczkę</h2><ul>${lis}</ul>${due.length > 4 ? `<p class="small">i jeszcze ${due.length - 4}</p>` : ""}<a class="gall" href="#/moja-apteczka">Otwórz Moją apteczkę ${I.chevr}</a></div>`;
+}
+/* Czerwony kafelek na górze Pulpitu i Poradnika: od razu widać, gdzie szukać pomocy przy krwotoku i zatrzymaniu krążenia */
+const aidHero = () => `<section class="aidhero" aria-label="Pierwsza pomoc"><a class="aidmain" href="#/pierwsza-pomoc"><span class="aidic">${C.heart}</span><span><b>Pierwsza pomoc</b><span class="aidsub">Krwotok, RKO, zadławienie. Działa bez internetu</span></span>${I.chevr}</a>
+  <div class="aidq"><a href="#/pierwsza-pomoc/krwotok">${C.drop}Krwotok</a><a href="#/pierwsza-pomoc/rko">${C.heart}RKO</a></div></section>`;
+
 const DOT = { rcb: "#B3261E", pogoda: "#B45309", drogi: "#2A4DA0", woda: "#0B6B63" };
 function nearestMinutes() { try { const j = JSON.parse(sessionStorage.getItem("egida.nearest") || "null"); return j && Date.now() - j.t < 600000 && Number.isFinite(j.min) ? j.min : null; } catch { return null; } }
 function ring(pct) {
@@ -406,11 +474,23 @@ function screenPulpit() {
     const label = i === 1 ? `${st.t.replace("Przygotuj", "Spakuj")} <span class="muted small">· ${nPack} z ${tPack}</span>` : esc(st.t);
     return st.done ? `<li><a href="${st.h}"><span class="muted">${i === 1 ? label : esc(st.t)}</span><span class="stp">✓</span></a></li>` : `<li><a href="${st.h}"><span>${label}</span>${I.chevr}</a></li>`;
   }).join("");
-  return `<div class="hero"><h1>Pulpit</h1></div>${status}${newsCardHtml()}
+  if (state.senior) {
+    return `<div class="hero"><h1>Pulpit</h1></div>${status}${kitDueHtml()}
+  <a class="sen112" href="tel:112">${I.phone}Zadzwoń 112</a>
+  <div class="sengrid">
+  <a class="tile" href="#/pierwsza-pomoc"><span class="ti t-red">${C.heart}</span><b>Pierwsza pomoc</b></a>
+  <a class="tile" href="#/schrony"><span class="ti t-green">${C.shield}</span><b>Pomoc w pobliżu${nm != null ? `<br><span class="muted small">Schron: ${nm} min pieszo</span>` : ""}</b></a>
+  <a class="tile" href="#/plan-rodziny"><span class="ti t-amber">${C.users}</span><b>Plan rodziny i karty ICE</b></a>
+  <a class="tile" href="#/moja-apteczka"><span class="ti t-green">${C.list}</span><b>Moja apteczka</b></a>
+  <a class="tile" href="#/bez-pradu"><span class="ti t-amber">${C.bolt}</span><b>Bez prądu</b></a>
+  </div>${airCardHtml()}${installHint()}`;
+  }
+  return `<div class="hero"><h1>Pulpit</h1></div>${status}${aidHero()}${kitDueHtml()}${airCardHtml()}${newsCardHtml()}
   <div class="card ready"><div class="row" style="gap:16px">${ring(r.pct)}<div style="flex:1"><h2 style="margin:0">Twoja gotowość</h2><p class="muted small" style="margin:2px 0 0">Trzy małe kroki, żeby poczuć się pewniej.</p></div></div>
   <ul class="steps stepsnav">${steps}</ul></div>
-  <div class="grid2 grid-d grid4">${tile("#/schrony", "t-green", I.pin, "Pomoc w pobliżu", nm != null ? `Schron: ${nm} min pieszo · AED · szpitale` : "Schrony, AED, szpitale")}${tile("#/pierwsza-pomoc", "t-red", I.heart, "Pierwsza pomoc", "Krok po kroku, offline")}${tile("#/plecak", "t-blue", I.bag, "Plecak i zapasy", "Zestaw na 72 godziny")}${tile("#/plan-rodziny", "t-amber", I.users, "Plan rodziny", "Kontakty i miejsce spotkania")}</div>
-  <div class="grid2 grid-d" style="margin-top:12px"><a class="tile" style="flex-direction:row;align-items:center" href="#/poradnik"><span class="ti t-green">${I.list}</span><b>Poradnik: co robić, gdy…</b></a><a class="tile" style="flex-direction:row;align-items:center" href="#/telegram"><span class="ti t-blue">${I.send}</span><b>Powiadomienia Telegram dla Twojego województwa</b></a></div>
+  <div class="grid2 grid-d grid4">${tile("#/schrony", "t-green", C.shield, "Pomoc w pobliżu", nm != null ? `Schron: ${nm} min pieszo · AED · szpitale` : "Schrony, AED, szpitale")}${tile("#/plecak", "t-blue", C.bag, "Plecak i zapasy", "Zestaw na 72 godziny")}${tile("#/plan-rodziny", "t-amber", C.users, "Plan rodziny", "Kontakty i miejsce spotkania")}${tile("#/moja-apteczka", "t-green", C.list, "Moja apteczka", "Leki i terminy ważności")}</div>
+  <div class="grid2 grid-d" style="margin-top:12px">${tile("#/bez-pradu", "t-amber", C.bolt, "Bez prądu", "Plan na 72 godziny")}${tile("#/hybrydowe", "t-purple", C.hybrid, "Zagrożenia hybrydowe", "Dezinformacja i oszustwa")}</div>
+  <div class="grid2 grid-d" style="margin-top:12px"><a class="tile" style="flex-direction:row;align-items:center" href="#/poradnik"><span class="ti t-blue">${C.book}</span><b>Poradnik: co robić, gdy…</b></a><a class="tile" style="flex-direction:row;align-items:center" href="#/telegram"><span class="ti t-blue">${C.tg}</span><b>Powiadomienia Telegram dla Twojego województwa</b></a></div>
   ${installHint()}
 `;
 }
@@ -535,26 +615,68 @@ function groupBy(arr, fn) {
 function screenPoradnik() {
   const row = (x) => `<a class="check" style="text-decoration:none;color:inherit;cursor:pointer" href="#/co-robic/${x.id}"><span><b>${esc(x.t)}</b><br><span class="muted small">${esc(x.d)}</span></span></a>`;
   const items = groupBy(WHAT_TO_DO.items, row).map((o) => `<h3 class="grp">${esc(o.g)}</h3><div class="card flat">${o.list.join("")}</div>`).join("");
+  const wide = (h, cls, i, t, mt = 12) => `<a class="tile" style="flex-direction:row;align-items:center;margin-top:${mt}px" href="${h}"><span class="ti ${cls}">${i}</span><b>${t}</b></a>`;
   return `<div class="hero"><h1>Poradnik</h1><p>Krótkie instrukcje, które działają także bez internetu.</p></div>
-  <a class="tile" style="flex-direction:row;align-items:center;margin-bottom:12px" href="#/zagrozenie"><span class="ti t-red">${I.alert}</span><b>Tryb zagrożenia: 112, schron, 3 kroki</b></a>
-  <a class="tile" style="flex-direction:row;align-items:center" href="#/pierwsza-pomoc"><span class="ti">${I.heart}</span><b>Pierwsza pomoc, w tym resuscytacja (RKO)</b></a>
-  <a class="tile" style="flex-direction:row;align-items:center;margin-top:12px" href="#/apteczka"><span class="ti t-red">${I.bag}</span><b>Apteczka: co mieć i do czego służy</b></a>
+  ${aidHero()}
+  ${wide("#/zagrozenie", "t-red", C.danger, "Tryb zagrożenia: 112, schron, 3 kroki", 0)}
+  ${wide("#/bez-pradu", "t-amber", C.bolt, "Bez prądu: plan na pierwsze 72 godziny")}
+  ${wide("#/hybrydowe", "t-purple", C.hybrid, "Zagrożenia hybrydowe: dezinformacja i oszustwa")}
+  ${wide("#/apteczka", "t-red", C.kit, "Apteczka: co mieć i do czego służy")}
+  ${wide("#/moja-apteczka", "t-green", C.list, "Moja apteczka: leki i terminy ważności")}
   <h2 style="margin-top:20px">Co robić, gdy…</h2>${items}
-  <a class="tile" style="flex-direction:row;align-items:center;margin-top:12px" href="#/test"><span class="ti">${I.test}</span><b>Test gotowości (2 minuty)</b></a>
+  ${wide("#/test", "t-amber", C.test, "Test gotowości (2 minuty)")}
   <button class="btn" id="printGuide" style="margin-top:12px">Drukuj instrukcje (pierwsza pomoc i „Co robić”)</button>`;
 }
-/* Apteczka: osobny ekran z zakładkami (APTECZKA w js/content.js). */
-let apteczkaTab = "dom";
-const aptLine = (s) => { const m = /^([^:]{3,60}): (.+)$/.exec(s); return m ? `<b>${esc(m[1])}:</b> ${esc(m[2])}` : esc(s); };
-function screenApteczka() {
-  const tab = APTECZKA.tabs.find((x) => x.id === apteczkaTab) || APTECZKA.tabs[0];
-  const chips = APTECZKA.tabs.map((x) => `<button class="chip" data-apttab="${x.id}" aria-pressed="${x.id === tab.id}">${esc(x.t)}</button>`).join("");
+/* Przewodniki z zakładkami (Apteczka, Bez prądu, Zagrożenia hybrydowe): wspólny wygląd, treść w js/content.js. */
+const guideTabs = { apteczka: "dom", bezpradu: "start", hybrydowe: "co" };
+const aptLine = (s) => {
+  const n = /^(\d{1,2})\. (.+)$/.exec(s); if (n) return `<b>${n[1]}.</b> ${esc(n[2])}`;
+  const m = /^([^:]{3,60}): (.+)$/.exec(s); return m ? `<b>${esc(m[1])}:</b> ${esc(m[2])}` : esc(s);
+};
+const aptLi = (x) => `<li${/^\d{1,2}\. /.test(x) ? ' class="n"' : ""}>${aptLine(x)}</li>`;
+function guideBody(key, data) {
+  const tab = data.tabs.find((x) => x.id === guideTabs[key]) || data.tabs[0];
+  const chips = data.tabs.map((x) => `<button class="chip" data-gtab="${key}:${x.id}" aria-pressed="${x.id === tab.id}">${esc(x.t)}</button>`).join("");
   const link = (l) => `<a class="gall" href="${esc(l.h)}">${esc(l.t)} ${I.chevr}</a>`;
-  const blocks = tab.blocks.map((b) => `<h3 class="grp">${esc(b.h)}</h3><div class="card flat apt">${b.p ? `<p>${esc(b.p)}</p>` : ""}${b.items ? `<ul class="aptlist">${b.items.map((x) => `<li>${aptLine(x)}</li>`).join("")}</ul>` : ""}${b.note ? `<div class="note ${b.note.k === "warn" ? "warn" : "neutral"}">${esc(b.note.t)}</div>` : ""}${b.link ? link(b.link) : ""}</div>`).join("");
-  return `${back("#/poradnik", "Poradnik")}<div class="hero"><h1>Apteczka</h1><p>${esc(APTECZKA.intro)}</p></div>
-  <div class="chips" role="group" aria-label="Rozdziały apteczki">${chips}</div>
-  ${blocks}${tab.link ? `<div class="card flat apt">${link(tab.link)}</div>` : ""}
+  const blocks = tab.blocks.map((b) => `<h3 class="grp">${esc(b.h)}</h3><div class="card flat apt">${b.p ? `<p>${esc(b.p)}</p>` : ""}${b.items ? `<ul class="aptlist">${b.items.map(aptLi).join("")}</ul>` : ""}${b.note ? `<div class="note ${b.note.k === "warn" ? "warn" : "neutral"}">${esc(b.note.t)}</div>` : ""}${b.link ? link(b.link) : ""}</div>`).join("");
+  return `<div class="chips" role="group" aria-label="Rozdziały">${chips}</div>${blocks}${tab.link ? `<div class="card flat apt">${link(tab.link)}</div>` : ""}`;
+}
+function screenApteczka() {
+  return `${back("#/poradnik", "Poradnik")}<div class="hero"><div class="guidehead"><span class="gi" style="background:#FDE8E6">${C.kit}</span><h1>Apteczka</h1></div><p>${esc(APTECZKA.intro)}</p></div>
+  <a class="tile" style="flex-direction:row;align-items:center;margin:8px 0" href="#/moja-apteczka"><span class="ti t-green">${C.list}</span><b>Moja apteczka: wpisz swoje leki i terminy ważności</b></a>
+  ${guideBody("apteczka", APTECZKA)}
   <p class="muted small">Opracowanie własne EGIDA na podstawie wytycznych PRC/ERC. Ostatni przegląd: ${esc(APTECZKA.reviewed)}. Przy zagrożeniu życia dzwoń pod 112.</p>`;
+}
+function screenGuide(key, data, title, icon, purple) {
+  const extra = key === "bezpradu" ? `<div class="grid2" style="margin-top:12px"><a class="btn" href="tel:991">${I.phone}991 – awarie prądu</a><a class="btn112" style="justify-content:center;min-height:52px" href="tel:112">${I.phone}Zadzwoń 112</a></div>` : "";
+  return `${back("#/poradnik", "Poradnik")}<div class="hero"><div class="guidehead"><span class="gi ${purple ? "purple" : ""}">${icon}</span><h1>${esc(title)}</h1></div><p>${esc(data.intro)}</p></div>
+  ${guideBody(key, data)}${extra}${reviewLine(data)}`;
+}
+/* Moja apteczka: własna lista leków i środków z terminami ważności (tylko w urządzeniu, bez powiadomień push – przypomnienie na Pulpicie) */
+const KIT_QUICK = ["Plastry", "Gaza jałowa", "Bandaż elastyczny", "Środek odkażający", "Paracetamol", "Ibuprofen", "Węgiel aktywny", "Opatrunek hemostatyczny"];
+let kitFill = "";
+function screenMojaApteczka() {
+  const list = kitSorted(state.myKit);
+  const rows = list.map((x) => {
+    const st = kitStatus(x), lbl = { expired: "Po terminie", soon: "Kończy się termin", ok: "Ważne", none: "Bez terminu" }[st];
+    const d = kitDays(x.expires);
+    return `<div class="kitrow"><div class="kmain"><span class="kst ${st}">${lbl}</span><b>${esc(x.name)}</b><span class="kmeta">${x.expires ? `${esc(plDate(x.expires))} · ${esc(kitWhen({ days: d }))}` : "Nie wpisano terminu"}${x.note ? ` · ${esc(x.note)}` : ""}</span></div><button type="button" class="kdel" data-kitdel="${esc(x.id)}" aria-label="Usuń ${esc(x.name)}">Usuń</button></div>`;
+  }).join("");
+  const quick = KIT_QUICK.map((q) => `<button type="button" class="chip" data-kitfill="${esc(q)}">${esc(q)}</button>`).join("");
+  const full = state.myKit.length >= KIT_LIMIT;
+  return `${back("#/poradnik", "Poradnik")}<div class="hero"><div class="guidehead"><span class="gi" style="background:#E1F2EC">${C.list}</span><h1>Moja apteczka</h1></div><p>Wpisz leki i opatrunki, które masz w domu, razem z datą ważności. Gdy termin się zbliża, zobaczysz przypomnienie na Pulpicie. To nie jest powiadomienie push, więc zajrzyj do aplikacji od czasu do czasu.</p></div>
+  ${kitDueHtml()}
+  <div class="card"><h2>Dodaj pozycję</h2>
+  <div class="chips" role="group" aria-label="Szybkie podpowiedzi">${quick}</div>
+  <form id="kitForm" class="kitform" autocomplete="off">
+  <div><label for="kitName">Nazwa</label><input type="text" id="kitName" maxlength="60" required placeholder="np. Paracetamol 500 mg" value="${esc(kitFill)}"></div>
+  <div><label for="kitDate">Termin ważności (z opakowania)</label><input type="date" id="kitDate"></div>
+  <div><label for="kitNote">Notatka (niepotrzebne)</label><input type="text" id="kitNote" maxlength="120" placeholder="np. szuflada w kuchni"></div>
+  <button class="btn primary" type="submit" ${full ? "disabled" : ""}>Dodaj do apteczki</button>${full ? `<p class="small">Osiągnięto limit ${KIT_LIMIT} pozycji.</p>` : ""}</form></div>
+  <h3 class="grp">Twoja lista (${list.length})</h3>
+  ${list.length ? `<div class="card flat">${rows}</div>` : `<div class="card"><p class="muted">Lista jest pusta. Dodaj pierwszą pozycję powyżej.</p></div>`}
+  <a class="tile" style="flex-direction:row;align-items:center;margin-top:12px" href="#/apteczka"><span class="ti t-red">${C.kit}</span><b>Co powinno być w apteczce</b></a>
+  <p class="muted small">Dane zostają tylko w tym urządzeniu. Zapiszesz je w kopii danych (Ustawienia → Twoje dane). To nie jest porada medyczna: lek po terminie wyrzuć lub oddaj do apteki.</p>`;
 }
 function screenCoRobic(id) {
   const x = WHAT_TO_DO.items.find((i) => i.id === id);
@@ -605,13 +727,14 @@ function startMetro() {
   };
   metro = m; tick();
 }
-function screenPierwszaPomoc() {
+function screenPierwszaPomoc(openId) {
   const R = FIRST_AID.rko;
   const steps = R.steps.map((s, i) => `<li style="display:flex;gap:12px;margin:.8rem 0"><span class="dot done" style="flex:none">${i + 1}</span><span><b>${esc(s.t)}</b><br>${esc(s.d)}</span></li>`).join("");
-  const acc = (o) => `<details class="acc"><summary>${esc(o.t)}<span class="muted">${I.chev}</span></summary><div class="body"><ol>${o.steps.map((s) => `<li>${esc(s)}</li>`).join("")}</ol></div></details>`;
+  const AIC = { krwotok: C.drop, opaska: C.drop, "rana-klatki": C.drop, "rko-dziecko": C.heart, zawal: C.heart };
+  const acc = (o) => `<details class="acc${o.id === openId ? " hl" : ""}" id="fa-${esc(o.id)}" ${o.id === openId ? "open" : ""}><summary><span class="accl">${AIC[o.id] || ""}${esc(o.t)}</span><span class="muted">${I.chev}</span></summary><div class="body"><ol>${o.steps.map((s) => `<li>${esc(s)}</li>`).join("")}</ol></div></details>`;
   const others = groupBy(FIRST_AID.others, acc).map((o) => `<h3 class="grp">${esc(o.g)}</h3><div class="card flat">${o.list.join("")}</div>`).join("");
-  return `<div class="hero"><h1>Pierwsza pomoc</h1><p>Działa bez internetu.</p></div>
-  <section class="rko"><h2>Nie oddycha? Rozpocznij RKO</h2>
+  return `<div class="hero"><div class="guidehead"><span class="gi" style="background:#FDE8E6">${C.heart}</span><h1>Pierwsza pomoc</h1></div><p>Działa bez internetu.</p></div>
+  <section class="rko" id="fa-rko"><h2>Nie oddycha? Rozpocznij RKO</h2>
   <div class="row" style="margin:12px 0"><span class="pulse" id="pulse"></span><div><div class="bpm">~${R.bpm}<span style="font-size:1rem"> /min</span></div><div>uciśnięć na minutę</div><div id="phase" style="font-weight:800;letter-spacing:.04em;min-height:1.4em"></div></div></div>
   <button class="btn" id="metroBtn" aria-pressed="false">Włącz rytm</button><p class="small" style="margin:8px 0 0;opacity:.9">Dioda świeci, gdy uciskasz, i gaśnie, gdy puszczasz klatkę. Rytm 100/min (dopuszczalne 100–120) zostawia czas na pełne puszczenie. Brak dźwięku? Wyłącz tryb cichy i podgłośnij telefon. Wibracja nie działa na iPhonie.</p></section>
   <div class="card"><ol style="list-style:none;padding:0;margin:0">${steps}</ol>
@@ -688,10 +811,13 @@ function screenUstawienia() {
   <p class="muted small">Strona zlicza wyłącznie to, ile razy została otwarta: bez cookies, bez identyfikatorów i bez zapisywania adresu IP.</p>
   ${CONFIG.neptun?.enabled === false ? "" : `<label class="switch"><input type="checkbox" id="setNeptun" ${c.neptun ? "checked" : ""}><span><b>Obiekty znad Ukrainy na mapie (NEPTUN) <span class="badge unofficial">nieoficjalne · beta</span></b><span class="muted small">Domyślnie włączone. Na ekranie Mapa przeglądarka łączy się bezpośrednio z neptun.in.ua, a serwis widzi Twój adres IP. To nieoficjalne dane, mogą być spóźnione lub błędne. Wyłączysz to tutaj.</span></span></label>`}
   <p style="margin-top:6px"><a href="#/prywatnosc">Polityka prywatności</a></p></div>
+  <div class="card"><h2>Tryb seniora</h2><label class="switch"><input type="checkbox" id="setSenior" ${state.senior ? "checked" : ""}><span><b>Duże litery i prostszy Pulpit</b><span class="muted small">Większy tekst, na Pulpicie wielki przycisk 112 i tylko najważniejsze kafelki. Wszystkie funkcje zostają w zakładce Więcej.</span></span></label></div>
   <div class="card"><h2>Wygląd</h2><div class="grid2" style="margin-top:8px"><div class="field"><label for="setFs" class="muted small">Rozmiar tekstu</label><select class="sel" id="setFs">${opt("normal", state.fs, "Normalny")}${opt("large", state.fs, "Duży")}${opt("xlarge", state.fs, "Bardzo duży")}</select></div>
   <div class="field"><label for="setContrast" class="muted small">Kontrast</label><select class="sel" id="setContrast">${opt("normal", state.contrast, "Normalny")}${opt("high", state.contrast, "Wysoki")}</select></div></div></div>
-  <div class="card"><h2>Twoje dane</h2><p class="muted">Wszystko, co ustawisz, jest tylko w tym urządzeniu: województwo, plecak, plan rodziny, karty ICE, ważne miejsca.</p><div class="grid2"><button class="btn" id="exportData">Pobierz dane</button><button class="btn" id="wipeData">Usuń dane</button></div>
-  <button class="btn" id="importBtn" style="margin-top:12px">Wczytaj dane z pliku</button><input type="file" id="importFile" accept="application/json,.json" hidden><p id="importMsg" class="small" role="status" aria-live="polite"></p></div>
+  <div class="card"><h2>Twoje dane</h2><p class="muted">Wszystko, co ustawisz, jest tylko w tym urządzeniu: województwo, plecak, plan rodziny, karty ICE, ważne miejsca, Moja apteczka. Zrób kopię przed zmianą telefonu albo gdy czyścisz dane przeglądarki.</p>
+  <p class="small" id="backupInfo">${state.lastBackup ? `Ostatnia kopia: ${esc(plDate(state.lastBackup))}.` : "Nie zrobiono jeszcze kopii danych."}</p>
+  <div class="grid2"><button class="btn" id="exportData">${C.backup}Zapisz kopię</button><button class="btn" id="wipeData">Usuń dane</button></div>
+  <button class="btn" id="importBtn" style="margin-top:12px">Wczytaj kopię z pliku</button><input type="file" id="importFile" accept="application/json,.json" hidden><p id="importMsg" class="small" role="status" aria-live="polite"></p></div>
   ${offlineCardHtml()}
   ${installHtml(false)}
   <div class="card"><h2>Aplikacja</h2><p class="muted small">Jeśli widzisz starą wersję albo coś się nie odświeża, dotknij poniższego przycisku. Wyczyści pamięć podręczną aplikacji i wczyta najnowszą wersję (Twoje dane zostają).</p><button class="btn" id="refreshApp">Odśwież aplikację</button></div>
@@ -727,7 +853,10 @@ function render() {
     case "prywatnosc": inner = renderPrivacy(geoCtx); break;
     case "poradnik": inner = screenPoradnik(); break;
     case "co-robic": inner = screenCoRobic(arg); break;
-    case "pierwsza-pomoc": inner = screenPierwszaPomoc(); break;
+    case "pierwsza-pomoc": inner = screenPierwszaPomoc(arg); break;
+    case "bez-pradu": inner = screenGuide("bezpradu", BEZPRADU, "Bez prądu", C.bolt, false); break;
+    case "hybrydowe": inner = screenGuide("hybrydowe", HYBRYDOWE, "Zagrożenia hybrydowe", C.hybrid, true); break;
+    case "moja-apteczka": inner = screenMojaApteczka(); break;
     case "apteczka": inner = screenApteczka(); break;
     case "plecak": inner = screenPlecak(); break;
     case "test": inner = arg === "wynik" ? screenWynik() : screenTest(); break;
@@ -744,9 +873,10 @@ function render() {
   else if (route === "zagrozenie") initEmergency(geoCtx);
   else if (route === "miejsca") initPlaces(geoCtx);
   else if (route === "ustawienia") showSwVersion();
-  const titles = { wazne: "Wiadomości", pulpit: "Pulpit", alerty: "Alerty", mapa: "Mapa zagrożeń", poradnik: "Poradnik", plecak: "Plecak", "pierwsza-pomoc": "Pierwsza pomoc", test: "Test gotowości", ustawienia: "Ustawienia", zrodla: "Źródła", telegram: "Powiadomienia Telegram", schrony: "Pomoc w pobliżu", "plan-rodziny": "Plan rodziny", zagrozenie: "Tryb zagrożenia", miejsca: "Ważne miejsca", prywatnosc: "Polityka prywatności", wiecej: "Więcej" };
+  const titles = { wazne: "Wiadomości", pulpit: "Pulpit", alerty: "Alerty", mapa: "Mapa zagrożeń", poradnik: "Poradnik", plecak: "Plecak", "pierwsza-pomoc": "Pierwsza pomoc", "bez-pradu": "Bez prądu", hybrydowe: "Zagrożenia hybrydowe", "moja-apteczka": "Moja apteczka", apteczka: "Apteczka", test: "Test gotowości", ustawienia: "Ustawienia", zrodla: "Źródła", telegram: "Powiadomienia Telegram", schrony: "Pomoc w pobliżu", "plan-rodziny": "Plan rodziny", zagrozenie: "Tryb zagrożenia", miejsca: "Ważne miejsca", prywatnosc: "Polityka prywatności", wiecej: "Więcej" };
   document.title = `EGIDA – ${titles[route] || "Pulpit"}`;
   window.scrollTo(0, 0); { const sh = document.querySelector(".shell"); if (sh) sh.scrollTop = 0; }
+  if (route === "pierwsza-pomoc" && arg) { const el = document.getElementById("fa-" + arg); if (el) requestAnimationFrame(() => el.scrollIntoView({ block: "start" })); }
 }
 
 /* ---------- GPS -> województwo (uproszczone granice PRG/GUGiK, bez wysyłania pozycji) ---------- */
@@ -821,6 +951,7 @@ document.addEventListener("change", (e) => {
   else if (t.id === "setGps") { state.consent.gps = t.checked; save(); }
   else if (t.id === "importFile") importFromFile(t);
   else if (t.id === "setNeptun") { state.consent.neptun = t.checked; if (state.map?.layers) state.map.layers.neptun = t.checked; save(); }
+  else if (t.id === "setSenior") { state.senior = t.checked; save(); applyPrefs(); render(); }
   else if (t.id === "setFs") { state.fs = t.value; save(); applyPrefs(); }
   else if (t.id === "setContrast") { state.contrast = t.value; save(); applyPrefs(); }
   else if (t.dataset.check) { state.checked[t.dataset.check] = t.checked; save(); render(); const el = document.querySelector(`[data-check="${t.dataset.check}"]`); el?.focus(); }
@@ -836,12 +967,32 @@ async function importFromFile(input) {
     if (f.size > 2e6) throw new Error("Plik jest za duży jak na kopię danych EGIDY.");
     const res = importState(JSON.parse(await f.text()), { validRegions: VOIVODESHIPS.map((v) => v.id) });
     if (!res.ok) { msg.style.color = "var(--danger-ink)"; msg.textContent = res.error; return; }
-    if (!confirm("Wczytać dane z pliku? Zastąpią one odpowiadające im dane w tej aplikacji (ustawienia, plan rodziny, miejsca).")) return;
-    Object.assign(state, res.state); state.plan = normalizePlan(state.plan); state.places = normalizePlaces(state.places);
+    if (!confirm("Wczytać kopię z pliku? Zastąpi ona odpowiadające jej dane w tej aplikacji (ustawienia, plan rodziny, miejsca, Moja apteczka).")) return;
+    Object.assign(state, res.state); state.plan = normalizePlan(state.plan); state.places = normalizePlaces(state.places); state.myKit = normalizeKit(state.myKit);
     save(); applyPrefs(); render();
     const m2 = $("#importMsg"); if (m2) { m2.style.color = ""; m2.textContent = "Dane wczytane."; }
-  } catch (err) { msg.style.color = "var(--danger-ink)"; msg.textContent = err?.message && !/JSON/i.test(err.message) ? err.message : "Nie udało się odczytać pliku. Wybierz plik pobrany wcześniej przyciskiem „Pobierz dane”."; }
+  } catch (err) { msg.style.color = "var(--danger-ink)"; msg.textContent = err?.message && !/JSON/i.test(err.message) ? err.message : "Nie udało się odczytać pliku. Wybierz plik zapisany wcześniej przyciskiem „Zapisz kopię”."; }
 }
+/* Kopia danych: na telefonie otwiera się menu udostępniania (Zapisz w Plikach, AirDrop, e-mail), na komputerze plik trafia do Pobranych. */
+async function exportBackup(btn) {
+  const name = `egida-kopia-${todayYmd()}.json`, text = JSON.stringify(exportState(state), null, 2);
+  const info = () => { state.lastBackup = todayYmd(); save(); const el = document.getElementById("backupInfo"); if (el) el.textContent = `Ostatnia kopia: ${plDate(state.lastBackup)}.`; };
+  try {
+    const f = new File([text], name, { type: "application/json" });
+    if (navigator.canShare?.({ files: [f] })) { await navigator.share({ files: [f], title: "Kopia danych EGIDA" }); info(); return; }
+  } catch (err) { if (err?.name === "AbortError") return; /* inna usterka: pobierz zwykłym plikiem */ }
+  const url = URL.createObjectURL(new Blob([text], { type: "application/json" }));
+  const a = document.createElement("a"); a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000);
+  info();
+}
+document.addEventListener("submit", (e) => {
+  if (e.target.id !== "kitForm") return;
+  e.preventDefault();
+  const name = document.getElementById("kitName")?.value || "", date = document.getElementById("kitDate")?.value || "", note = document.getElementById("kitNote")?.value || "";
+  if (!name.trim() || state.myKit.length >= KIT_LIMIT) return;
+  state.myKit = normalizeKit([...state.myKit, { name, expires: date, note }]);
+  kitFill = ""; save(); render();
+});
 document.addEventListener("click", (e) => {
   const b = e.target.closest("button"); if (!b) return;
   if (b.id === "installBtn" && installEvt) { const ev = installEvt; installEvt = null; try { ev.prompt(); } catch { /* */ } render(); return; }
@@ -862,7 +1013,10 @@ document.addEventListener("click", (e) => {
   else if (b.id === "printPack") printSheet("Plecak i zapasy", packPrintHtml(state, esc));
   else if (b.id === "importBtn") $("#importFile")?.click();
   else if (b.id === "refreshApp") { b.disabled = true; b.textContent = "Odświeżam…"; refreshApp(); }
-  else if (b.dataset.apttab) { apteczkaTab = b.dataset.apttab; render(); }
+  else if (b.dataset.gtab) { const [k, id] = b.dataset.gtab.split(":"); if (k in guideTabs) { guideTabs[k] = id; softRender(); } }
+  else if (b.dataset.kitfill) { kitFill = b.dataset.kitfill; render(); document.getElementById("kitDate")?.focus(); }
+  else if (b.dataset.kitdel) { const x = state.myKit.find((k) => k.id === b.dataset.kitdel); if (x && confirm(`Usunąć „${x.name}” z apteczki?`)) { state.myKit = state.myKit.filter((k) => k.id !== x.id); save(); softRender(); } }
+  else if (b.id === "updNow") { b.disabled = true; location.reload(); }
   else if (b.dataset.newsscope) { newsScope = b.dataset.newsscope; render(); }
   else if (b.dataset.newsgo) { newsScope = b.dataset.newsgo; location.hash = "#/wazne"; render(); }
   else if (b.dataset.filter) { alertFilter = b.dataset.filter; render(); }
@@ -874,9 +1028,7 @@ document.addEventListener("click", (e) => {
   } else if (b.id === "testDone") {
     const score = READINESS_QUESTIONS.filter((q) => testAnswers[q.id]).length;
     state.test = { answers: { ...testAnswers }, score, at: new Date().toISOString() }; save(); location.hash = "#/test/wynik";
-  } else if (b.id === "exportData") {
-    const url = URL.createObjectURL(new Blob([JSON.stringify(state, null, 2)], { type: "application/json" }));
-    const a = document.createElement("a"); a.href = url; a.download = "egida-moje-dane.json"; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
+  } else if (b.id === "exportData") { exportBackup(b);
   } else if (b.id === "wipeData") {
     if (confirm("Usunąć wszystkie dane zapisane w tej aplikacji na tym urządzeniu?")) { try { localStorage.removeItem(KEY); } catch { /* */ } state = defaults(); testAnswers = {}; applyPrefs(); location.hash = ""; render(); }
   }
@@ -888,6 +1040,7 @@ applyPrefs(); applyCounter();
 testAnswers = { ...(state.test?.answers || {}) };
 render();
 loadNews().then(() => { if (state.onboarded && ["pulpit", "wazne", ""].includes(parse().route) && !document.activeElement?.closest?.("select,input,textarea")) render(); });
+loadAir().then(() => { if (state.onboarded && ["pulpit", ""].includes(parse().route) && !editingNow()) render(); });
 loadAlerts().then(() => { if (state.onboarded && ["pulpit", "alerty", "ustawienia", "telegram", ""].includes(parse().route) && !document.activeElement?.closest?.("select,input,textarea")) render(); });
 
 /* ---------- odświeżanie na żywo ----------
@@ -917,9 +1070,16 @@ async function refreshLive(kinds, { force = false } = {}) {
 }
 setInterval(() => { if (Date.now() - liveLast.alerts >= LIVE_ALERT_MS - 1000) refreshLive(["alerts"]); }, 10 * 1000);
 setInterval(() => { if (Date.now() - liveLast.news >= LIVE_NEWS_MS - 1000) refreshLive(["news"]); }, 20 * 1000);
-const resumeLive = () => { if (document.hidden) return; const gap = Date.now() - Math.max(liveLast.alerts, liveLast.news); if (gap >= LIVE_MIN_GAP) refreshLive(["alerts", "news"], { force: true }); };
+const resumeLive = () => { if (document.hidden) return;
+  if (Date.now() - airAt > 15 * 60 * 1000) loadAir().then(() => { if (state.onboarded && parse().route === "pulpit" && !editingNow()) softRender(); });
+  try { navigator.serviceWorker?.getRegistration?.().then((r) => r?.update?.()).catch(() => {}); } catch { /* */ } const gap = Date.now() - Math.max(liveLast.alerts, liveLast.news); if (gap >= LIVE_MIN_GAP) refreshLive(["alerts", "news"], { force: true }); };
 document.addEventListener("visibilitychange", resumeLive);
 window.addEventListener("pageshow", resumeLive);
 window.addEventListener("focus", resumeLive);
 window.addEventListener("online", () => refreshLive(["alerts", "news"], { force: true }));
-if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
+if ("serviceWorker" in navigator) {
+  // Nowa wersja przejmuje stronę sama (skipWaiting + claim). Jeśli aplikacja już działała pod starą wersją, pokaż baner z przyciskiem „Odśwież”.
+  const hadController = !!navigator.serviceWorker.controller;
+  navigator.serviceWorker.addEventListener("controllerchange", () => { if (hadController && !updateReady) { updateReady = true; if (state.onboarded && !editingNow()) softRender(); } });
+  navigator.serviceWorker.register("sw.js").catch(() => {});
+}

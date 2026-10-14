@@ -74,6 +74,12 @@ if [ -n "$NEWS_MODE" ]; then
     [ "$NEWS_CUR" != "$NEWS_OLD" ] && NEWS_NEW=1
   fi
 fi
+# Co ~60 min indeks jakości powietrza ze stacji GIOŚ → air.json (kilkaset krótkich zapytań z odstępami). Błąd nie blokuje komunikatów: zostaje poprzedni plik.
+AIR_FILE="$DATA_DIR/air.json"; AIR_NEW=0
+if [ ! -f "$BASE/air.checked" ] || [ "$(( $(date +%s) - $(stat -c %Y "$BASE/air.checked") ))" -gt 3300 ]; then
+  touch "$BASE/air.checked"
+  if AIR_OUT="$AIR_FILE" timeout 150 node air-sync.mjs 2>&1 | tail -n 6; then AIR_NEW=1; else echo "air-sync nieudany – zostaje poprzedni plik"; fi
+fi
 # Skumulowany raport NEPTUN dołącza do zwykłych publikacji (co najmniej raz na 25 min). Sam nie wymusza publikacji, bo zmienia się co 10 s.
 [ -f "$NEPTUN_SEEN" ] && cp "$NEPTUN_SEEN" "$DATA_DIR/neptun-seen.json"
 # Licznik kolejnych porażek: po 3 z rzędu (≈15 min) wysyłamy wiadomość administratorowi (jeśli ustawiono ADMIN_CHAT_ID).
@@ -93,7 +99,7 @@ NEW="$(node -e 'const j=JSON.parse(require("fs").readFileSync(process.env.ALERTS
 OLD="$(cat "$BASE/last.hash" 2>/dev/null || true)"
 AGE=99999
 [ -f "$BASE/last.push" ] && AGE=$(( ( $(date +%s) - $(stat -c %Y "$BASE/last.push") ) / 60 ))
-if [ "$NEW" != "$OLD" ] || [ "$AGE" -ge 25 ] || [ "$SH_NEW" = 1 ] || [ "$PSP_NEW" = 1 ] || [ "$NP_NEW" = 1 ] || [ "$NEWS_NEW" = 1 ] || [ "$RJ_NEW" = 1 ]; then
+if [ "$NEW" != "$OLD" ] || [ "$AGE" -ge 25 ] || [ "$SH_NEW" = 1 ] || [ "$PSP_NEW" = 1 ] || [ "$NP_NEW" = 1 ] || [ "$NEWS_NEW" = 1 ] || [ "$RJ_NEW" = 1 ] || [ "$AIR_NEW" = 1 ]; then
   if bash "$SERVER_DIR/publish.sh"; then echo "$NEW" > "$BASE/last.hash"; touch "$BASE/last.push"; echo "opublikowano"; ok; else echo "publikacja nieudana"; fail; exit 1; fi
 else
   echo "bez zmian (ostatnia publikacja ${AGE} min temu)"; ok

@@ -92,7 +92,44 @@ export function normalizePlaces(raw) {
   }));
 }
 
-/* ---------- import kopii zapasowej (plik z „Pobierz dane”) ---------- */
+/* ---------- własna apteczka: leki i środki z terminem ważności (tylko w urządzeniu) ---------- */
+export const KIT_LIMIT = 60;
+export const KIT_WARN_DAYS = 30; // „kończy się termin” od tylu dni przed datą
+const ymd = (v) => { const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(v ?? "")); if (!m) return ""; const d = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3])); return d.getUTCFullYear() === +m[1] && d.getUTCMonth() === +m[2] - 1 && d.getUTCDate() === +m[3] ? m[0] : ""; };
+/** Czyści listę z pamięci lub z importu. expires = RRRR-MM-DD albo "" (brak terminu). */
+export function normalizeKit(raw) {
+  return (Array.isArray(raw) ? raw : []).filter((x) => x && typeof x === "object" && clean(x.name, 60)).slice(0, KIT_LIMIT).map((x) => ({
+    id: clean(x.id, 60) || newId(), name: clean(x.name, 60), expires: ymd(x.expires), qty: clean(x.qty, 20), note: clean(x.note, 120),
+  }));
+}
+/** Dzień w formacie RRRR-MM-DD z daty lokalnej. */
+export const todayYmd = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+/** Ile dni do terminu (ujemne = po terminie); null gdy brak daty. */
+export function kitDays(expires, today = todayYmd()) {
+  if (!ymd(expires) || !ymd(today)) return null;
+  const a = Date.parse(expires + "T00:00:00Z"), b = Date.parse(today + "T00:00:00Z");
+  return Math.round((a - b) / 86400000);
+}
+/** "expired" (po terminie) | "soon" (do 30 dni) | "ok" | "none" (bez terminu). */
+export function kitStatus(item, today = todayYmd()) {
+  const d = kitDays(item?.expires, today);
+  if (d == null) return "none";
+  return d < 0 ? "expired" : d <= KIT_WARN_DAYS ? "soon" : "ok";
+}
+/** Pozycje wymagające uwagi (po terminie lub kończące się), najpierw najpilniejsze. */
+export function kitDue(list, today = todayYmd()) {
+  return normalizeKit(list).map((x) => ({ ...x, st: kitStatus(x, today), days: kitDays(x.expires, today) })).filter((x) => x.st === "expired" || x.st === "soon").sort((a, b) => a.days - b.days);
+}
+/** Sortowanie: po terminie, potem według daty, na końcu bez terminu. */
+export const kitSorted = (list) => normalizeKit(list).slice().sort((a, b) => (a.expires || "9999") < (b.expires || "9999") ? -1 : (a.expires || "9999") > (b.expires || "9999") ? 1 : a.name.localeCompare(b.name, "pl"));
+/** Treść pliku kopii: tylko dane użytkownika (bez pamięci podręcznej i znaczników technicznych). */
+export function exportState(state, now = new Date()) {
+  const keys = ["onboarded", "consent", "region", "shelters", "checked", "plan", "places", "test", "fs", "contrast", "map", "myKit", "senior"];
+  const data = {}; for (const k of keys) if (k in state) data[k] = state[k];
+  return { egida: 1, exportedAt: now.toISOString(), ...data };
+}
+
+/* ---------- import kopii zapasowej (plik z „Zapisz kopię”) ---------- */
 const bool = (v) => v === true;
 /**
  * Zamienia wczytany JSON na bezpieczny stan aplikacji. Nieznane pola są odrzucane.
@@ -100,7 +137,7 @@ const bool = (v) => v === true;
  */
 export function importState(raw, { validRegions = [] } = {}) {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return { ok: false, error: "To nie wygląda na plik z danymi EGIDY." };
-  const known = ["onboarded", "consent", "region", "shelters", "checked", "plan", "places", "test", "fs", "contrast", "map"];
+  const known = ["onboarded", "consent", "region", "shelters", "checked", "plan", "places", "test", "fs", "contrast", "map", "myKit", "senior"];
   if (!known.some((k) => k in raw)) return { ok: false, error: "W pliku nie ma żadnych danych EGIDY." };
   const out = {};
   if ("consent" in raw && raw.consent && typeof raw.consent === "object") out.consent = { gps: bool(raw.consent.gps), counter: bool(raw.consent.counter), ack: bool(raw.consent.ack), neptun: bool(raw.consent.neptun) };
@@ -110,6 +147,8 @@ export function importState(raw, { validRegions = [] } = {}) {
   if ("plan" in raw) out.plan = normalizePlan(raw.plan);
   if ("places" in raw) out.places = normalizePlaces(raw.places);
   if (raw.test && typeof raw.test === "object" && num(raw.test.score) != null) out.test = { answers: Object.fromEntries(Object.entries(raw.test.answers && typeof raw.test.answers === "object" ? raw.test.answers : {}).filter(([k, v]) => /^[\w-]{1,40}$/.test(k) && typeof v === "boolean")), score: raw.test.score, at: clean(raw.test.at, 40) };
+  if ("myKit" in raw) out.myKit = normalizeKit(raw.myKit);
+  if (typeof raw.senior === "boolean") out.senior = raw.senior;
   if (["normal", "large", "xlarge"].includes(raw.fs)) out.fs = raw.fs;
   if (["normal", "high"].includes(raw.contrast)) out.contrast = raw.contrast;
   if (raw.map && typeof raw.map === "object") out.map = { base: ["map", "terrain", "sat"].includes(raw.map.base) ? raw.map.base : "map", layers: { shelters: raw.map.layers?.shelters !== false, neptun: false } };

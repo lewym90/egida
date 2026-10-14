@@ -377,3 +377,92 @@ input[type="search"].sel{-webkit-appearance:none;appearance:none;width:100%;font
 .badge.media{background:var(--note);color:var(--text-card);border:1px solid var(--line);padding:1px 8px;margin-right:2px}
 .goodtoknow .gall{display:flex;align-items:center;gap:6px;min-height:44px}
 h3.grp{margin:18px 2px 8px;font-family:var(--font-h);font-size:.95rem;color:var(--muted,#667);text-transform:uppercase;letter-spacing:.04em}
+
+/* ===== v39: kolorowe ikony, kafelek Pierwsza pomoc, przewodniki, własna apteczka, powietrze, baner, tryb seniora ===== */
+.ci{display:block;flex:none}
+.tile .ti{width:48px;height:48px;border-radius:15px}
+.tile .ti .ci{width:30px;height:30px}
+.tile .ti.t-purple{background:#EFE8FB}
+.tile .ti.t-green{background:#E1F2EC}
+.tile .ti.t-red{background:#FDE8E6}
+.tile .ti.t-blue{background:#E8EEFA}
+.tile .ti.t-amber{background:#FFF1D6}
+.morelist .mi{background:#F1F5F9;width:44px;height:44px}
+.morelist .mi .ci{width:28px;height:28px}
+.side a.nav .ci{width:24px;height:24px}
+.tabbar a[aria-current="page"]{background:var(--brand-tint)}
+.tabbar a[aria-current="page"] .ci{filter:none}
+:root[data-contrast="high"] .tabbar a[aria-current="page"]{background:#fff;box-shadow:inset 0 0 0 2px var(--brand)}
+/* Pierwsza pomoc: czerwony, duży kafelek przyciągający wzrok */
+.aidhero{background:linear-gradient(135deg,#C62B26,#A5201A);color:#fff;border-radius:var(--r-card);padding:16px;margin:12px 0;box-shadow:0 6px 16px rgba(165,32,26,.28)}
+.aidhero a{color:inherit;text-decoration:none}
+.aidmain{display:flex;align-items:center;gap:14px;min-height:64px}
+.aidmain .aidic{flex:none;width:58px;height:58px;border-radius:18px;background:#fff;display:grid;place-items:center}
+.aidmain .aidic .ci{width:38px;height:38px}
+.aidmain b{display:block;font-family:var(--font-h);font-weight:800;font-size:1.3rem;line-height:1.15}
+.aidmain span.aidsub{display:block;font-size:.9rem;opacity:.95;margin-top:2px}
+.aidmain>svg:last-child{margin-left:auto;flex:none}
+.aidq{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
+.aidq a{display:flex;align-items:center;justify-content:center;gap:8px;min-height:52px;border-radius:16px;background:#fff;color:#A5201A;font-family:var(--font-h);font-weight:800;font-size:1rem;padding:0 10px}
+.aidq a .ci{width:24px;height:24px}
+:root[data-contrast="high"] .aidhero{background:#8A1914}
+.acc.hl{outline:3px solid var(--danger);outline-offset:2px;border-radius:12px}
+/* Przewodniki (Bez prądu, Zagrożenia hybrydowe) */
+.guidehead{display:flex;gap:14px;align-items:center}
+.guidehead .gi{flex:none;width:52px;height:52px;border-radius:16px;display:grid;place-items:center;background:#FFF1D6}
+.guidehead .gi.purple{background:#EFE8FB}
+.guidehead .gi .ci{width:34px;height:34px}
+.guidehead h1{margin:0}
+/* Własna apteczka */
+.kitrow{display:flex;gap:12px;align-items:flex-start;padding:12px 16px;border-top:1px solid var(--line-in)}
+.kitrow:first-child{border-top:0}
+.kitrow .kmain{flex:1;min-width:0}
+.kitrow .kmain b{display:block;font-family:var(--font-h);overflow-wrap:anywhere}
+.kitrow .kmeta{font-size:.875rem;color:var(--muted)}
+.kitrow button.kdel{flex:none;min-height:44px;min-width:44px;border:1px solid var(--line);background:var(--card);border-radius:12px;font-weight:700;font-family:var(--font-h);color:var(--danger-ink);cursor:pointer}
+.kst{display:inline-block;font-family:var(--font-h);font-weight:800;font-size:.75rem;border-radius:999px;padding:2px 10px;margin-bottom:4px}
+.kst.expired{background:var(--danger-bg);color:var(--danger-ink)}
+.kst.soon{background:var(--warn-bg);color:var(--warn-ink)}
+.kst.ok{background:var(--brand-tint);color:var(--brand-ink)}
+.kst.none{background:var(--note);color:var(--muted)}
+.kitform{display:grid;gap:10px;margin-top:10px}
+.kitform input[type=text],.kitform input[type=date]{width:100%;min-height:48px;border:1px solid var(--line);border-radius:14px;padding:0 14px;font:inherit;background:#fff;color:var(--text)}
+.kitform label{font-size:.8125rem;color:var(--muted);display:block;margin-bottom:4px}
+.kitdue{border-radius:var(--r-card);padding:14px 16px;margin:12px 0;border:1px solid #f1d19b;background:var(--warn-bg);color:var(--warn-ink)}
+.kitdue.red{background:var(--danger-bg);border-color:#f4b8b3;color:var(--danger-ink)}
+.kitdue h2{color:inherit;font-size:1.05rem;margin:0 0 6px;display:flex;gap:8px;align-items:center}
+.kitdue ul{list-style:none;margin:0;padding:0}
+.kitdue li{padding:3px 0;overflow-wrap:anywhere}
+.kitdue a.gall{color:inherit}
+/* Jakość powietrza */
+.aircard{display:flex;gap:14px;align-items:flex-start;border-radius:var(--r-card);padding:14px 16px;margin:12px 0;border:1px solid var(--line);background:var(--card)}
+.aircard .aq{flex:none;width:52px;height:52px;border-radius:16px;display:grid;place-items:center;background:#E8EEFA}
+.aircard .aq .ci{width:34px;height:34px}
+.aircard h2{margin:0;font-size:1.05rem}
+.aircard .lvl{display:inline-block;font-family:var(--font-h);font-weight:800;border-radius:999px;padding:2px 12px;margin:4px 0;font-size:.9rem}
+.aircard .lvl.ok{background:var(--brand-tint);color:var(--brand-ink)}
+.aircard .lvl.warn{background:var(--warn-bg);color:var(--warn-ink)}
+.aircard .lvl.alert{background:var(--danger-bg);color:var(--danger-ink)}
+.aircard p{margin:2px 0 0}
+/* Baner nowej wersji (w treści strony, nie przesuwa dolnego paska) */
+.updbar{display:flex;align-items:center;gap:12px;background:#E8EEFA;border:1px solid #c5d3f3;color:#1f3a7a;border-radius:var(--r-card);padding:12px 14px;margin:10px 0}
+.updbar .ci{width:28px;height:28px}
+.updbar span.ut{flex:1;min-width:0;font-weight:700;font-family:var(--font-h);font-size:.95rem}
+.updbar button{flex:none;min-height:44px;border:0;border-radius:14px;background:#2A4DA0;color:#fff;font-family:var(--font-h);font-weight:800;padding:0 16px;cursor:pointer}
+/* Tryb seniora: większy tekst, uproszczony Pulpit, wielki przycisk 112 */
+:root[data-senior="1"]{--fs:20px}
+:root[data-senior="1"][data-fs="xlarge"]{--fs:22px}
+:root[data-senior="1"] .tabbar a{font-size:.6rem}
+.sen112{display:flex;align-items:center;justify-content:center;gap:12px;min-height:84px;border-radius:24px;background:var(--danger);color:#fff;text-decoration:none;font-family:var(--font-h);font-weight:800;font-size:1.9rem;margin:12px 0;box-shadow:0 6px 16px rgba(179,38,30,.3)}
+.sen112 svg{width:34px;height:34px}
+.sengrid{display:grid;gap:12px;margin:12px 0}
+.sengrid .tile{flex-direction:row;align-items:center;min-height:84px;gap:14px}
+.sengrid .tile b{font-size:1.15rem}
+.sengrid .tile .ti{width:56px;height:56px}
+.sengrid .tile .ti .ci{width:36px;height:36px}
+.seniorsw{display:flex;gap:12px;align-items:flex-start}
+.accl{display:flex;align-items:center;gap:8px}
+.accl .ci{width:22px;height:22px}
+.aptlist li.n{list-style:none;margin-left:-20px}
+.tile[style*="flex-direction:row"]{min-height:72px}
+:root[data-senior="1"] .shell[data-route="pulpit"] .fab112,:root[data-senior="1"] .tagline{display:none}
