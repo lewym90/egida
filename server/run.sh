@@ -90,13 +90,13 @@ if budget; then
   fi
 else echo "pomijam sondę NEPTUN (budżet czasu tego przebiegu) – zrobię przy następnym"; fi
 
-# Raz na dobę defibrylatory (AED) i szpitale z OpenStreetMap → aed.json, hospitals.json. Trwa kilka minut (16 zapytań z przerwami),
+# Raz na dobę defibrylatory (AED) najpierw, szpitale rzadziej (raz na tydzień, bo prawie się nie zmieniają) – osobne wywołania z własnymi limitami czasu, żeby wolne szpitale nie zabierały czasu AED. Dawniej: defibrylatory i szpitale z OpenStreetMap → aed.json, hospitals.json. Trwa kilka minut (16 zapytań z przerwami),
 # więc działa w tle i zwalnia blokadę – komunikaty nie czekają. Pliki trafią na gałąź data przy najbliższej publikacji (≤ 25 min).
 [ -f "$BASE/medical.log" ] && [ "$(stat -c %s "$BASE/medical.log")" -gt 1000000 ] && tail -n 300 "$BASE/medical.log" > "$BASE/medical.log.tmp" && mv "$BASE/medical.log.tmp" "$BASE/medical.log"
 MED_STAMP="$BASE/medical.v28.checked"
 if [ ! -f "$MED_STAMP" ] || [ "$(( $(date +%s) - $(stat -c %Y "$MED_STAMP") ))" -gt 86400 ]; then
   touch "$MED_STAMP"
-  ( export ADDR_CACHE="$BASE/addr-cache.json"; DATA_DIR="$DATA_DIR" flock "$BASE/medical.lock" timeout 1500 node medical-sync.mjs >> "$BASE/medical.log" 2>&1 || touch -d "-18 hours" "$MED_STAMP" ) 9>&- &
+  ( export ADDR_CACHE="$BASE/addr-cache.json"; DATA_DIR="$DATA_DIR" flock "$BASE/medical.lock" bash -c 'rc=0; timeout 2400 node medical-sync.mjs --only=aed || rc=1; if [ ! -f "$DATA_DIR/hospitals.json" ] || [ "$(( $(date +%s) - $(stat -c %Y "$DATA_DIR/hospitals.json") ))" -gt 604800 ]; then timeout 1200 node medical-sync.mjs --only=hospitals || rc=1; fi; exit $rc' >> "$BASE/medical.log" 2>&1 || touch -d "-18 hours" "$MED_STAMP" ) 9>&- &
 fi
 # Raz na dobę punkty wody pitnej z OpenStreetMap → water.json (osobny, lekki przebieg w tle, własna blokada i log /opt/egida/water.log, żeby nie czekać za adresami AED; po porażce ponowna próba za ok. 2 h).
 WATER_STAMP="$BASE/water.checked"

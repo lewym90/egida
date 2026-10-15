@@ -29,6 +29,7 @@ async function overpass(query, rounds = 3, ms = 120000) {
         if (!r.ok) { console.log(u.split("/")[2], "→ HTTP", r.status); continue; }
         const j = await r.json();
         if (!Array.isArray(j?.elements)) { console.log(u.split("/")[2], "→ nieoczekiwany format"); continue; }
+        if (/runtime error|timed out|out of memory|too busy/i.test(String(j.remark || ""))) { console.log(u.split("/")[2], "→ serwer przerwał zapytanie:", String(j.remark).slice(0, 80)); continue; } // 200 z pustą listą i uwagą o błędzie to nie „zero obiektów”
         return j;
       } catch (e) { console.log(u.split("/")[2], "→ błąd:", e.message); }
     }
