@@ -1,0 +1,1286 @@
+{
+ "generatedAt": "2026-10-17T21:40:10.275Z",
+ "note": "Raport o strukturze danych NEPTUN (neptun.in.ua). Próbki ucięte, tylko do diagnostyki formatu.",
+ "rest": [
+  {
+   "path": "threats",
+   "status": 200,
+   "ms": 205,
+   "contentType": "application/json",
+   "bytes": 10322,
+   "cors": "*",
+   "enums": {
+    "type": {
+     "fpv": 4,
+     "uav": 15
+    },
+    "status": {
+     "active": 19
+    },
+    "lifecycle": {
+     "uncertain": 14,
+     "tracking": 1,
+     "confirmed": 4
+    },
+    "positionQuality": {
+     "approx": 14,
+     "confirmed": 5
+    },
+    "confidenceLevel": {
+     "medium": 14,
+     "high": 5
+    },
+    "displayConfidence": {
+     "medium": 14,
+     "high": 5
+    }
+   },
+   "withTrail": [
+    {
+     "id": "trk_00276994",
+     "type": "uav",
+     "title": "БпЛА",
+     "region": "Чернігівська область",
+     "district": "",
+     "locality": "Карпівка",
+     "lat": 51.96836218043923,
+     "lon": 31.695911519280635,
+     "heading": 298.243,
+     "confidenceLevel": "medium",
+     "sourceCount": 1,
+     "updatedAt": "2026-10-17T21:38:23Z",
+     "explanationShort": "БпЛА курсом на Карпівка. Підтверджень: 1.",
+     "status": "active",
+     "confirmedAt": "2026-10-17T21:35:26Z",
+     "uncertaintyKm": 10,
+     "positionQuality": "approx",
+     "trail": [
+      {
+       "lat": 52.0303,
+       "lon": 31.39287,
+       "t": "2026-10-17T21:10:36Z"
+      },
+      {
+       "lat": 52.06960934210887,
+       "lon": 31.388064969871827,
+       "t": "2026-10-17T21:35:26Z"
+      }
+     ],
+     "lifecycle": "uncertain",
+     "displayConfidence": "medium",
+     "destination": true,
+     "presumptiveCourse": true
+    },
+    {
+     "id": "trk_00276997",
+     "type": "uav",
+     "title": "БпЛА",
+     "region": "Черкаська область",
+     "district": "",
+     "locality": "Корсунь-Шевченківський",
+     "lat": 49.40515340419728,
+     "lon": 31.256281118365624,
+     "heading": 347.2,
+     "confidenceLevel": "high",
+     "sourceCount": 6,
+     "updatedAt": "2026-10-17T21:34:10Z",
+     "explanationShort": "БпЛА — Корсунь-Шевченківський, Черкаська область. Підтверджень: 6.",
+     "status": "active",
+     "velocity": {
+      "bearingDeg": 347.2,
+      "speedKmh": 137.2
+     },
+     "confirmedAt": "2026-10-17T21:34:10Z",
+     "uncertaintyKm": 4,
+     "positionQuality": "confirmed",
+     "trail": [
+      {
+       "lat": 49.01291,
+       "lon": 31.3926,
+       "t": "2026-10-17T21:10:30Z"
+      },
+      {
+       "lat": 49.40515340419728,
+       "lon": 31.256281118365624,
+       "t": "2026-10-17T21:32:53Z"
+      }
+     ],
+     "lifecycle": "tracking",
+     "displayConfidence": "high"
+    }
+   ],
+   "withCount": [
+    {
+     "id": "trk_00276960",
+     "type": "fpv",
+     "title": "FPV-дрон",
+     "region": "Харківська область",
+     "district": "",
+     "locality": "Савинці",
+     "lat": 49.407,
+     "lon": 37.082,
+     "heading": null,
+     "confidenceLevel": "medium",
+     "sourceCount": 9,
+     "count": 2,
+     "updatedAt": "2026-10-17T20:53:45Z",
+     "explanationShort": "FPV-дрон курсом на Савинці. Підтверджень: 9.",
+     "status": "active",
+     "confirmedAt": "2026-10-17T21:34:10Z",
+     "uncertaintyKm": 10,
+     "positionQuality": "approx",
+     "lifecycle": "uncertain",
+     "displayConfidence": "medium",
+     "destination": true
+    },
+    {
+     "id": "trk_00276996",
+     "type": "uav",
+     "title": "БпЛА",
+     "region": "Чернігівська область",
+     "district": "",
+     "locality": "Любеч",
+     "lat": 51.791767206597335,
+     "lon": 31.213782538737764,
+     "heading": 255.441,
+     "confidenceLevel": "medium",
+     "sourceCount": 5,
+     "count": 2,
+     "updatedAt": "2026-10-17T21:34:10Z",
+     "explanationShort": "БпЛА курсом на Любеч. Підтверджень: 5.",
+     "status": "active",
+     "confirmedAt": "2026-10-17T21:34:10Z",
+     "uncertaintyKm": 4,
+     "positionQuality": "approx",
+     "lifecycle": "uncertain",
+     "displayConfidence": "medium",
+     "destination": true,
+     "presumptiveCourse": true
+    }
+   ],
+   "areaOnly": [],
+   "stale": [],
+   "topLevel": [
+    "epoch",
+    "seq",
+    "serverTime",
+    "threats"
+   ],
+   "shape": {
+    "type": "object",
+    "fields": {
+     "epoch": {
+      "type": "string"
+     },
+     "seq": {
+      "type": "number"
+     },
+     "serverTime": {
+      "type": "string"
+     },
+     "threats": {
+      "type": "array",
+      "length": 19,
+      "item": {
+       "type": "object",
+       "fields": {
+        "id": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "19/19"
+        },
+        "type": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "19/19"
+        },
+        "title": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "19/19"
+        },
+        "region": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "19/19"
+        },
+        "district": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "19/19"
+        },
+        "locality": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "19/19"
+        },
+        "lat": {
+         "types": [
+          "number"
+         ],
+         "presentIn": "19/19"
+        },
+        "lon": {
+         "types": [
+          "number"
+         ],
+         "presentIn": "19/19"
+        },
+        "heading": {
+         "types": [
+          "null",
+          "number"
+         ],
+         "presentIn": "19/19"
+        },
+        "confidenceLevel": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "19/19"
+        },
+        "sourceCount": {
+         "types": [
+          "number"
+         ],
+         "presentIn": "19/19"
+        },
+        "updatedAt": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "19/19"
+        },
+        "explanationShort": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "19/19"
+        },
+        "status": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "19/19"
+        },
+        "uncertaintyKm": {
+         "types": [
+          "number"
+         ],
+         "presentIn": "19/19"
+        },
+        "positionQuality": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "19/19"
+        },
+        "lifecycle": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "19/19"
+        },
+        "displayConfidence": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "19/19"
+        },
+        "destination": {
+         "types": [
+          "boolean"
+         ],
+         "presentIn": "14/19"
+        },
+        "count": {
+         "types": [
+          "number"
+         ],
+         "presentIn": "2/19"
+        },
+        "confirmedAt": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "17/19"
+        },
+        "presumptiveCourse": {
+         "types": [
+          "boolean"
+         ],
+         "presentIn": "9/19"
+        },
+        "trail": {
+         "types": [
+          "array"
+         ],
+         "presentIn": "4/19",
+         "nested": {
+          "type": "array",
+          "length": 2,
+          "item": {
+           "types": [
+            "object"
+           ]
+          }
+         }
+        },
+        "velocity": {
+         "types": [
+          "object"
+         ],
+         "presentIn": "1/19",
+         "nested": {
+          "type": "object",
+          "fields": {
+           "bearingDeg": {
+            "type": "number"
+           },
+           "speedKmh": {
+            "type": "number"
+           }
+          }
+         }
+        }
+       }
+      }
+     }
+    }
+   },
+   "samples": [
+    {
+     "id": "trk_00276954",
+     "type": "fpv",
+     "title": "FPV-дрон",
+     "region": "Харківська область",
+     "district": "",
+     "locality": "Старовірівка",
+     "lat": 49.68872,
+     "lon": 37.42775,
+     "heading": null,
+     "confidenceLevel": "medium",
+     "sourceCount": 1,
+     "updatedAt": "2026-10-17T21:38:07Z",
+     "explanationShort": "FPV-дрон курсом на Старовірівка. Підтверджень: 1.",
+     "status": "active",
+     "uncertaintyKm": 25,
+     "positionQuality": "approx",
+     "lifecycle": "uncertain",
+     "displayConfidence": "medium",
+     "destination": true
+    },
+    {
+     "id": "trk_00276960",
+     "type": "fpv",
+     "title": "FPV-дрон",
+     "region": "Харківська область",
+     "district": "",
+     "locality": "Савинці",
+     "lat": 49.407,
+     "lon": 37.082,
+     "heading": null,
+     "confidenceLevel": "medium",
+     "sourceCount": 9,
+     "count": 2,
+     "updatedAt": "2026-10-17T20:53:45Z",
+     "explanationShort": "FPV-дрон курсом на Савинці. Підтверджень: 9.",
+     "status": "active",
+     "confirmedAt": "2026-10-17T21:34:10Z",
+     "uncertaintyKm": 10,
+     "positionQuality": "approx",
+     "lifecycle": "uncertain",
+     "displayConfidence": "medium",
+     "destination": true
+    },
+    {
+     "id": "trk_00276976",
+     "type": "uav",
+     "title": "БпЛА",
+     "region": "Чернігівська область",
+     "district": "",
+     "locality": "Мощенка",
+     "lat": 51.9945556540316,
+     "lon": 31.782968553126317,
+     "heading": 323.071,
+     "confidenceLevel": "medium",
+     "sourceCount": 1,
+     "updatedAt": "2026-10-17T21:38:12Z",
+     "explanationShort": "БпЛА курсом на Мощенка. Підтверджень: 1.",
+     "status": "active",
+     "confirmedAt": "2026-10-17T21:38:12Z",
+     "uncertaintyKm": 10,
+     "positionQuality": "approx",
+     "lifecycle": "uncertain",
+     "displayConfidence": "medium",
+     "destination": true,
+     "presumptiveCourse": true
+    }
+   ],
+   "scalarFields": {
+    "epoch": "rt-14f9c6ae",
+    "seq": 4989,
+    "serverTime": "2026-10-17T21:40:01.687Z"
+   }
+  },
+  {
+   "path": "alerts",
+   "status": 200,
+   "ms": 60,
+   "contentType": "application/json",
+   "bytes": 5880,
+   "cors": "*",
+   "topLevel": [
+    "version",
+    "updatedAt",
+    "raions",
+    "oblasts"
+   ],
+   "shape": {
+    "type": "object",
+    "fields": {
+     "version": {
+      "type": "number"
+     },
+     "updatedAt": {
+      "type": "string"
+     },
+     "raions": {
+      "type": "array",
+      "length": 30,
+      "item": {
+       "type": "object",
+       "fields": {
+        "key": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "30/30"
+        },
+        "name": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "30/30"
+        },
+        "oblast": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "30/30"
+        },
+        "since": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "30/30"
+        },
+        "level": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "30/30"
+        },
+        "reasons": {
+         "types": [
+          "array"
+         ],
+         "presentIn": "29/30",
+         "nested": {
+          "type": "array",
+          "length": 1,
+          "item": {
+           "types": [
+            "string"
+           ]
+          }
+         }
+        }
+       }
+      }
+     },
+     "oblasts": {
+      "type": "array",
+      "length": 3,
+      "item": {
+       "type": "object",
+       "fields": {
+        "key": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "3/3"
+        },
+        "name": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "3/3"
+        },
+        "oblast": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "3/3"
+        },
+        "since": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "3/3"
+        },
+        "level": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "3/3"
+        }
+       }
+      }
+     }
+    }
+   },
+   "samples": [
+    {
+     "key": "бахмутський",
+     "name": "Бахмутський район",
+     "oblast": "Донецька область",
+     "since": "2026-10-17T16:59:28.683677Z",
+     "level": "red",
+     "reasons": [
+      "Ракетна загроза (червоний рівень)"
+     ]
+    },
+    {
+     "key": "бердичівський",
+     "name": "Бердичівський район",
+     "oblast": "Житомирська область",
+     "since": "2026-10-17T19:23:11.563838Z",
+     "level": "yellow",
+     "reasons": [
+      "Дронова загроза (жовтий рівень)"
+     ]
+    },
+    {
+     "key": "волноваський",
+     "name": "Волноваський район",
+     "oblast": "Донецька область",
+     "since": "2026-10-17T16:59:27.520745Z",
+     "level": "red",
+     "reasons": [
+      "Ракетна загроза (червоний рівень)"
+     ]
+    }
+   ],
+   "scalarFields": {
+    "version": 1792273156,
+    "updatedAt": "2026-10-17T21:39:16.840952776Z"
+   }
+  },
+  {
+   "path": "messages",
+   "status": 200,
+   "ms": 44,
+   "contentType": "application/json",
+   "bytes": 20710,
+   "cors": "*",
+   "topLevel": [
+    "messages",
+    "updatedAt"
+   ],
+   "shape": {
+    "type": "object",
+    "fields": {
+     "messages": {
+      "type": "array",
+      "length": 120,
+      "item": {
+       "type": "object",
+       "fields": {
+        "channel": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "50/50"
+        },
+        "text": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "50/50"
+        },
+        "date": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "50/50"
+        }
+       }
+      }
+     },
+     "updatedAt": {
+      "type": "string"
+     }
+    }
+   },
+   "samples": [
+    {
+     "channel": "@UkraineAlarmSignal",
+     "text": "🟢 Відбій тривоги\n• Вінницький район (Вінницька обл.)\n• Звягельський район (Житомирська обл.)",
+     "date": "2026-10-17T21:38:52Z"
+    },
+    {
+     "channel": "@horizon_of_war_Official",
+     "text": "БпЛА на Вербівку / Добрянку \n\nБпЛА на деревини / Карпівку",
+     "date": "2026-10-17T21:38:23Z"
+    },
+    {
+     "channel": "@tlknewsua",
+     "text": "Ланцет на Шевченково⚠️",
+     "date": "2026-10-17T21:38:17Z"
+    }
+   ],
+   "scalarFields": {
+    "updatedAt": "2026-10-17T21:40:07.431871497Z"
+   }
+  }
+ ],
+ "ws": {
+  "url": "/stream",
+  "frames": [
+   {
+    "type": "snapshot",
+    "keys": [
+     "type",
+     "ts",
+     "data"
+    ],
+    "shape": {
+     "type": "object",
+     "fields": {
+      "threats": {
+       "type": "array",
+       "length": 19,
+       "item": {
+        "type": "object",
+        "fields": {
+         "id": {
+          "types": [
+           "string"
+          ],
+          "presentIn": "19/19"
+         },
+         "type": {
+          "types": [
+           "string"
+          ],
+          "presentIn": "19/19"
+         },
+         "title": {
+          "types": [
+           "string"
+          ],
+          "presentIn": "19/19"
+         },
+         "region": {
+          "types": [
+           "string"
+          ],
+          "presentIn": "19/19"
+         },
+         "district": {
+          "types": [
+           "string"
+          ],
+          "presentIn": "19/19"
+         },
+         "locality": {
+          "types": [
+           "string"
+          ],
+          "presentIn": "19/19"
+         },
+         "lat": {
+          "types": [
+           "number"
+          ],
+          "presentIn": "19/19"
+         },
+         "lon": {
+          "types": [
+           "number"
+          ],
+          "presentIn": "19/19"
+         },
+         "heading": {
+          "types": [
+           "null",
+           "number"
+          ],
+          "presentIn": "19/19"
+         },
+         "confidenceLevel": {
+          "types": [
+           "string"
+          ],
+          "presentIn": "19/19"
+         },
+         "sourceCount": {
+          "types": [
+           "number"
+          ],
+          "presentIn": "19/19"
+         },
+         "updatedAt": {
+          "types": [
+           "string"
+          ],
+          "presentIn": "19/19"
+         },
+         "explanationShort": {
+          "types": [
+           "string"
+          ],
+          "presentIn": "19/19"
+         },
+         "status": {
+          "types": [
+           "string"
+          ],
+          "presentIn": "19/19"
+         },
+         "uncertaintyKm": {
+          "types": [
+           "number"
+          ],
+          "presentIn": "19/19"
+         },
+         "positionQuality": {
+          "types": [
+           "string"
+          ],
+          "presentIn": "19/19"
+         },
+         "lifecycle": {
+          "types": [
+           "string"
+          ],
+          "presentIn": "19/19"
+         },
+         "displayConfidence": {
+          "types": [
+           "string"
+          ],
+          "presentIn": "19/19"
+         },
+         "destination": {
+          "types": [
+           "boolean"
+          ],
+          "presentIn": "14/19"
+         },
+         "count": {
+          "types": [
+           "number"
+          ],
+          "presentIn": "2/19"
+         },
+         "confirmedAt": {
+          "types": [
+           "string"
+          ],
+          "presentIn": "17/19"
+         },
+         "presumptiveCourse": {
+          "types": [
+           "boolean"
+          ],
+          "presentIn": "9/19"
+         },
+         "trail": {
+          "types": [
+           "array"
+          ],
+          "presentIn": "4/19",
+          "nested": {
+           "type": "array",
+           "length": 2,
+           "item": {
+            "types": [
+             "object"
+            ]
+           }
+          }
+         },
+         "velocity": {
+          "types": [
+           "object"
+          ],
+          "presentIn": "1/19",
+          "nested": {
+           "type": "object",
+           "fields": {
+            "bearingDeg": {
+             "type": "number"
+            },
+            "speedKmh": {
+             "type": "number"
+            }
+           }
+          }
+         }
+        }
+       }
+      }
+     }
+    },
+    "sample": {
+     "threats": [
+      {
+       "id": "trk_00276954",
+       "type": "fpv",
+       "title": "FPV-дрон",
+       "region": "Харківська область",
+       "district": "",
+       "locality": "Старовірівка",
+       "lat": 49.68872,
+       "lon": 37.42775,
+       "heading": null,
+       "confidenceLevel": "medium",
+       "sourceCount": 1,
+       "updatedAt": "2026-10-17T21:38:07Z",
+       "explanationShort": "FPV-дрон курсом на Старовірівка. Підтверджень: 1.",
+       "status": "active",
+       "uncertaintyKm": 25,
+       "positionQuality": "approx",
+       "lifecycle": "uncertain",
+       "displayConfidence": "medium",
+       "destination": true
+      },
+      {
+       "id": "trk_00276960",
+       "type": "fpv",
+       "title": "FPV-дрон",
+       "region": "Харківська область",
+       "district": "",
+       "locality": "Савинці",
+       "lat": 49.407,
+       "lon": 37.082,
+       "heading": null,
+       "confidenceLevel": "medium",
+       "sourceCount": 9,
+       "count": 2,
+       "updatedAt": "2026-10-17T20:53:45Z",
+       "explanationShort": "FPV-дрон курсом на Савинці. Підтверджень: 9.",
+       "status": "active",
+       "confirmedAt": "2026-10-17T21:34:10Z",
+       "uncertaintyKm": 10,
+       "positionQuality": "approx",
+       "lifecycle": "uncertain",
+       "displayConfidence": "medium",
+       "destination": true
+      },
+      {
+       "id": "trk_00276976",
+       "type": "uav",
+       "title": "БпЛА",
+       "region": "Чернігівська область",
+       "district": "",
+       "locality": "Мощенка",
+       "lat": 51.9945556540316,
+       "lon": 31.782968553126317,
+       "heading": 323.071,
+       "confidenceLevel": "medium",
+       "sourceCount": 1,
+       "updatedAt": "2026-10-17T21:38:12Z",
+       "explanationShort": "БпЛА курсом на Мощенка. Підтверджень: 1.",
+       "status": "active",
+       "confirmedAt": "2026-10-17T21:38:12Z",
+       "uncertaintyKm": 10,
+       "positionQuality": "approx",
+       "lifecycle": "uncertain",
+       "displayConfidence": "medium",
+       "destination": true,
+       "presumptiveCourse": true
+      },
+      {
+       "id": "trk_00276987",
+       "type": "uav",
+       "title": "БпЛА",
+       "region": "Чернігівська область",
+       "district": "",
+       "locality": "Добрянка",
+       "lat": 51.96184664904797,
+       "lon": 31.61363511003177,
+       "heading": 289.339,
+       "confidenceLevel": "medium",
+       "sourceCount": 8,
+       "updatedAt": "2026-10-17T21:38:23Z",
+       "explanationShort": "БпЛА курсом на Добрянка. Підтверджень: 8.",
+       "status": "active",
+       "confirmedAt": "2026-10-17T21:35:26Z",
+       "uncertaintyKm": 10,
+       "positionQuality": "approx",
+       "lifecycle": "uncertain",
+       "displayConfidence": "medium",
+       "destination": true,
+       "presumptiveCourse": true
+      },
+      {
+       "id": "trk_00276994",
+       "type": "uav",
+       "title": "БпЛА",
+       "region": "Чернігівська область",
+       "district": "",
+       "locality": "Карпівка",
+       "lat": 51.96836218043923,
+       "lon": 31.695911519280635,
+       "heading": 298.243,
+       "confidenceLevel": "medium",
+       "sourceCount": 1,
+       "updatedAt": "2026-10-17T21:38:23Z",
+       "explanationShort": "БпЛА курсом на Карпівка. Підтверджень: 1.",
+       "status": "active",
+       "confirmedAt": "2026-10-17T21:35:26Z",
+       "uncertaintyKm": 10,
+       "positionQuality": "approx",
+       "trail": [
+        "{…}",
+        "{…}"
+       ],
+       "lifecycle": "uncertain",
+       "displayConfidence": "medium",
+       "destination": true,
+       "presumptiveCourse": true
+      }
+     ]
+    }
+   },
+   {
+    "type": "alerts",
+    "keys": [
+     "type",
+     "ts",
+     "data"
+    ],
+    "shape": {
+     "type": "object",
+     "fields": {
+      "version": {
+       "type": "number"
+      },
+      "updatedAt": {
+       "type": "string"
+      },
+      "raions": {
+       "type": "array",
+       "length": 30,
+       "item": {
+        "type": "object",
+        "fields": {
+         "key": {
+          "types": [
+           "string"
+          ],
+          "presentIn": "30/30"
+         },
+         "name": {
+          "types": [
+           "string"
+          ],
+          "presentIn": "30/30"
+         },
+         "oblast": {
+          "types": [
+           "string"
+          ],
+          "presentIn": "30/30"
+         },
+         "since": {
+          "types": [
+           "string"
+          ],
+          "presentIn": "30/30"
+         },
+         "level": {
+          "types": [
+           "string"
+          ],
+          "presentIn": "30/30"
+         },
+         "reasons": {
+          "types": [
+           "array"
+          ],
+          "presentIn": "29/30",
+          "nested": {
+           "type": "array",
+           "length": 1,
+           "item": {
+            "types": [
+             "string"
+            ]
+           }
+          }
+         }
+        }
+       }
+      },
+      "oblasts": {
+       "type": "array",
+       "length": 3,
+       "item": {
+        "type": "object",
+        "fields": {
+         "key": {
+          "types": [
+           "string"
+          ],
+          "presentIn": "3/3"
+         },
+         "name": {
+          "types": [
+           "string"
+          ],
+          "presentIn": "3/3"
+         },
+         "oblast": {
+          "types": [
+           "string"
+          ],
+          "presentIn": "3/3"
+         },
+         "since": {
+          "types": [
+           "string"
+          ],
+          "presentIn": "3/3"
+         },
+         "level": {
+          "types": [
+           "string"
+          ],
+          "presentIn": "3/3"
+         }
+        }
+       }
+      }
+     }
+    },
+    "sample": {
+     "version": 1792273156,
+     "updatedAt": "2026-10-17T21:39:16.840952776Z",
+     "raions": [
+      {
+       "key": "бахмутський",
+       "name": "Бахмутський район",
+       "oblast": "Донецька область",
+       "since": "2026-10-17T16:59:28.683677Z",
+       "level": "red",
+       "reasons": [
+        "Ракетна загроза (червоний рівень)"
+       ]
+      },
+      {
+       "key": "бердичівський",
+       "name": "Бердичівський район",
+       "oblast": "Житомирська область",
+       "since": "2026-10-17T19:23:11.563838Z",
+       "level": "yellow",
+       "reasons": [
+        "Дронова загроза (жовтий рівень)"
+       ]
+      },
+      {
+       "key": "волноваський",
+       "name": "Волноваський район",
+       "oblast": "Донецька область",
+       "since": "2026-10-17T16:59:27.520745Z",
+       "level": "red",
+       "reasons": [
+        "Ракетна загроза (червоний рівень)"
+       ]
+      },
+      {
+       "key": "вінницький",
+       "name": "Вінницький район",
+       "oblast": "Вінницька область",
+       "since": "2026-10-17T21:10:27.156976Z",
+       "level": "yellow",
+       "reasons": [
+        "Дронова загроза (жовтий рівень)"
+       ]
+      },
+      {
+       "key": "горлівський",
+       "name": "Горлівський район",
+       "oblast": "Донецька область",
+       "since": "2026-10-17T16:59:27.851128Z",
+       "level": "red",
+       "reasons": [
+        "Ракетна загроза (червоний рівень)"
+       ]
+      }
+     ],
+     "oblasts": [
+      {
+       "key": "автономна республіка крим",
+       "name": "Автономна Республіка Крим",
+       "oblast": "Автономна Республіка Крим",
+       "since": "2022-12-10T22:22:00Z",
+       "level": "red"
+      },
+      {
+       "key": "луганська",
+       "name": "Луганська область",
+       "oblast": "Луганська область",
+       "since": "2022-04-04T16:45:00Z",
+       "level": "red"
+      },
+      {
+       "key": "севастополь",
+       "name": "Севастополь",
+       "oblast": "Автономна Республіка Крим",
+       "since": "2022-12-10T22:22:00Z",
+       "level": "red"
+      }
+     ]
+    }
+   },
+   {
+    "type": "upsert",
+    "keys": [
+     "type",
+     "ts",
+     "data"
+    ],
+    "shape": {
+     "type": "object",
+     "fields": {
+      "id": {
+       "type": "string"
+      },
+      "type": {
+       "type": "string"
+      },
+      "title": {
+       "type": "string"
+      },
+      "region": {
+       "type": "string"
+      },
+      "district": {
+       "type": "string"
+      },
+      "locality": {
+       "type": "string"
+      },
+      "lat": {
+       "type": "number"
+      },
+      "lon": {
+       "type": "number"
+      },
+      "heading": {
+       "type": "null"
+      },
+      "confidenceLevel": {
+       "type": "string"
+      },
+      "sourceCount": {
+       "type": "number"
+      },
+      "count": {
+       "type": "number"
+      },
+      "updatedAt": {
+       "type": "string"
+      },
+      "explanationShort": {
+       "type": "string"
+      },
+      "status": {
+       "type": "string"
+      },
+      "confirmedAt": {
+       "type": "string"
+      },
+      "uncertaintyKm": {
+       "type": "number"
+      },
+      "positionQuality": {
+       "type": "string"
+      },
+      "lifecycle": {
+       "type": "string"
+      },
+      "displayConfidence": {
+       "type": "string"
+      },
+      "destination": {
+       "type": "boolean"
+      }
+     }
+    },
+    "sample": {
+     "id": "trk_00276960",
+     "type": "fpv",
+     "title": "FPV-дрон",
+     "region": "Харківська область",
+     "district": "",
+     "locality": "Савинці",
+     "lat": 49.407,
+     "lon": 37.082,
+     "heading": null,
+     "confidenceLevel": "medium",
+     "sourceCount": 8,
+     "count": 2,
+     "updatedAt": "2026-10-17T20:53:45Z",
+     "explanationShort": "FPV-дрон курсом на Савинці. Підтверджень: 8.",
+     "status": "active",
+     "confirmedAt": "2026-10-17T21:34:10Z",
+     "uncertaintyKm": 10,
+     "positionQuality": "approx",
+     "lifecycle": "uncertain",
+     "displayConfidence": "medium",
+     "destination": true
+    }
+   },
+   {
+    "type": "heartbeat",
+    "keys": [
+     "type",
+     "ts"
+    ],
+    "shape": {
+     "type": "null"
+    },
+    "sample": {
+     "type": "heartbeat",
+     "ts": "2026-10-17T21:40:12.813Z"
+    }
+   },
+   {
+    "type": "heartbeat",
+    "keys": [
+     "type",
+     "ts"
+    ],
+    "shape": {
+     "type": "null"
+    },
+    "sample": {
+     "type": "heartbeat",
+     "ts": "2026-10-17T21:40:27.786Z"
+    }
+   }
+  ],
+  "opened": true
+ }
+}
