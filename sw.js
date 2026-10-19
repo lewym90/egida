@@ -1,11 +1,11 @@
 // Service worker: offline dla treści (powłoka aplikacji z cache), komunikaty zawsze najpierw z sieci.
-const VERSION = "egida-v46";
+const VERSION = "egida-v47";
 const SHELL = [
   "./", "index.html", "manifest.webmanifest", "css/style.css",
   "js/app.js", "js/content.js", "js/config.js",
   "js/geo.js", "js/neptun.js", "js/neptun-feed.js", "js/shelters.js", "js/mapscreen.js",
   "js/sheltersscreen.js", "js/classify.js", "js/poland-border.js", "js/demo.js",
-  "js/version.js", "js/regions.js", "js/regions-data.js", "js/personal.js", "js/screens2.js", "js/polish.js", "js/ua-shade.js", "js/ua-oblasts.js", "js/news.js", "js/similar.js", "js/offline.js", "js/medical.js", "js/aed-extra.js", "js/icons.js", "js/air.js",
+  "js/version.js", "js/regions.js", "js/regions-data.js", "js/personal.js", "js/screens2.js", "js/polish.js", "js/ua-shade.js", "js/ua-oblasts.js", "js/news.js", "js/similar.js", "js/offline.js", "js/medical.js", "js/aed-extra.js", "js/icons.js", "js/air.js", "js/alarm.js", "js/alarm-table.js",
   "js/vendor/leaflet/leaflet.js", "js/vendor/leaflet/leaflet.css",
   "icons/favicon.png", "icons/logo.png", "icons/icon-192.png", "icons/icon-512.png", "icons/apple-touch-icon.png",
   "fonts/manrope-latin-500-normal.woff2", "fonts/manrope-latin-700-normal.woff2", "fonts/manrope-latin-800-normal.woff2",

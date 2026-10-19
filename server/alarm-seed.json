@@ -1,0 +1,13 @@
+{
+  "verified": "2026-10-19",
+  "basis": {
+    "article": "art. 16 ust. 1 pkt 1 ustawy z dnia 10 czerwca 2016 roku o działaniach antyterrorystycznych",
+    "journal": "Dz. U. z 2025 r. poz. 194"
+  },
+  "items": [
+    { "nr": 49, "date": "2026-08-25", "level": "BRAVO", "crp": false, "scope": "wobec polskiej infrastruktury energetycznej mieszczącej się poza granicami Rzeczypospolitej Polskiej", "from": "2026-09-01T00:00:00+02:00", "until": "2026-11-30T23:59:00+01:00", "url": "https://www.gov.pl/web/rcb/przedluzenie-obowiazywania-stopni-alarmowych-do-30-listopada-2026-r", "published": "2026-08-26" },
+    { "nr": 48, "date": "2026-08-25", "level": "CHARLIE", "crp": false, "scope": "na obszarach linii kolejowych zarządzanych przez PKP Polskie Linie Kolejowe S.A. i PKP Linia Hutnicza Szerokotorowa Sp. z o.o.", "from": "2026-09-01T00:00:00+02:00", "until": "2026-11-30T23:59:00+01:00", "url": "https://www.gov.pl/web/rcb/przedluzenie-obowiazywania-stopni-alarmowych-do-30-listopada-2026-r", "published": "2026-08-26" },
+    { "nr": 47, "date": "2026-08-25", "level": "BRAVO", "crp": false, "scope": "na całym terytorium Rzeczypospolitej Polskiej", "from": "2026-09-01T00:00:00+02:00", "until": "2026-11-30T23:59:00+01:00", "url": "https://www.gov.pl/web/rcb/przedluzenie-obowiazywania-stopni-alarmowych-do-30-listopada-2026-r", "published": "2026-08-26" },
+    { "nr": 50, "date": "2026-08-25", "level": "BRAVO-CRP", "crp": true, "scope": "na całym terytorium Rzeczypospolitej Polskiej", "from": "2026-09-01T00:00:00+02:00", "until": "2026-11-30T23:59:00+01:00", "url": "https://www.gov.pl/web/rcb/przedluzenie-obowiazywania-stopni-alarmowych-do-30-listopada-2026-r", "published": "2026-08-26" }
+  ]
+}

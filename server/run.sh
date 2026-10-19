@@ -52,7 +52,7 @@ else
 fi
 
 # ===== 2. ZADANIA DODATKOWE (wiadomości, powietrze, sondy, bazy). Od najczęstszych; każde w budżecie czasu. =====
-PSP_NEW=0; SH_NEW=0; RJ_NEW=0; NP_NEW=0; NEWS_NEW=0; AIR_NEW=0
+PSP_NEW=0; SH_NEW=0; RJ_NEW=0; NP_NEW=0; NEWS_NEW=0; AIR_NEW=0; ALARM_NEW=0
 
 # Co ~15 min „Ważne w regionie”: aktualności z oficjalnych źródeł (Policja, MEN, RCB, urzędy, kuratoria) → news.json + news-report.json.
 # Błąd tu nigdy nie blokuje komunikatów: przy porażce zostaje poprzedni plik (aplikacja sama pokaże „Brak aktualnych danych” po 3 h).
@@ -81,6 +81,21 @@ if budget; then
     if AIR_OUT="$AIR_FILE" timeout 150 node air-sync.mjs 2>&1 | tail -n 6; then AIR_NEW=1; else echo "air-sync nieudany – zostaje poprzedni plik"; fi
   fi
 else echo "pomijam powietrze (budżet czasu tego przebiegu) – zrobię przy następnym"; fi
+
+# Co ~30 min stopnie alarmowe z komunikatów RCB (gov.pl, odczyt publiczny, robots.txt respektowany) → alarm-levels.json. Błąd nie blokuje komunikatów: zostaje poprzedni plik,
+# a strażnik zgłosi, gdy plik nie był odświeżany za długo. Publikujemy tylko, gdy treść się zmieniła albo minęło ≥6 h (żeby pole „at” w aplikacji nie wyglądało na stare).
+if budget; then
+  ALARM_FILE="$DATA_DIR/alarm-levels.json"
+  if [ ! -f "$BASE/alarm.checked" ] || [ "$(( $(date +%s) - $(stat -c %Y "$BASE/alarm.checked") ))" -gt 1740 ]; then
+    touch "$BASE/alarm.checked"
+    ALARM_OLD="$(node -e 'try{const j=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));console.log(require("crypto").createHash("sha1").update(JSON.stringify([j.items,j.notices,j.basis])).digest("hex")+" "+j.at)}catch{console.log("")}' "$ALARM_FILE")"
+    if ALARM_OUT="$ALARM_FILE" timeout 90 node alarm-sync.mjs 2>&1 | tail -n 8; then
+      ALARM_CUR="$(node -e 'try{const j=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));console.log(require("crypto").createHash("sha1").update(JSON.stringify([j.items,j.notices,j.basis])).digest("hex")+" "+j.at)}catch{console.log("")}' "$ALARM_FILE")"
+      ALARM_AGE=99999; [ -f "$BASE/alarm.pushed" ] && ALARM_AGE=$(( ( $(date +%s) - $(stat -c %Y "$BASE/alarm.pushed") ) / 60 ))
+      if [ "${ALARM_OLD%% *}" != "${ALARM_CUR%% *}" ] || [ "$ALARM_AGE" -ge 360 ]; then ALARM_NEW=1; touch "$BASE/alarm.pushed"; fi
+    else echo "alarm-sync nieudany – zostaje poprzedni plik"; fi
+  fi
+else echo "pomijam stopnie alarmowe (budżet czasu tego przebiegu) – zrobię przy następnym"; fi
 
 # Co ~30 min sonda formatu NEPTUN (3 zapytania REST + 8 s WebSocket): raport trafia na gałąź data jako neptun-schema.json.
 if budget; then
@@ -138,7 +153,7 @@ if budget; then
 else echo "pomijam Ratuj z sercem (budżet czasu tego przebiegu) – zrobię przy następnym"; fi
 
 # Jeśli któreś zadanie dodatkowe dało nowy plik, publikujemy drugi raz (alerty poszły już wcześniej).
-if [ "$SH_NEW" = 1 ] || [ "$PSP_NEW" = 1 ] || [ "$NP_NEW" = 1 ] || [ "$NEWS_NEW" = 1 ] || [ "$RJ_NEW" = 1 ] || [ "$AIR_NEW" = 1 ]; then
+if [ "$SH_NEW" = 1 ] || [ "$PSP_NEW" = 1 ] || [ "$NP_NEW" = 1 ] || [ "$NEWS_NEW" = 1 ] || [ "$RJ_NEW" = 1 ] || [ "$AIR_NEW" = 1 ] || [ "$ALARM_NEW" = 1 ]; then
   if bash "$SERVER_DIR/publish.sh"; then touch "$BASE/last.push"; echo "opublikowano (dodatkowe pliki)"; else echo "druga publikacja nieudana – spróbuję przy następnym przebiegu"; fi
 fi
 

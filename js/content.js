@@ -215,7 +215,7 @@ export const READINESS_QUESTIONS = [
 
 export const SOURCES = [
   { n: "Komunikaty RSO (TVP Technologie)", l: "Dane publiczne", u: "https://komunikaty.tvp.pl", w: "Alerty RCB, ostrzeżenia IMGW, woda, drogi" },
-  { n: "Rządowe Centrum Bezpieczeństwa (gov.pl/rcb)", l: "Teksty: CC BY-SA 4.0", u: "https://www.gov.pl/web/rcb", w: "Poradnik bezpieczeństwa, komunikaty" },
+  { n: "Rządowe Centrum Bezpieczeństwa (gov.pl/rcb)", l: "Teksty: CC BY-SA 4.0", u: "https://www.gov.pl/web/rcb", w: "Poradnik bezpieczeństwa, komunikaty, obowiązujące stopnie alarmowe (zarządzenia Prezesa Rady Ministrów)" },
   { n: "Policja, MEN, urzędy wojewódzkie i kuratoria oświaty", l: "Publiczne strony instytucji; EGIDA pokazuje tylko tytuł, źródło i link do oryginału", u: "https://policja.pl", w: "Wiadomości z regionu i kraju o bezpieczeństwie (wybór automatyczny po słowach kluczowych)" },
   { n: "GDDKiA: utrudnienia na drogach krajowych", l: "Dane publiczne GDDKiA (plik XML „Dane do pobrania”); teksty serwisu: CC BY-SA 4.0", u: "https://drogi.gddkia.gov.pl", w: "Zdarzenia i zamknięcia dróg krajowych w wiadomościach z regionu i kraju" },
   { n: "GIOŚ: Państwowy Monitoring Środowiska", l: "Dane publiczne udostępniane przez API GIOŚ; EGIDA pokazuje indeks jakości powietrza najbliższej stacji i podaje źródło", u: "https://powietrze.gios.gov.pl", w: "Jakość powietrza na Pulpicie (indeks ze stacji pomiarowej, odświeżany co godzinę)" },

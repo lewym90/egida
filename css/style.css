@@ -469,6 +469,29 @@ h3.grp{margin:18px 2px 8px;font-family:var(--font-h);font-size:.95rem;color:var(
 :root[data-senior="1"] .shell[data-route="pulpit"] .fab112,:root[data-senior="1"] .tagline{display:none}
 
 /* Tryb ciemny: wybierany w Ustawieniach (Ciemny albo Jak w telefonie). Domyślnie jasny. */
+/* ---------- stopnie alarmowe ---------- */
+.alh{margin:18px 0 4px}
+.alcard h3{margin:8px 0 2px}
+.alcard .alhead{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.alcard .altime{font-family:var(--font-h);font-weight:700;font-size:.875rem;color:var(--muted)}
+.alcard.ended{opacity:.8}
+.alpill{display:inline-block;border-radius:999px;padding:4px 12px;font-family:var(--font-h);font-weight:800;font-size:.875rem;letter-spacing:.02em}
+.aldl{margin:10px 0 0;font-size:.9375rem}
+.aldl dt{color:var(--muted);font-weight:600;font-size:.8125rem;margin-top:10px}
+.aldl dd{margin:2px 0 0}
+.alsrc{display:inline-block;margin-top:10px;font-size:.9375rem}
+.alended summary{cursor:pointer;font-family:var(--font-h);font-weight:700;min-height:44px;display:flex;align-items:center}
+.card.altablewrap{padding:18px 0 0}
+.altablewrap h3{padding:0 16px 12px;margin:0}
+table.altable{width:100%;border-collapse:collapse;font-size:.875rem}
+table.altable th,table.altable td{vertical-align:top;border-top:1px solid var(--line-in)}
+table.altable thead th{text-align:left;padding:8px 12px;font-family:var(--font-h);font-size:.75rem;color:var(--muted);border-top:0;background:var(--note)}
+table.altable tbody th{width:27%;min-width:84px;padding:12px 8px;text-align:center;font-family:var(--font-h);font-weight:800;font-size:.8125rem;overflow-wrap:anywhere}
+table.altable td{padding:10px 12px}
+table.altable td ul{margin:0;padding-left:1.1em}
+table.altable td li{margin:2px 0}
+table.altable .alnote{margin:6px 0 0;font-style:italic}
+table.altable tr.alcit th{background:var(--brand-tint);color:var(--brand-ink)}
 :root[data-theme="dark"]{--bg:#0F1720;--card:#17212C;--line:#2B3947;--line-in:#223040;--text:#E8EEF4;--muted:#A9B7C5;--text-card:#D3DDE7;--brand:#12877B;--brand-tint:#12352F;--brand-ink:#8FDDD0;--warn:#E0A04A;--warn-bg:#3A2A10;--warn-ink:#F3C987;--danger:#C9362E;--danger-head:#B3261E;--danger-bg:#3B1C1B;--danger-ink:#F5A9A4;--info:#8CA9F5;--info-bg:#1C2A4A;--note:#1F2B38;color-scheme:dark}
 :root[data-theme="dark"] .sel,:root[data-theme="dark"] .kitform input[type=text],:root[data-theme="dark"] .kitform input[type=date],:root[data-theme="dark"] .expiry input[type=date]{background:var(--card);color:var(--text)}
 :root[data-theme="dark"] .srcchip{background:var(--card);border-color:var(--line)}

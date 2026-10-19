@@ -14,6 +14,7 @@ git add alerts.json
 [ -f neptun-schema.json ] && git add neptun-schema.json
 [ -f neptun-seen.json ] && git add neptun-seen.json
 [ -f air.json ] && git add air.json
+[ -f alarm-levels.json ] && git add alarm-levels.json
 [ -f news.json ] && git add news.json
 [ -f news-report.json ] && git add news-report.json
 [ -d psp ] && git add -A psp

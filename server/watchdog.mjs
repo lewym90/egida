@@ -9,7 +9,7 @@ import { readFile, writeFile, stat } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-export const LIMITS = { pushMin: 30, remoteMin: 40, newsMin: 90, newsOkRatio: 0.6, remindH: 6, airMin: 180, neptunMin: 20, dailyH: 48, fileH: { "hospitals.json": 200 }, gddkiaH: 6, addrStallH: 72, addrMinPct: 90 };
+export const LIMITS = { pushMin: 30, remoteMin: 40, newsMin: 90, newsOkRatio: 0.6, remindH: 6, airMin: 180, neptunMin: 20, dailyH: 48, fileH: { "hospitals.json": 200, "alarm-levels.json": 30 }, gddkiaH: 6, addrStallH: 72, addrMinPct: 90 };
 /** Terminy, o których przypominamy administratorowi (data|opis; zmienna WD_DEADLINES nadpisuje, rozdzielone średnikiem). */
 export const DEADLINES = [{ date: "2026-10-30", label: "Odnowienie serwera (VPS)" }, { date: "2027-01-07", label: "Wygaśnięcie tokenu GitHub (GH_TOKEN w /opt/egida/env)" }];
 export const REMIND_DAYS = [14, 3];
@@ -111,7 +111,7 @@ async function main() {
   const ageOf = (iso, unitMs) => { const t = Date.parse(iso || ""); return Number.isFinite(t) ? (now - t) / unitMs : null; };
   const airAgeMin = ageOf(await headField(path.join(DATA, "air.json"), "updated"), 6e4);
   const dailyAgesH = {};
-  for (const f of ["aed.json", "hospitals.json", "shelters.json", "water.json"]) { const h = ageOf(await headField(path.join(DATA, f), "at"), 36e5); if (h != null) dailyAgesH[f] = h; }
+  for (const f of ["aed.json", "hospitals.json", "shelters.json", "water.json", "alarm-levels.json"]) { const h = ageOf(await headField(path.join(DATA, f), "at"), 36e5); if (h != null) dailyAgesH[f] = h; }
   let gddkiaBadH = null, gddkiaSince = state.gddkiaSince ?? null;
   try {
     const rep = JSON.parse(await readFile(path.join(DATA, "news-report.json"), "utf8")); const g = (rep.details || []).find((x) => x.id === "gddkia");

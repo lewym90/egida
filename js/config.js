@@ -50,5 +50,7 @@ export const CONFIG = {
   // Drugie źródło defibrylatorów: publiczna mapa „Ratuj z sercem – Mapa AED” (ratujzsercem.pl), odczytywana przez serwer EGIDA raz na dobę. Brak pliku = pomijane.
   // Jakość powietrza (indeks GIOŚ), odświeżana co godzinę przez serwer EGIDA (gałąź data). Brak pliku = karta jest ukryta.
   airUrl: "https://raw.githubusercontent.com/lewym90/egida/data/air.json",
+  // Stopnie alarmowe z komunikatów RCB (zarządzenia Prezesa Rady Ministrów), sprawdzane przez serwer EGIDA co godzinę. Brak pliku = ekran pokazuje „Brak aktualnych danych”.
+  alarmUrl: "https://raw.githubusercontent.com/lewym90/egida/data/alarm-levels.json",
   aedRatujUrl: "https://raw.githubusercontent.com/lewym90/egida/data/aed-ratuj.json",
 };

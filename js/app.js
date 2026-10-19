@@ -5,6 +5,7 @@ import {
 import { APTECZKA, BEZPRADU, HYBRYDOWE } from "./content.js";
 import { C } from "./icons.js";
 import { AIR_NAMES, AIR_TONE, airAdvice, normalizeAir, nearestStation } from "./air.js";
+import { normalizeAlarm, renderAlarmHtml, alarmSummary } from "./alarm.js";
 import { analyze, statusOf, summarize, compose } from "./classify.js";
 import { APP_VERSION, APP_BUILD } from "./version.js";
 import { storyTokens, sameStory } from "./similar.js";
@@ -220,6 +221,7 @@ const TABS = [...NAV, { h: "#/wiecej", k: "wiecej", t: "Więcej", i: C.more }];
 const MORE = [
   { h: "#/pierwsza-pomoc", t: "Pierwsza pomoc", d: "Krwotok, RKO, zadławienie. Działa offline", i: C.heart },
   { h: "#/wazne", t: "Wiadomości", d: "Policja, MEN, RCB i urzędy: bezpieczeństwo", i: C.news },
+  { h: "#/alarmowe", t: "Stopnie alarmowe", d: "Obowiązujące w kraju lub jego części, tabela stopni", i: C.warn },
   { h: "#/bez-pradu", t: "Bez prądu", d: "Plan na pierwsze 72 godziny", i: C.bolt },
   { h: "#/hybrydowe", t: "Zagrożenia hybrydowe", d: "Dezinformacja, oszustwa, awarie sieci", i: C.hybrid },
   { h: "#/plan-rodziny", t: "Plan rodziny", d: "Kontakty, miejsce spotkania, karty ICE", i: C.users },
@@ -237,6 +239,7 @@ const MORE = [
 const SIDE = [
   ...NAV.slice(0, 2),
   { h: "#/wazne", k: "wazne", t: "Wiadomości", i: C.news },
+  { h: "#/alarmowe", k: "alarmowe", t: "Stopnie alarmowe", i: C.warn },
   { h: "#/telegram", k: "telegram", t: "Powiadomienia Telegram", i: C.tg },
   { h: "#/mapa", k: "mapa", t: "Mapa zagrożeń", i: C.map },
   { h: "#/schrony", k: "schrony", t: "Pomoc w pobliżu", i: C.shield },
@@ -254,7 +257,7 @@ const SIDE = [
   { h: "#/ustawienia", k: "ustawienia", t: "Ustawienia", i: C.gear },
   { h: "#/zrodla", k: "zrodla", t: "Źródła i licencje", i: C.book },
 ];
-const GROUP = { ustawienia: "wiecej", zrodla: "wiecej", prywatnosc: "wiecej", telegram: "alerty", "co-robic": "poradnik", "pierwsza-pomoc": "poradnik", apteczka: "poradnik", "moja-apteczka": "poradnik", "bez-pradu": "poradnik", hybrydowe: "poradnik", test: "poradnik", plecak: "wiecej", "plan-rodziny": "pulpit", zagrozenie: "pulpit", miejsca: "pulpit" };
+const GROUP = { alarmowe: "wiecej", ustawienia: "wiecej", zrodla: "wiecej", prywatnosc: "wiecej", telegram: "alerty", "co-robic": "poradnik", "pierwsza-pomoc": "poradnik", apteczka: "poradnik", "moja-apteczka": "poradnik", "bez-pradu": "poradnik", hybrydowe: "poradnik", test: "poradnik", plecak: "wiecej", "plan-rodziny": "pulpit", zagrozenie: "pulpit", miejsca: "pulpit" };
 
 function shell(route, inner) {
   const cur = GROUP[route] || route;
@@ -381,6 +384,24 @@ async function loadAir() {
     try { airData = normalizeAir(JSON.parse(localStorage.getItem(AIR_CACHE) || "null"), { maxAgeH: 6 }) || airData; } catch { /* */ }
   }
 }
+/* ---------- stopnie alarmowe (RCB) ---------- */
+let alarmData = null, alarmAt = 0, alarmTried = false;
+const ALARM_CACHE = "egida.alarm.v1";
+async function loadAlarm() {
+  if (!CONFIG.alarmUrl) return;
+  alarmAt = Date.now();
+  try {
+    const j = await getJsonT(`${CONFIG.alarmUrl}${CONFIG.alarmUrl.includes("?") ? "&" : "?"}t=${Math.floor(Date.now() / 300000)}`);
+    const a = normalizeAlarm(j);
+    if (!a) throw new Error("format");
+    alarmData = a;
+    try { localStorage.setItem(ALARM_CACHE, JSON.stringify(j)); } catch { /* brak miejsca / tryb prywatny */ }
+  } catch {
+    try { alarmData = normalizeAlarm(JSON.parse(localStorage.getItem(ALARM_CACHE) || "null")) || alarmData; } catch { /* uszkodzone */ }
+  } finally { alarmTried = true; }
+}
+const screenAlarmowe = () => renderAlarmHtml(alarmData, { now: Date.now(), back: back("#/wiecej", "Więcej"), loading: !alarmTried });
+
 function airCardHtml() {
   if (!airData) return "";
   const home = state.places.find((p) => p.label === "Dom");
@@ -864,7 +885,8 @@ function screenWynik() {
 }
 
 function screenWiecej() {
-  const rows = MORE.map((n) => `<li><a href="${n.h}"><span class="mi">${n.i}</span><span class="mt"><b>${n.t}</b><span class="muted small">${n.d}</span></span>${I.chevr}</a></li>`).join("");
+  const alarmNow = alarmSummary(alarmData);
+  const rows = MORE.map((n) => `<li><a href="${n.h}"><span class="mi">${n.i}</span><span class="mt"><b>${n.t}</b><span class="muted small">${n.h === "#/alarmowe" ? (alarmNow ? `Cała Polska: ${alarmNow}. Terminy i tabela stopni` : n.d) : n.d}</span></span>${I.chevr}</a></li>`).join("");
   return `<div class="hero"><h1>Więcej</h1><p>Wszystkie funkcje w jednym miejscu.</p></div>
   <div class="card flat"><ul class="list morelist">${rows}</ul></div>
   <p class="vers">EGIDA ${esc(APP_VERSION)} · ${esc(APP_BUILD)}</p>`;
@@ -937,6 +959,7 @@ function render() {
     case "plecak": inner = screenPlecak(); break;
     case "test": inner = arg === "wynik" ? screenWynik() : screenTest(); break;
     case "telegram": inner = screenTelegram(); break;
+    case "alarmowe": inner = screenAlarmowe(); break;
     case "wiecej": inner = screenWiecej(); break;
     case "ustawienia": inner = screenUstawienia(); break;
     case "zrodla": inner = screenZrodla(); break;
@@ -949,7 +972,7 @@ function render() {
   else if (route === "zagrozenie") initEmergency(geoCtx);
   else if (route === "miejsca") initPlaces(geoCtx);
   else if (route === "ustawienia") showSwVersion();
-  const titles = { wazne: "Wiadomości", pulpit: "Pulpit", alerty: "Alerty", mapa: "Mapa zagrożeń", poradnik: "Poradnik", plecak: "Plecak", "pierwsza-pomoc": "Pierwsza pomoc", "bez-pradu": "Bez prądu", hybrydowe: "Zagrożenia hybrydowe", "moja-apteczka": "Moja apteczka", apteczka: "Apteczka", test: "Test gotowości", ustawienia: "Ustawienia", zrodla: "Źródła", telegram: "Powiadomienia Telegram", schrony: "Pomoc w pobliżu", "plan-rodziny": "Plan rodziny", zagrozenie: "Tryb zagrożenia", miejsca: "Ważne miejsca", prywatnosc: "Polityka prywatności", wiecej: "Więcej" };
+  const titles = { alarmowe: "Stopnie alarmowe", wazne: "Wiadomości", pulpit: "Pulpit", alerty: "Alerty", mapa: "Mapa zagrożeń", poradnik: "Poradnik", plecak: "Plecak", "pierwsza-pomoc": "Pierwsza pomoc", "bez-pradu": "Bez prądu", hybrydowe: "Zagrożenia hybrydowe", "moja-apteczka": "Moja apteczka", apteczka: "Apteczka", test: "Test gotowości", ustawienia: "Ustawienia", zrodla: "Źródła", telegram: "Powiadomienia Telegram", schrony: "Pomoc w pobliżu", "plan-rodziny": "Plan rodziny", zagrozenie: "Tryb zagrożenia", miejsca: "Ważne miejsca", prywatnosc: "Polityka prywatności", wiecej: "Więcej" };
   document.title = `EGIDA – ${titles[route] || "Pulpit"}`;
   window.scrollTo(0, 0); { const sh = document.querySelector(".shell"); if (sh) sh.scrollTop = 0; }
   if (route === "pierwsza-pomoc" && arg) { const el = document.getElementById("fa-" + arg); if (el) requestAnimationFrame(() => el.scrollIntoView({ block: "start" })); }
@@ -1127,6 +1150,7 @@ testAnswers = { ...(state.test?.answers || {}) };
 render();
 loadNews().then(() => { if (state.onboarded && ["pulpit", "wazne", ""].includes(parse().route) && !document.activeElement?.closest?.("select,input,textarea")) render(); });
 loadAir().then(() => { if (state.onboarded && ["pulpit", ""].includes(parse().route) && !editingNow()) render(); });
+loadAlarm().then(() => { if (state.onboarded && ["alarmowe", "wiecej"].includes(parse().route) && !editingNow()) render(); });
 loadAlerts().then(() => { if (state.onboarded && ["pulpit", "alerty", "ustawienia", "telegram", ""].includes(parse().route) && !document.activeElement?.closest?.("select,input,textarea")) render(); });
 
 /* ---------- odświeżanie na żywo ----------
@@ -1156,7 +1180,15 @@ async function refreshLive(kinds, { force = false } = {}) {
 }
 setInterval(() => { if (Date.now() - liveLast.alerts >= LIVE_ALERT_MS - 1000) refreshLive(["alerts"]); }, 10 * 1000);
 setInterval(() => { if (Date.now() - liveLast.news >= LIVE_NEWS_MS - 1000) refreshLive(["news"]); }, 20 * 1000);
-const resumeLive = () => { if (document.hidden) return;
+// Stopnie alarmowe: odświeżanie co 10 min na ekranie „Stopnie alarmowe” i „Więcej” oraz przy powrocie do aplikacji; ekran przerysowuje się tylko, gdy dane się zmieniły.
+const alarmSig = () => JSON.stringify([alarmData?.at, alarmData?.items?.map((o) => [o.nr, o.date, o.until]), alarmData?.notices?.map((n) => n.url)]);
+async function refreshAlarm() {
+  if (document.hidden || !state.onboarded || !["alarmowe", "wiecej"].includes(parse().route) || Date.now() - alarmAt < 10 * 60 * 1000) return;
+  const before = alarmSig(); await loadAlarm();
+  if (alarmSig() !== before && ["alarmowe", "wiecej"].includes(parse().route) && !editingNow()) softRender();
+}
+setInterval(refreshAlarm, 60 * 1000);
+const resumeLive = () => { if (document.hidden) return; refreshAlarm();
   if (Date.now() - airAt > 15 * 60 * 1000) loadAir().then(() => { if (state.onboarded && parse().route === "pulpit" && !editingNow()) softRender(); });
   try { navigator.serviceWorker?.getRegistration?.().then((r) => r?.update?.()).catch(() => {}); } catch { /* */ } const gap = Date.now() - Math.max(liveLast.alerts, liveLast.news); if (gap >= LIVE_MIN_GAP) refreshLive(["alerts", "news"], { force: true }); };
 document.addEventListener("visibilitychange", resumeLive);
