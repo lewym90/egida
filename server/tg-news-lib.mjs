@@ -5,6 +5,7 @@
 //  - utrudnienia drogowe GDDKiA: nowe wpisy na kanał województwa, bez limitu;
 //  - kolor wg powagi: 🔴 PILNE, 🟠 UWAGA, 🔵 INFORMACJA (drogi: 🟠 zamknięcie, 🟡 pozostałe utrudnienia);
 //  - w treści nigdy nie ma gołego adresu aplikacji: jest ukryty link „Śledź w aplikacji EGIDA – Twoje centrum bezpieczeństwa”.
+import { isAirIncident } from "../js/news.js";
 import { dedupeSimilar } from "../js/similar.js";
 import { appLink } from "./tg-policy.mjs";
 
@@ -14,6 +15,10 @@ export const NAMES = { dolnoslaskie: "Dolnośląskie", "kujawsko-pomorskie": "Ku
 const esc = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 const fold = (s) => String(s || "").toLowerCase().replace(/ł/g, "l").normalize("NFD").replace(/[̀-ͯ]/g, "");
 
+/** Komunikat o działaniach lotnictwa wojskowego lub zamknięciu lotnisk (poderwane myśliwce, wstrzymane loty). Idzie przed innymi i nie podlega godzinowemu limitowi „z kraju”. */
+const airScramble = (title) => { const t = String(title || "").toLowerCase().replace(/ł/g, "l").normalize("NFD").replace(/[\u0300-\u036f]/g, ""); return /\b(poderwan|poderwal|mysliwc|wstrzyman\w* lot|wstrzymane lot|dowodztw\w* operacyjn)/.test(t) || (/\blotnisk/.test(t) && /\b(zamkni|wstrzyman|zawiesz)/.test(t)); };
+/** Komunikat o działaniach lotnictwa wojskowego, zamknięciu lotnisk albo zdarzeniu w powietrzu (isAirIncident z js/news.js). Idzie przed innymi i nie podlega godzinowemu limitowi „z kraju”. */
+export const isAirDefence = (title) => isAirIncident(title) || airScramble(title);
 /** Kategoria wiadomości: "droga" | "region" | "kraj" | "swiat". */
 export const categoryOf = (it) => (it.kind === "gddkia" ? "droga" : it.region === "all" ? "kraj" : it.region === "world" ? "swiat" : "region");
 /** Powaga: "info" (wiadomości) albo "closed" | "traffic" (drogi). */
@@ -62,7 +67,7 @@ export function selectNews(items, stateIn, { now = Date.now(), limits = LIMITS, 
     return Number.isFinite(t) && now - t <= limits.recentH * H && t - now < H;
   });
   // ta sama sprawa innymi słowami: wcześniej wysłane wygrywają, a w obrębie nowych – pilniejsze i nowsze
-  const ranked = fresh.map((it) => ({ it, cat: categoryOf(it), lv: levelOf(it) })).sort((a, b) => RANK[a.lv] - RANK[b.lv] || String(b.it.date).localeCompare(String(a.it.date)));
+  const ranked = fresh.map((it) => ({ it, cat: categoryOf(it), lv: levelOf(it) })).sort((a, b) => (isAirDefence(b.it.title) ? 1 : 0) - (isAirDefence(a.it.title) ? 1 : 0) || RANK[a.lv] - RANK[b.lv] || String(b.it.date).localeCompare(String(a.it.date)));
   const past = state.titles.map((x, i) => ({ id: `past${i}`, title: x.title }));
   const roads = ranked.filter((r) => r.cat === "droga"), news = ranked.filter((r) => r.cat !== "droga");
   const keep = new Set(dedupeSimilar([...past, ...news.map((r) => r.it)], (x) => x.title, { share: 0.75, minTokens: 4 }));
@@ -70,7 +75,7 @@ export function selectNews(items, stateIn, { now = Date.now(), limits = LIMITS, 
   const used = { kraj: state.rate.kraj.length, swiat: state.rate.swiat.length }, send = [];
   for (const r of uniq) {
     if (send.length >= limits.maxPerRun) break;
-    if (r.cat === "kraj" || r.cat === "swiat") { if (used[r.cat] >= limits[r.cat]) continue; used[r.cat]++; }
+    if ((r.cat === "kraj" || r.cat === "swiat") && !isAirDefence(r.it.title)) { if (used[r.cat] >= limits[r.cat]) continue; used[r.cat]++; }
     send.push(r);
   }
   return { send, state, duplicates: news.filter((r) => !keep.has(r.it)).map((r) => r.it) };

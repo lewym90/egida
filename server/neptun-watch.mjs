@@ -13,6 +13,7 @@ import { mergeSeen, loadSeen, saveSeen } from "./neptun-seen.mjs";
 
 const URL_REST = process.env.NEPTUN_REST || "https://neptun.in.ua/api/v1/threats";
 const STATE_FILE = process.env.NEPTUN_STATE || "/opt/egida/neptun-state.json";
+const HEALTH_FILE = process.env.NEPTUN_HEALTH || "/opt/egida/neptun-health.json"; // znacznik ostatniego POPRAWNEGO odczytu (czyta go strażnik)
 const SEEN_FILE = process.env.NEPTUN_SEEN || "/opt/egida/neptun-seen.json"; // skumulowany raport typów i próbek (patrz neptun-seen.mjs)
 const TOKEN = process.env.TELEGRAM_BOT_TOKEN || "";
 const APP_URL = process.env.APP_URL || "";
@@ -56,6 +57,7 @@ async function tick() {
   }
   const store = new ThreatStore();
   try { applySnapshotJson(store, json); } catch (e) { log("FORMAT NEPTUN:", e.message); return; }
+  if (!preview) { try { writeFileSync(HEALTH_FILE, JSON.stringify({ lastOk: Date.now(), records: store.items.size })); } catch (e) { log("neptun-health:", e.message); } }
   const now = store.nowMs();
   const { cands, skipped } = candidates(store, now, regions);
   const state = readState();

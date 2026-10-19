@@ -35,7 +35,7 @@ export const ALERT_FILTERS = [
 // Uproszczenie dla przeciętnego człowieka. Przed publikacją porównać pełną listę z oryginałem RCB.
 export const PLECAK = {
   source: "Poradnik bezpieczeństwa RCB (rcb.gov.pl) oraz opracowanie własne EGIDA",
-  reviewed: "2026-10-12",
+  reviewed: "2026-10-17",
   start: [
     { id: "woda", t: "Woda", d: "Co najmniej 3 litry na osobę na dobę." },
     { id: "jedzenie", t: "Trwałe jedzenie", d: "Konserwy, kasze, makaron, batony – rzeczy, które nie wymagają lodówki." },

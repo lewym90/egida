@@ -363,6 +363,7 @@ input[type="search"].sel{-webkit-appearance:none;appearance:none;width:100%;font
 .newsitem .nt{font-family:var(--font-h);font-weight:700;font-size:1rem;line-height:1.35}
 .newsitem .nm{font-size:.8125rem;color:var(--muted,#5b6b78)}
 .list.newslist .newsitem{padding:0 14px}
+.badge.pin{border:1px solid var(--brand);background:transparent;color:var(--brand-ink);font-weight:800}
 .smore2{display:inline-flex;align-items:center;gap:4px;min-height:44px;font-weight:700;color:var(--brand-ink)}
 .card.flat.apt{padding:14px 16px;overflow:visible}
 .apt p{margin:0 0 8px}

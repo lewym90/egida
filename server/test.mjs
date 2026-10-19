@@ -99,6 +99,11 @@ assert.equal(evaluate({ pushAgeMin: 5, remoteAgeMin: 10, airAgeMin: 60 }).proble
 assert.equal(evaluate({ pushAgeMin: 5, remoteAgeMin: 10, airAgeMin: WD.airMin + 1 }).problem, true, "stary air.json");
 assert.equal(evaluate({ pushAgeMin: 5, remoteAgeMin: 10, dailyAgesH: { "aed.json": 20, "hospitals.json": 30 } }).problem, false, "pliki dobowe w normie");
 assert.match(evaluate({ pushAgeMin: 5, remoteAgeMin: 10, dailyAgesH: { "aed.json": WD.dailyH + 1 } }).reasons[0], /aed\.json/, "stary plik dobowy");
+assert.equal(evaluate({ pushAgeMin: 5, remoteAgeMin: 10, dailyAgesH: { "hospitals.json": 120 } }).problem, false, "szpitale odświeżane co tydzień: 120 h to norma");
+assert.match(evaluate({ pushAgeMin: 5, remoteAgeMin: 10, dailyAgesH: { "hospitals.json": 201 } }).reasons[0], /hospitals\.json/, "szpitale starsze niż 200 h");
+assert.equal(evaluate({ pushAgeMin: 5, remoteAgeMin: 10, neptunAgeMin: 3 }).problem, false, "NEPTUN odpowiada: norma");
+assert.equal(evaluate({ pushAgeMin: 5, remoteAgeMin: 10 }).problem, false, "brak znacznika NEPTUN: nie oceniamy");
+assert.match(evaluate({ pushAgeMin: 5, remoteAgeMin: 10, neptunAgeMin: WD.neptunMin + 1 }).reasons[0], /NEPTUN/, "NEPTUN milczy za długo");
 assert.equal(evaluate({ pushAgeMin: 5, remoteAgeMin: 10, gddkiaBadH: 2 }).problem, false);
 assert.equal(evaluate({ pushAgeMin: 5, remoteAgeMin: 10, gddkiaBadH: WD.gddkiaH + 1 }).problem, true, "GDDKiA długo bez danych");
 assert.equal(evaluate({ pushAgeMin: 5, remoteAgeMin: 10, addrPct: 69, addrStallH: 10 }).problem, false, "adresy: krótko stoją");
@@ -131,7 +136,7 @@ w = decide(false, w.state, NOW + 10 * 36e5); assert.equal(w.action, "up", "wiado
 assert.equal(decide(false, w.state, NOW + 11 * 36e5).action, "none");
 // --- Telegram: wiadomości z news.json ---
 import { appLink, APP_FOLLOW } from "./tg-policy.mjs";
-import { newsMessage, levelOf as nLevel, categoryOf as nCat, selectNews, markNewsSent, channelsFor, sampleItems, LIMITS as NL } from "./tg-news-lib.mjs";
+import { newsMessage, isAirDefence, levelOf as nLevel, categoryOf as nCat, selectNews, markNewsSent, channelsFor, sampleItems, LIMITS as NL } from "./tg-news-lib.mjs";
 {
   const strip = (h) => h.replace(/<[^>]+>/g, "");
   const APP = "https://app.test/egida/";
@@ -164,6 +169,13 @@ import { newsMessage, levelOf as nLevel, categoryOf as nCat, selectNews, markNew
   const more = [mk("kr_new", { region: "all", title: "Zupełnie inna sprawa krajowa" })];
   assert.equal(selectNews(more, r.state, { now: NOW + 6e4 }).send.length, 0, "limit 10/h wyczerpany");
   assert.equal(selectNews([mk("kr_new2", { region: "all", title: "Zupełnie inna sprawa krajowa", date: new Date(NOW + 61 * 6e4 - 6e4).toISOString() })], r.state, { now: NOW + 61 * 6e4 }).send.length, 1, "po godzinie limit wraca");
+  // lotnictwo wojskowe: nie podlega limitowi 10/h i idzie pierwsze
+  const air = mk("kr_air", { region: "all", title: "Polska poderwała myśliwce. Lotniska w Rzeszowie i Lublinie zamknięte", date: new Date(NOW + 61 * 6e4 - 6e4).toISOString() });
+  assert.equal(selectNews([air], r.state, { now: NOW + 6e4 }).send.length, 1, "komunikat o poderwaniu myśliwców omija limit godzinowy");
+  const firstAir = selectNews([...kr.slice(0, 3), air], { sent: {} }, { now: NOW + 6e4 }).send[0];
+  assert.equal(firstAir.it.id, "kr_air", "komunikat lotniczy idzie pierwszy");
+  assert.equal(isAirDefence("Lotnisko Rzeszów zamknięte, wojsko podniosło lotnictwo"), true); assert.equal(isAirDefence("Wstrzymano loty nad wschodem Polski"), true);
+  assert.equal(isAirDefence("Myśliwy postrzelił psa w lesie"), false, "myśliwy to nie myśliwiec"); assert.equal(isAirDefence("Nowy rozkład lotów z lotniska w Gdańsku"), false);
   // świeżość, duplikaty, już wysłane, kinds
   assert.equal(selectNews([mk("old", { date: ago(4 * 60) })], { sent: {} }, { now: NOW }).send.length, 0, "starsze niż 3 h pomijane");
   assert.equal(selectNews([mk("a1")], { sent: { a1: NOW } }, { now: NOW }).send.length, 0);

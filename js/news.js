@@ -38,13 +38,31 @@ export function dedupeNews(list) {
   return list.filter((x) => keep.has(x));
 }
 
+/* Zdarzenie w powietrzu nad Polską lub przy niej (podejrzenie naruszenia przestrzeni, nieznany obiekt, sygnał radaru): przypinamy na górze listy.
+   Zwykłe „Polska poderwała myśliwce” (rutynowe, po atakach na Ukrainę) NIE jest przypinane, żeby nie męczyć stałym przypięciem; idzie za to pierwsze na Telegram (isAirDefence w tg-news-lib). */
+export const PIN_H = 12;
+const foldT = (s) => String(s || "").toLowerCase().replace(/ł/g, "l").normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+export function isAirIncident(title) {
+  const t = foldT(title);
+  return (/\bnarusz\w*/.test(t) && /\bprzestrzen\w*\s+powietrzn/.test(t))
+    || /\bniezidentyfikowan\w*\s+(obiekt|dron|statek)/.test(t)
+    || /\bsygnal\w*\s+radiolokacyj/.test(t)
+    || (/\b(wojsk|zolnierz|wot|zandarm)\w*/.test(t) && /\b(?:po)?szuk\w*/.test(t) && /\b(obiekt|dron|szczatk)\w*/.test(t));
+}
+/** Przypina komunikaty o zdarzeniach w powietrzu (nie starsze niż PIN_H godzin) na początku listy; reszta bez zmian. Zwraca kopie z polem pin. */
+export function pinAirIncidents(list, nowMs = Date.now()) {
+  const pinned = [], rest = [];
+  for (const x of list) { const age = nowMs - Date.parse(x.date); (isAirIncident(x.title) && age >= -36e5 && age <= PIN_H * 36e5 ? pinned : rest).push(x); }
+  return [...pinned.map((x) => ({ ...x, pin: true })), ...rest];
+}
+
 /** Wpisy dla województwa użytkownika + ogólnopolskie (bez województwa: wszystkie). opts: {max, onlyRegion, onlyAll} */
 export function newsForRegion(feed, regionId, opts = {}) {
   if (!feed) return [];
   let l = feed.items.filter((x) => x.kind !== "gddkia"); // utrudnienia drogowe GDDKiA mają własne miejsce: „Dobrze wiedzieć” na Pulpicie
   if (opts.onlyAll) l = l.filter((x) => x.region === "all");
   else if (regionId) l = l.filter((x) => (opts.onlyRegion ? x.region === regionId : x.region === regionId || x.region === "all"));
-  l = dedupeNews(l);
+  l = pinAirIncidents(dedupeNews(l), opts.now ?? Date.now());
   return opts.max ? l.slice(0, opts.max) : l;
 }
 

@@ -113,8 +113,8 @@ ok("GDDKiA: czas polski (lato/zima), zdarzenia i zamknięcia tak, roboty i zako�
   assert.equal(mergeItems([[it]], NOW + 3 * 36e5).length, 1);
 });
 ok("media: poważne zdarzenia tak, sport/kultura/rozmowy nie", () => {
-  for (const t of ["Dachowanie samochodu na S12 pod Lublinem. Zablokowany prawy pas ruchu", "Pożar hali w Radomiu. Ewakuowano pracowników", "Alarm bombowy w szkole. Policja sprawdza budynek", "Nie żyje 18-latek. Tragiczny wypadek na DK 17", "Ostrzeżenie przed wichurami w regionie"]) assert.ok(passesMedia(t), t);
-  for (const t of ["Porażka Czarnych w Zamościu", "Mariusz Kamiński „Historia z drugiej ręki” | Reportaż", "Koncert w filharmonii. Atak bólu w wykonaniu zespołu", "Piotr Robakowski, ekspert ds. bezpieczeństwa, będzie Gościem Radia Gdańsk", "Wiadomości sportowe: mecz z zagrożeniem spadku", "Targi Gesty [WIDEO, ZDJĘCIA]"]) assert.ok(!passesMedia(t), t);
+  for (const t of ["Dachowanie samochodu na S12 pod Lublinem. Zablokowany prawy pas ruchu", "Pożar hali w Radomiu. Ewakuowano pracowników", "Alarm bombowy w szkole. Policja sprawdza budynek", "Nie żyje 18-latek. Tragiczny wypadek na DK 17", "Ostrzeżenie przed wichurami w regionie", "Polska poderwała myśliwce po atakach Rosji na Ukrainę", "Wstrzymano loty. Lotniska w Lublinie i Rzeszowie zamknięte", "Dowództwo Operacyjne: wzmożona aktywność lotnictwa"]) assert.ok(passesMedia(t), t);
+  for (const t of ["Porażka Czarnych w Zamościu", "Mariusz Kamiński „Historia z drugiej ręki” | Reportaż", "Koncert w filharmonii. Atak bólu w wykonaniu zespołu", "Piotr Robakowski, ekspert ds. bezpieczeństwa, będzie Gościem Radia Gdańsk", "Wiadomości sportowe: mecz z zagrożeniem spadku", "Targi Gesty [WIDEO, ZDJĘCIA]", "Myśliwy z Podlasia zdobył puchar w zawodach strzeleckich"]) assert.ok(!passesMedia(t), t);
 });
 ok("media: wpis z radia ma etykietę kind=media, bez streszczenia i z regionem rozgłośni", () => {
   const src = SOURCES.find((x) => x.id === "radio-lubelskie");

@@ -2,20 +2,20 @@
 // Uruchamiany z crona co 10 min przez run-watchdog.sh (install.sh --watchdog-cron), niezależnie od run.sh.
 // Alarm, gdy: (1) ostatnia udana publikacja jest starsza niż 30 min, (2) opublikowany alerts.json (to, co widzi aplikacja) jest starszy niż 40 min,
 // (3) opublikowany news.json (wiadomości) jest starszy niż 90 min albo (4) odpowiada mniej niż 60% źródeł wiadomości (news-report.json).
-// Od v42 także: (5) air.json (powietrze) starszy niż 3 h, (6) pliki dzienne (AED, szpitale, schrony, woda) starsze niż 48 h, (7) GDDKiA nie zwraca danych od ponad 6 h,
-// (8) odsetek adresów AED poniżej 90% i bez wzrostu od 72 h. Oraz przypomnienia o terminach (odnowienie serwera, wygaśnięcie tokenu): 14 i 3 dni przed.
+// Od v42 także: (5) air.json (powietrze) starszy niż 3 h, (6) pliki dzienne (AED, schrony, woda) starsze niż 48 h, a szpitale (odświeżane raz na tydzień) starsze niż 200 h, (7) GDDKiA nie zwraca danych od ponad 6 h,
+// (8) odsetek adresów AED poniżej 90% i bez wzrostu od 72 h, (9) NEPTUN bez poprawnego odczytu od ponad 20 min (gdy obserwator jest włączony). Oraz przypomnienia o terminach (odnowienie serwera, wygaśnięcie tokenu): 14 i 3 dni przed.
 // Wymaga ADMIN_CHAT_ID i TELEGRAM_BOT_TOKEN w /opt/egida/env. Opcje: --status (tylko pokaż), --test (wyślij próbną wiadomość).
 import { readFile, writeFile, stat } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-export const LIMITS = { pushMin: 30, remoteMin: 40, newsMin: 90, newsOkRatio: 0.6, remindH: 6, airMin: 180, dailyH: 48, gddkiaH: 6, addrStallH: 72, addrMinPct: 90 };
+export const LIMITS = { pushMin: 30, remoteMin: 40, newsMin: 90, newsOkRatio: 0.6, remindH: 6, airMin: 180, neptunMin: 20, dailyH: 48, fileH: { "hospitals.json": 200 }, gddkiaH: 6, addrStallH: 72, addrMinPct: 90 };
 /** Terminy, o których przypominamy administratorowi (data|opis; zmienna WD_DEADLINES nadpisuje, rozdzielone średnikiem). */
 export const DEADLINES = [{ date: "2026-10-30", label: "Odnowienie serwera (VPS)" }, { date: "2027-01-07", label: "Wygaśnięcie tokenu GitHub (GH_TOKEN w /opt/egida/env)" }];
 export const REMIND_DAYS = [14, 3];
 
 /** Czysta ocena: { pushAgeMin, remoteAgeMin, newsAgeMin, newsSources, newsOk, airAgeMin, dailyAgesH, gddkiaBadH, addrPct, addrStallH } (null/undefined = nieznane) → { problem, reasons }. */
-export function evaluate({ pushAgeMin, remoteAgeMin, newsAgeMin = null, newsSources = null, newsOk = null, airAgeMin = null, dailyAgesH = null, gddkiaBadH = null, addrPct = null, addrStallH = null }, limits = LIMITS) {
+export function evaluate({ pushAgeMin, remoteAgeMin, newsAgeMin = null, newsSources = null, newsOk = null, airAgeMin = null, dailyAgesH = null, gddkiaBadH = null, addrPct = null, addrStallH = null, neptunAgeMin = null }, limits = LIMITS) {
   const reasons = [];
   if (pushAgeMin == null) reasons.push("serwer jeszcze nigdy nie opublikował danych");
   else if (pushAgeMin > limits.pushMin) reasons.push(`ostatnia udana publikacja była ${Math.round(pushAgeMin)} min temu`);
@@ -23,7 +23,8 @@ export function evaluate({ pushAgeMin, remoteAgeMin, newsAgeMin = null, newsSour
   if (newsAgeMin != null && newsAgeMin > limits.newsMin) reasons.push(`wiadomości (news.json) mają ${Math.round(newsAgeMin)} min`);
   if (newsSources > 0 && newsOk != null && newsOk / newsSources < limits.newsOkRatio) reasons.push(`odpowiada tylko ${newsOk} z ${newsSources} źródeł wiadomości`);
   if (airAgeMin != null && airAgeMin > limits.airMin) reasons.push(`jakość powietrza (air.json) ma ${Math.round(airAgeMin)} min`);
-  for (const [name, h] of Object.entries(dailyAgesH || {})) if (h != null && h > limits.dailyH) reasons.push(`plik ${name} nie był odświeżany od ${Math.round(h)} h`);
+  if (neptunAgeMin != null && neptunAgeMin > limits.neptunMin) reasons.push(`NEPTUN nie dał poprawnych danych od ${Math.round(neptunAgeMin)} min (źródło nie odpowiada albo obserwator nie działa)`);
+  for (const [name, h] of Object.entries(dailyAgesH || {})) if (h != null && h > (limits.fileH?.[name] ?? limits.dailyH)) reasons.push(`plik ${name} nie był odświeżany od ${Math.round(h)} h`);
   if (gddkiaBadH != null && gddkiaBadH > limits.gddkiaH) reasons.push(`źródło GDDKiA (drogi) nie zwraca danych od ${Math.round(gddkiaBadH)} h`);
   if (addrPct != null && addrPct < limits.addrMinPct && addrStallH != null && addrStallH > limits.addrStallH) reasons.push(`adresy AED stoją na ${addrPct}% od ${Math.round(addrStallH)} h`);
   return { problem: reasons.length > 0, reasons };
@@ -121,7 +122,10 @@ async function main() {
     const a = JSON.parse(await readFile(path.join(BASE, "aed-addr.json"), "utf8"));
     if (Number.isFinite(a?.pct)) { addrPct = a.pct; if (!addrState || a.pct >= addrState.pct + 0.5 || a.pct >= LIMITS.addrMinPct) addrState = { pct: a.pct, t: now }; addrStallH = (now - addrState.t) / 36e5; }
   } catch { /* brak pliku – nie oceniamy */ }
-  const ev = evaluate({ pushAgeMin, remoteAgeMin, newsAgeMin, newsSources, newsOk, airAgeMin, dailyAgesH, gddkiaBadH, addrPct, addrStallH });
+  // NEPTUN: obserwator zapisuje znacznik po każdym poprawnym odczycie; brak pliku = obserwator nie jest włączony (nie oceniamy).
+  let neptunAgeMin = null;
+  try { const h = JSON.parse(await readFile(path.join(BASE, "neptun-health.json"), "utf8")); if (Number.isFinite(h?.lastOk)) neptunAgeMin = (now - h.lastOk) / 6e4; } catch { /* brak pliku */ }
+  const ev = evaluate({ pushAgeMin, remoteAgeMin, newsAgeMin, newsSources, newsOk, airAgeMin, dailyAgesH, gddkiaBadH, addrPct, addrStallH, neptunAgeMin });
   const d = decide(ev.problem, state, now);
   const extras = { gddkiaSince, addr: addrState };
   const dl = dueReminders(parseDeadlines(process.env.WD_DEADLINES), state.sent || {}, now);

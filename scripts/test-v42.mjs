@@ -101,7 +101,7 @@ t("mapa zagrożeń: bez schronów, bez przycisku pozycji, GPS na stałe", () => 
   assert.match(m, /locate\(onPos/); assert.match(m, /zoom: 8/); assert.match(m, /< 0\.015/); assert.match(m, /20000/); assert.match(m, /120000/);
 });
 t("wersja i service worker", () => {
-  assert.match(src("js/version.js"), /APP_VERSION = "v45"/); assert.match(src("sw.js"), /const VERSION = "egida-v45"/);
+  assert.match(src("js/version.js"), /APP_VERSION = "v46"/); assert.match(src("sw.js"), /const VERSION = "egida-v46"/);
 });
 t("media: awaria schodów ruchomych nie jest wiadomością o bezpieczeństwie, awaria prądu jest", () => {
   assert.equal(passesMedia("Awaria schodów ruchomych, jeżdżą tylko w górę"), false);

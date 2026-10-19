@@ -8,7 +8,7 @@ import { AIR_NAMES, AIR_TONE, airAdvice, normalizeAir, nearestStation } from "./
 import { analyze, statusOf, summarize, compose } from "./classify.js";
 import { APP_VERSION, APP_BUILD } from "./version.js";
 import { storyTokens, sameStory } from "./similar.js";
-import { emptyPlan, normalizePlan, normalizePlaces, importState, normalizeKit, normalizeExpiry, normalizeExercise, kitDue, kitSorted, kitStatus, kitDays, todayYmd, exportState, KIT_LIMIT } from "./personal.js";
+import { emptyPlan, normalizePlan, normalizePlaces, importState, normalizeKit, normalizeExpiry, normalizeExercise, normalizeSupply, supplyNeeds, SUPPLY_DAYS, kitDue, kitSorted, kitStatus, kitDays, todayYmd, exportState, KIT_LIMIT } from "./personal.js";
 import { renderEmergency, initEmergency, renderPlan, initPlan, renderPlaces, initPlaces, renderPrivacy, shareText, shareNote, printSheet, planPrintHtml, packPrintHtml, guidePrintHtml } from "./screens2.js";
 import { renderMapHtml, initMapScreen, destroyScreens } from "./mapscreen.js";
 import { renderSheltersHtml, initSheltersScreen } from "./sheltersscreen.js";
@@ -67,6 +67,7 @@ const defaults = () => ({
   myKit: [], // własna apteczka: leki i środki z terminem ważności (tylko w urządzeniu)
   expiry: {}, // terminy ważności pozycji z list Plecak i Zapas domowy: { id: "RRRR-MM-DD" }
   exercise: { last: "" }, // data ostatniego ćwiczenia rodzinnego
+  supply: { adults: 2, kids: 0, days: 3 }, // kalkulator zapasów: domownicy i liczba dni
   theme: "light", // wygląd: light | dark | auto (jak w telefonie)
   senior: false, // tryb seniora: większy tekst, uproszczony Pulpit, wielki przycisk 112
   lastBackup: "", // data ostatniej kopii danych (RRRR-MM-DD)
@@ -81,7 +82,7 @@ if (!state.mig?.neptunOn) {
   state.map = { ...(state.map || { base: "map" }), layers: { shelters: true, ...(state.map?.layers || {}), neptun: true } };
   try { localStorage.setItem(KEY, JSON.stringify(state)); } catch { /* */ }
 }
-state.plan = normalizePlan(state.plan); state.places = normalizePlaces(state.places); state.myKit = normalizeKit(state.myKit); state.expiry = normalizeExpiry(state.expiry); state.exercise = normalizeExercise(state.exercise); state.theme = ["light", "dark", "auto"].includes(state.theme) ? state.theme : "light"; state.senior = state.senior === true;
+state.plan = normalizePlan(state.plan); state.places = normalizePlaces(state.places); state.myKit = normalizeKit(state.myKit); state.expiry = normalizeExpiry(state.expiry); state.exercise = normalizeExercise(state.exercise); state.supply = normalizeSupply(state.supply); state.theme = ["light", "dark", "auto"].includes(state.theme) ? state.theme : "light"; state.senior = state.senior === true;
 const save = () => { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch { /* tryb prywatny */ } };
 const applyPrefs = () => {
   document.documentElement.dataset.fs = state.fs === "normal" ? "" : state.fs;
@@ -132,7 +133,7 @@ async function loadNews() {
     try { newsData = normalizeNews(JSON.parse(localStorage.getItem(NEWS_CACHE) || "null")) || newsData; } catch { /* uszkodzone */ }
   }
 }
-const newsLink = (x) => { const g = groupLabel(x, state.region); return `<li class="newsitem"><a href="${esc(x.url)}" target="_blank" rel="noopener noreferrer"><span class="nt">${esc(x.title)}</span><span class="nm">${g ? `<span class="badge grp${x.region === "world" ? " world" : x.region === "all" ? " kraj" : ""}">${esc(g)}</span> ` : ""}${x.kind === "media" ? '<span class="badge media">doniesienie medialne</span> ' : ""}${esc(x.source)} · ${esc(ageLabel(x.date))}</span></a></li>`; };
+const newsLink = (x) => { const g = groupLabel(x, state.region); return `<li class="newsitem"><a href="${esc(x.url)}" target="_blank" rel="noopener noreferrer"><span class="nt">${esc(x.title)}</span><span class="nm">${x.pin ? '<span class="badge pin">Ważne</span> ' : ""}${g ? `<span class="badge grp${x.region === "world" ? " world" : x.region === "all" ? " kraj" : ""}">${esc(g)}</span> ` : ""}${x.kind === "media" ? '<span class="badge media">doniesienie medialne</span> ' : ""}${esc(x.source)} · ${esc(ageLabel(x.date))}</span></a></li>`; };
 /* Utrudnienia na drogach krajowych (GDDKiA) dla Twojego województwa: wiersze do bloku „Dobrze wiedzieć” */
 const roadRows = () => (state.region && newsData && newsFresh(newsData) ? roadsForRegion(newsData, state.region) : []);
 const roadLi = (x) => `<li><span class="lbl">Drogi krajowe · GDDKiA</span><span class="shead">${esc(x.title)}</span><span class="ssub">od ${esc(fmtDate(x.date))}${x.until ? `, do ${esc(fmtDate(x.until))}` : ""}</span></li>`;
@@ -808,6 +809,20 @@ function expiryDueHtml() {
   if (!due.length) return "";
   return `<div class="note warn" style="margin:12px 0"><b>Do wymiany lub sprawdzenia:</b><ul style="margin:6px 0 0;padding-left:1.2rem">${due.slice(0, 6).map((x) => `<li>${esc(x.name)}: ${esc(kitWhen(x))} (${esc(plDate(x.expires))})</li>`).join("")}</ul></div>`;
 }
+function supplyCalcHtml() {
+  const sp = normalizeSupply(state.supply), n = supplyNeeds(sp);
+  const stepper = (key, label, v) => `<div class="row" style="margin-top:8px"><span>${label}</span><span class="spacer"></span><button type="button" class="chip" data-sup="${key}:-1" aria-label="Mniej: ${label}">−</button><b style="min-width:2ch;text-align:center">${v}</b><button type="button" class="chip" data-sup="${key}:1" aria-label="Więcej: ${label}">+</button></div>`;
+  const days = SUPPLY_DAYS.map((d) => `<button type="button" class="chip" data-sup="days:${d}" aria-pressed="${sp.days === d}">${d} dni</button>`).join("");
+  const res = n.people === 0 ? `<p class="muted small" style="margin:12px 0 0">Dodaj domowników, żeby policzyć zapas.</p>` : `<ul style="margin:12px 0 0;padding-left:20px">
+    <li><b>Woda do picia i gotowania: ${n.waterL} l</b> (ok. ${n.bottles} butelek po 1,5 l)</li>
+    <li><b>Plecaki: ${n.backpacks}</b> (każdy domownik, także dziecko, ma własny)</li>
+    ${n.adults ? `<li><b>Jedzenie dla dorosłych: ok. ${n.kcal.toLocaleString("pl-PL")} kcal</b> łącznie (szacunek EGIDA: ${n.adults} × 2000 kcal × ${n.days} dni)</li>` : ""}
+    ${n.kids ? `<li><b>Dzieci:</b> porcje dobierz do wieku; dla niemowląt miej mleko modyfikowane i pieluchy na co najmniej 3 doby</li>` : ""}
+    <li><b>Zwierzęta:</b> karma i woda na tyle samo dni</li></ul>`;
+  return `<div class="card" style="margin-top:8px"><h3 style="margin:0">Kalkulator zapasów</h3><p class="muted small" style="margin:4px 0 0">Wody liczymy co najmniej 3 litry na osobę na dobę, tak jak w Poradniku bezpieczeństwa.</p>
+  ${stepper("adults", "Dorośli", sp.adults)}${stepper("kids", "Dzieci", sp.kids)}<div class="chips" role="group" aria-label="Na ile dni" style="margin-top:8px">${days}</div>${res}
+  <p class="muted small" style="margin:12px 0 0">Poradnik podaje zapas na 72 godziny. Dla 7 i 14 dni EGIDA przelicza te same stawki. W wywiadzie dla PAP (2025) rzecznik RCB wspomniał też o 2 litrach na osobę na dobę jako zapasie na tydzień; liczymy więcej, bo to bezpieczniej.</p></div>`;
+}
 function screenPlecak() {
   const n = plecakDone(), total = PLECAK.start.length, pct = Math.round((n / total) * 100);
   const tabs = [["plecak", "Plecak"], ["zapas", "Zapas domowy"], ["dokumenty", "Dokumenty"], ["rodzina", "Rodzina"]].map(([k, t]) => `<button class="chip" data-ptab="${k}" aria-pressed="${plecakTab === k}">${t}</button>`).join("");
@@ -816,7 +831,7 @@ function screenPlecak() {
     body = `<h2>Na start: pięć rzeczy</h2><div class="card flat" style="margin-top:8px">${PLECAK.start.map((x) => checkRow(x, true)).join("")}</div>
     <h2 style="margin-top:20px">Gdy masz czas</h2><div class="card flat" style="margin-top:8px">${PLECAK.later.map((x) => checkRow(x, true)).join("")}</div>`;
   } else if (plecakTab === "zapas") {
-    body = `<h2>Zapas domowy na min. 3 dni</h2><div class="card flat" style="margin-top:8px">${PLECAK.zapas.map((x) => checkRow(x, true)).join("")}</div>`;
+    body = `<h2>Zapas domowy na min. 3 dni</h2>${supplyCalcHtml()}<div class="card flat" style="margin-top:8px">${PLECAK.zapas.map((x) => checkRow(x, true)).join("")}</div>`;
   } else if (plecakTab === "rodzina") {
     body = `<h2>Plan rodzinny</h2><p class="muted small" style="margin:4px 0 0">Ustalcie to wspólnie, zanim coś się wydarzy.</p><div class="card flat" style="margin-top:8px">${PLECAK.rodzina.map(checkRow).join("")}</div>${exerciseHtml()}`;
   } else {
@@ -1031,7 +1046,7 @@ async function importFromFile(input) {
     const res = importState(JSON.parse(await f.text()), { validRegions: VOIVODESHIPS.map((v) => v.id) });
     if (!res.ok) { msg.style.color = "var(--danger-ink)"; msg.textContent = res.error; return; }
     if (!confirm("Wczytać kopię z pliku? Zastąpi ona odpowiadające jej dane w tej aplikacji (ustawienia, plan rodziny, miejsca, Moja apteczka).")) return;
-    Object.assign(state, res.state); state.plan = normalizePlan(state.plan); state.places = normalizePlaces(state.places); state.myKit = normalizeKit(state.myKit); state.expiry = normalizeExpiry(state.expiry); state.exercise = normalizeExercise(state.exercise);
+    Object.assign(state, res.state); state.plan = normalizePlan(state.plan); state.places = normalizePlaces(state.places); state.myKit = normalizeKit(state.myKit); state.expiry = normalizeExpiry(state.expiry); state.exercise = normalizeExercise(state.exercise); state.supply = normalizeSupply(state.supply);
     save(); applyPrefs(); render();
     const m2 = $("#importMsg"); if (m2) { m2.style.color = ""; m2.textContent = "Dane wczytane."; }
   } catch (err) { msg.style.color = "var(--danger-ink)"; msg.textContent = err?.message && !/JSON/i.test(err.message) ? err.message : "Nie udało się odczytać pliku. Wybierz plik zapisany wcześniej przyciskiem „Zapisz kopię”."; }
@@ -1055,6 +1070,12 @@ document.addEventListener("submit", (e) => {
   if (!name.trim() || state.myKit.length >= KIT_LIMIT) return;
   state.myKit = normalizeKit([...state.myKit, { name, expires: date, note }]);
   kitFill = ""; save(); render();
+});
+document.addEventListener("click", (e) => {
+  const sb = e.target.closest("button[data-sup]"); if (!sb) return;
+  const [key, val] = String(sb.dataset.sup).split(":"), cur = normalizeSupply(state.supply);
+  if (key === "days") cur.days = Number(val); else if (key === "adults" || key === "kids") cur[key] += Number(val);
+  state.supply = normalizeSupply(cur); save(); softRender();
 });
 document.addEventListener("click", (e) => {
   const b = e.target.closest("button"); if (!b) return;

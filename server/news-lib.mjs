@@ -11,6 +11,8 @@ export const LIMITS = { perSource: 15, total: 200, maxAgeDays: 14, titleChars: 2
 const SAFETY = [
   "alarm bombow", "grozb", "pogrozk", "zagroz", "ostrzez", "ostrzeg", "ewakuac", "zamach", "atak", "strzelani", "nozown", "niebezpiecz",
   "falszyw", "dezinformac", "fejk", "nieprawdziw", "oszust", "wyludz", "podszyw", "komunikat", "apel ", "apelu", "apeluj", "bezpieczen", "ludnosci", "obron cywiln",
+  "mysliwc", "poderwan", "poderwal", "wstrzymano lot", "wstrzymane lot", "dowodztwo operacyjne", "dowodztwa operacyjn", "lotnictwa wojsk", "lotnictwo wojsk",
+  "przestrzeni powietrzn", "niezidentyfikowan", "radiolokacyj",
   "schron", "dron", "rakiet", "wybuch", "pozar", "powodz", "wichur", "burz", "nawalnic", "upal", "gololed", "smog", "skazeni", "awari", "brak pradu",
   "cyberatak", "cyberbezp", "przemoc", "agresj", "amunicj", "materialy wybuchow", "arsenal",
   "kryzysow", "bezpieczn", "wypadk", "karambol", "tragiczn", "zgin", "nie zyj", "zabojstw", "napad", "porwan", "zaginion",
@@ -23,7 +25,7 @@ const OFFICIAL_DENY_HARD = ["remont", "uroczyst", "studi", "podyplom", "wyroznie
 const OFFICIAL_DENY_SOFT = ["technologi", "wspolprac", "inwestycj", "mln zl", "mld zl", "konferencj", "armii"];
 const CIVIL = ["ochron ludnosci", "ochrony ludnosci", "ochrone ludnosci", "obron cywiln", "obrone cywiln", "schron", "alarm", "ostrzez", "ewakuac", "komunikat"];
 // Filtr „civil” (MON, MSWiA): tylko ochrona ludności i bezpośrednie zagrożenia, bez ogólnych wpisów o „bezpieczeństwie” (rozmowy, wizyty).
-const CIVIL_STRICT = ["ochron ludnosci", "ochrony ludnosci", "ochrone ludnosci", "obron cywiln", "obrone cywiln", "schron", "alarm", "ostrzez", "ostrzeg", "ewakuac", "komunikat", "dron", "rakiet", "przestrzen powietrzn", "przestrzeni powietrzn", "sabota", "cyberatak", "zagrozeni", "powodz", "pozar", "skazeni"];
+const CIVIL_STRICT = ["ochron ludnosci", "ochrony ludnosci", "ochrone ludnosci", "obron cywiln", "obrone cywiln", "schron", "alarm", "ostrzez", "ostrzeg", "ewakuac", "komunikat", "dron", "rakiet", "przestrzen powietrzn", "niezidentyfikowan", "radiolokacyj", "przestrzeni powietrzn", "mysliwc", "poderwan", "poderwal", "wstrzymano lot", "wstrzymane lot", "dowodztwo operacyjne", "dowodztwa operacyjn", "lotnictwa wojsk", "lotnictwo wojsk", "sabota", "cyberatak", "zagrozeni", "powodz", "pozar", "skazeni"];
 const fold = (s) => String(s || "").toLowerCase().replace(/ł/g, "l").normalize("NFD").replace(/[̀-ͯ]/g, "");
 const matches = (text, words) => { const t = fold(text); return words.some((w) => new RegExp("(^|[^a-z0-9])" + fold(w)).test(t)); }; // dopasowanie od początku wyrazu
 
@@ -268,7 +270,9 @@ export function parseGddkia(xml, nowMs, regionIds) {
 // ---------- Doniesienia medialne (regionalne rozgłośnie publiczne): tylko tytuły poważnych zdarzeń, bez sportu i kultury ----------
 const MEDIA_SAFETY = ["alarm", "bomb", "ewakuac", "zagroz", "ostrzez", "grozb", "pozar", "wybuch", "wypad", "zablokowan", "zamkniet", "utrudnien", "powodz", "podtopien", "wichur", "nawalnic",
   "burz", "tornado", "gololed", "skazeni", "katastrof", "nie zyje", "nie zyja", "zgin", "smiertel", "ranni", "ranny", "rannych", "strzelani", "nozown", "atak", "zamach", "dron", "rakiet", "syren",
-  "sabotaz", "dywersj", "szpieg", "wojn", "bron jadrow", "bron biolog", "bron chemicz", "zestrzel", "przestrzen powietrzn", "mobilizac", "inwazj", "agresj", "cyberatak",
+  // lotnictwo wojskowe: poderwane myśliwce, wstrzymane loty (komunikaty Dowództwa Operacyjnego i PAŻP przez media)
+  "mysliwc", "poderwan", "poderwal", "wstrzymano lot", "wstrzymane lot", "dowodztwo operacyjne", "dowodztwa operacyjn", "lotnictwa wojsk", "lotnictwo wojsk",
+  "sabotaz", "dywersj", "szpieg", "wojn", "bron jadrow", "bron biolog", "bron chemicz", "zestrzel", "przestrzen powietrzn", "przestrzeni powietrzn", "niezidentyfikowan", "radiolokacyj", "mobilizac", "inwazj", "agresj", "cyberatak",
   "zabojstw", "morderstw", "napad", "porwan", "zaginion", "brak pradu", "brak wody", "przerw w dostaw", "zatruc", "epidemi",
   // awarie tylko tam, gdzie dotykają infrastruktury krytycznej (sama „awaria” łapała np. schody ruchome, windy, kasy biletowe)
   "awaria prad", "awaria zasilan", "awaria sieci energ", "awaria sieci wodoc", "awaria wodoc", "awaria gazoc", "awaria sieci gaz", "awaria ciepl", "awaria kanalizac", "awaria elektrown", "awaria sieci komorkow", "awaria internet", "awaria telefon", "awaria numeru 112", "awaria systemu alarm", "awaria mostu", "awaria wiaduktu", "awaria tamy", "awaria zapory", "awaria reaktor", "awaria zbiornik", "awaria rurociag", "awaria magistral", "awaria stacji transformator"];
