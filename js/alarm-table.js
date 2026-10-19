@@ -12,9 +12,9 @@ export const LEVEL_STYLE = {
   DELTA: { bg: "#D0312D", ink: "#FFFFFF" },
 };
 
-// Tabela ogólna (zadania dla administracji). complete: false = nie wszystkie wiersze zostały jeszcze przepisane z infografiki.
+// Tabela ogólna (zadania dla administracji i obywatela), przepisana w całości z infografiki.
 export const GENERAL_TABLE = {
-  complete: false,
+  complete: true,
   rows: [
     { level: "ALFA", admin: [
       "kontrola skupisk ludności i obiektów użyteczności publicznej;",
@@ -37,17 +37,23 @@ export const GENERAL_TABLE = {
       "kontrola dostępność obiektów na wypadek ewakuacji;",
       "wydanie broni i amunicji osobom wyznaczonym do wykonywania zadań ochronnych;",
       "całodobowy nadzór nad miejscami nieobjętymi nadzorem.",
-    ], partial: true },
-    { level: "DELTA", admin: null },
+    ] },
+    { level: "DELTA", admin: [
+      "ograniczenia komunikacyjne w rejonach zagrożonych;",
+      "identyfikacja pojazdów znajdujących się w rejonie obiektu;",
+      "kontrola pojazdów wjeżdżających na teren obiektu;",
+      "kontrola wnoszonych na teren obiektu przedmiotów;",
+      "przygotowanie do zapewnienia ciągłości działania w zapasowym miejscu.",
+    ] },
   ],
   citizen: {
-    // Kolumna „Zadania obywatela” z infografiki (widoczna jako jedna wspólna komórka obok wierszy tabeli).
+    // Kolumna „Zadania obywatela” z infografiki: jedna wspólna komórka obok wszystkich wierszy tabeli (ALFA–DELTA).
     items: [
       "zachowanie czujności;",
       "informowanie służb po zaobserwowaniu podejrzanych zdarzeń;",
       "stosowanie się do poleceń służb.",
     ],
-    partial: true,
+    partial: false,
   },
 };
 

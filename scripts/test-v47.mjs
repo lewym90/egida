@@ -139,10 +139,16 @@ await t("tabele: przepisane z infografiki RCB, kolory stopni, CRP kompletne, bra
   assert.ok(CRP_TABLE.rows.every((r) => r.admin.length > 0 && r.admin.every((x) => /[;.]$/.test(x))));
   assert.deepEqual(CRP_TABLE.rows[1].admin, ["zwiększenie dyspozycyjności personelu bezpieczeństwa systemów;", "całodobowe dyżury administratorów systemów kluczowych."]);
   assert.deepEqual(GENERAL_TABLE.rows.map((r) => r.level), ["ALFA", "BRAVO", "CHARLIE", "DELTA"]);
-  assert.equal(GENERAL_TABLE.rows[0].admin.length, 5); assert.equal(GENERAL_TABLE.rows[1].admin.length, 6);
+  assert.deepEqual(GENERAL_TABLE.rows.map((r) => r.admin.length), [5, 6, 5, 5]);
+  assert.equal(GENERAL_TABLE.complete, true);
+  assert.deepEqual(GENERAL_TABLE.rows[3].admin[0], "ograniczenia komunikacyjne w rejonach zagrożonych;");
+  assert.deepEqual(GENERAL_TABLE.rows[3].admin[4], "przygotowanie do zapewnienia ciągłości działania w zapasowym miejscu.");
+  assert.equal(GENERAL_TABLE.rows[2].admin[4], "całodobowy nadzór nad miejscami nieobjętymi nadzorem.");
+  assert.deepEqual(GENERAL_TABLE.citizen.items, ["zachowanie czujności;", "informowanie służb po zaobserwowaniu podejrzanych zdarzeń;", "stosowanie się do poleceń służb."]);
   for (const k of ["ALFA", "BRAVO", "CHARLIE", "DELTA"]) assert.match(LEVEL_STYLE[k].bg, /^#[0-9A-F]{6}$/i);
   const h = renderAlarmHtml(null, { now: NOW });
-  if (!GENERAL_TABLE.complete) assert.match(h, /jest w przygotowaniu/); // niepełna tabela jest jawnie oznaczona, a nie zgadywana
+  assert.ok(!/w przygotowaniu/.test(h) && !/To nie jest cały wiersz/.test(h)); // tabela jest kompletna, bez znaczników „w przygotowaniu”
+  assert.match(h, /DELTA/); assert.match(h, /Zadania obywatela/);
 });
 
 // ---------- kolektor na serwerze (lokalny serwer udający gov.pl) ----------

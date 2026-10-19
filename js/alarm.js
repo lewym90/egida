@@ -84,7 +84,7 @@ function tableHtml(tbl, { citizen = null, title, id }) {
       : '<p class="muted small alnote">Treść tego wiersza jest w przygotowaniu. Pełną tabelę zobacz w komunikacie RCB.</p>';
     return `<tr><th scope="row" style="background:${st.bg};color:${st.ink}">${esc(r.level)}</th><td>${body}</td></tr>`;
   }).join("");
-  const cit = citizen ? `<tr class="alcit"><th scope="row">Zadania obywatela</th><td><ul>${citizen.items.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>${citizen.partial ? '<p class="muted small alnote">Fragment tabeli RCB.</p>' : ""}</td></tr>` : "";
+  const cit = citizen ? `<tr class="alcit"><th scope="row">Zadania obywatela</th><td><ul>${citizen.items.map((x) => `<li>${esc(x)}</li>`).join("")}</ul><p class="muted small alnote">W infografice RCB to jedna wspólna kolumna dla wszystkich stopni (ALFA–DELTA).</p></td></tr>` : "";
   return `<div class="card flat altablewrap"><h3 id="${id}">${esc(title)}</h3><table class="altable" aria-labelledby="${id}"><thead><tr><th scope="col">Stopień</th><th scope="col">Najważniejsze zadania dla administracji</th></tr></thead><tbody>${rows}${cit}</tbody></table></div>`;
 }
 
