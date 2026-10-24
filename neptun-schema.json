@@ -1,0 +1,861 @@
+{
+ "generatedAt": "2026-10-24T22:20:08.805Z",
+ "note": "Raport o strukturze danych NEPTUN (neptun.in.ua). Próbki ucięte, tylko do diagnostyki formatu.",
+ "rest": [
+  {
+   "path": "threats",
+   "status": 200,
+   "ms": 119,
+   "contentType": "application/json",
+   "bytes": 935,
+   "cors": "*",
+   "enums": {
+    "type": {
+     "fpv": 1,
+     "uav": 1
+    },
+    "status": {
+     "active": 2
+    },
+    "lifecycle": {
+     "uncertain": 1,
+     "confirmed": 1
+    },
+    "positionQuality": {
+     "approx": 1,
+     "confirmed": 1
+    },
+    "confidenceLevel": {
+     "medium": 1,
+     "high": 1
+    },
+    "displayConfidence": {
+     "medium": 1,
+     "high": 1
+    }
+   },
+   "withTrail": [],
+   "withCount": [],
+   "areaOnly": [],
+   "stale": [],
+   "topLevel": [
+    "epoch",
+    "seq",
+    "serverTime",
+    "threats"
+   ],
+   "shape": {
+    "type": "object",
+    "fields": {
+     "epoch": {
+      "type": "string"
+     },
+     "seq": {
+      "type": "number"
+     },
+     "serverTime": {
+      "type": "string"
+     },
+     "threats": {
+      "type": "array",
+      "length": 2,
+      "item": {
+       "type": "object",
+       "fields": {
+        "id": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "2/2"
+        },
+        "type": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "2/2"
+        },
+        "title": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "2/2"
+        },
+        "region": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "2/2"
+        },
+        "district": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "2/2"
+        },
+        "locality": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "2/2"
+        },
+        "lat": {
+         "types": [
+          "number"
+         ],
+         "presentIn": "2/2"
+        },
+        "lon": {
+         "types": [
+          "number"
+         ],
+         "presentIn": "2/2"
+        },
+        "heading": {
+         "types": [
+          "null"
+         ],
+         "presentIn": "2/2"
+        },
+        "confidenceLevel": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "2/2"
+        },
+        "sourceCount": {
+         "types": [
+          "number"
+         ],
+         "presentIn": "2/2"
+        },
+        "updatedAt": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "2/2"
+        },
+        "explanationShort": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "2/2"
+        },
+        "status": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "2/2"
+        },
+        "uncertaintyKm": {
+         "types": [
+          "number"
+         ],
+         "presentIn": "2/2"
+        },
+        "positionQuality": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "2/2"
+        },
+        "lifecycle": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "2/2"
+        },
+        "displayConfidence": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "2/2"
+        },
+        "confirmedAt": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "1/2"
+        }
+       }
+      }
+     }
+    }
+   },
+   "samples": [
+    {
+     "id": "trk_00298539",
+     "type": "fpv",
+     "title": "FPV-дрон",
+     "region": "",
+     "district": "",
+     "locality": "Токарі",
+     "lat": 50.91794,
+     "lon": 34.89746,
+     "heading": null,
+     "confidenceLevel": "medium",
+     "sourceCount": 1,
+     "updatedAt": "2026-10-24T22:18:55Z",
+     "explanationShort": "FPV-дрон — Токарі. Підтверджень: 1.",
+     "status": "active",
+     "uncertaintyKm": 25,
+     "positionQuality": "approx",
+     "lifecycle": "uncertain",
+     "displayConfidence": "medium"
+    },
+    {
+     "id": "trk_00298540",
+     "type": "uav",
+     "title": "БпЛА",
+     "region": "Сумська область",
+     "district": "",
+     "locality": "Суми",
+     "lat": 50.9077,
+     "lon": 34.7981,
+     "heading": null,
+     "confidenceLevel": "high",
+     "sourceCount": 2,
+     "updatedAt": "2026-10-24T22:14:41Z",
+     "explanationShort": "БпЛА — Суми, Сумська область. Підтверджень: 2.",
+     "status": "active",
+     "confirmedAt": "2026-10-24T22:11:36Z",
+     "uncertaintyKm": 4,
+     "positionQuality": "confirmed",
+     "lifecycle": "confirmed",
+     "displayConfidence": "high"
+    }
+   ],
+   "scalarFields": {
+    "epoch": "rt-5ea3e304",
+    "seq": 78308,
+    "serverTime": "2026-10-24T22:20:02.884Z"
+   }
+  },
+  {
+   "path": "alerts",
+   "status": 200,
+   "ms": 31,
+   "contentType": "application/json",
+   "bytes": 3687,
+   "cors": "*",
+   "topLevel": [
+    "version",
+    "updatedAt",
+    "raions",
+    "oblasts"
+   ],
+   "shape": {
+    "type": "object",
+    "fields": {
+     "version": {
+      "type": "number"
+     },
+     "updatedAt": {
+      "type": "string"
+     },
+     "raions": {
+      "type": "array",
+      "length": 18,
+      "item": {
+       "type": "object",
+       "fields": {
+        "key": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "18/18"
+        },
+        "name": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "18/18"
+        },
+        "oblast": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "18/18"
+        },
+        "since": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "18/18"
+        },
+        "level": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "18/18"
+        },
+        "reasons": {
+         "types": [
+          "array"
+         ],
+         "presentIn": "17/18",
+         "nested": {
+          "type": "array",
+          "length": 1,
+          "item": {
+           "types": [
+            "string"
+           ]
+          }
+         }
+        }
+       }
+      }
+     },
+     "oblasts": {
+      "type": "array",
+      "length": 3,
+      "item": {
+       "type": "object",
+       "fields": {
+        "key": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "3/3"
+        },
+        "name": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "3/3"
+        },
+        "oblast": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "3/3"
+        },
+        "since": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "3/3"
+        },
+        "level": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "3/3"
+        }
+       }
+      }
+     }
+    }
+   },
+   "samples": [
+    {
+     "key": "бахмутський",
+     "name": "Бахмутський район",
+     "oblast": "Донецька область",
+     "since": "2026-10-24T21:42:30.534609Z",
+     "level": "red",
+     "reasons": [
+      "Ракетна загроза (червоний рівень)"
+     ]
+    },
+    {
+     "key": "бердянський",
+     "name": "Бердянський район",
+     "oblast": "Запорізька область",
+     "since": "2026-10-24T21:42:30.691268Z",
+     "level": "red",
+     "reasons": [
+      "Ракетна загроза (червоний рівень)"
+     ]
+    },
+    {
+     "key": "василівський",
+     "name": "Василівський район",
+     "oblast": "Запорізька область",
+     "since": "2026-10-24T21:42:32.451512Z",
+     "level": "red",
+     "reasons": [
+      "Ракетна загроза (червоний рівень)"
+     ]
+    }
+   ],
+   "scalarFields": {
+    "version": 1792879813,
+    "updatedAt": "2026-10-24T22:10:13.608623968Z"
+   }
+  },
+  {
+   "path": "messages",
+   "status": 200,
+   "ms": 31,
+   "contentType": "application/json",
+   "bytes": 14184,
+   "cors": "*",
+   "topLevel": [
+    "messages",
+    "updatedAt"
+   ],
+   "shape": {
+    "type": "object",
+    "fields": {
+     "messages": {
+      "type": "array",
+      "length": 120,
+      "item": {
+       "type": "object",
+       "fields": {
+        "channel": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "50/50"
+        },
+        "text": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "50/50"
+        },
+        "date": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "50/50"
+        }
+       }
+      }
+     },
+     "updatedAt": {
+      "type": "string"
+     }
+    }
+   },
+   "samples": [
+    {
+     "channel": "SUMY GO",
+     "text": "Молнія Гірне\n\nSUMY GO • Чуєте БпЛА?👉🏻@sumygo_bot",
+     "date": "2026-10-24T22:18:55Z"
+    },
+    {
+     "channel": "SUMY GO",
+     "text": "❗️Молнія біля Старого Села, Аеропорту\n\nSUMY GO • Чуєте БпЛА?👉🏻@sumygo_bot",
+     "date": "2026-10-24T22:17:23Z"
+    },
+    {
+     "channel": "SUMY GO",
+     "text": "В області можете чути добрі жужики🤫\n\nSUMY GO • Чуєте БпЛА?👉🏻@sumygo_bot",
+     "date": "2026-10-24T22:16:57Z"
+    }
+   ],
+   "scalarFields": {
+    "updatedAt": "2026-10-24T22:20:01.008245973Z"
+   }
+  }
+ ],
+ "ws": {
+  "url": "/stream",
+  "frames": [
+   {
+    "type": "snapshot",
+    "keys": [
+     "type",
+     "ts",
+     "data"
+    ],
+    "shape": {
+     "type": "object",
+     "fields": {
+      "threats": {
+       "type": "array",
+       "length": 2,
+       "item": {
+        "type": "object",
+        "fields": {
+         "id": {
+          "types": [
+           "string"
+          ],
+          "presentIn": "2/2"
+         },
+         "type": {
+          "types": [
+           "string"
+          ],
+          "presentIn": "2/2"
+         },
+         "title": {
+          "types": [
+           "string"
+          ],
+          "presentIn": "2/2"
+         },
+         "region": {
+          "types": [
+           "string"
+          ],
+          "presentIn": "2/2"
+         },
+         "district": {
+          "types": [
+           "string"
+          ],
+          "presentIn": "2/2"
+         },
+         "locality": {
+          "types": [
+           "string"
+          ],
+          "presentIn": "2/2"
+         },
+         "lat": {
+          "types": [
+           "number"
+          ],
+          "presentIn": "2/2"
+         },
+         "lon": {
+          "types": [
+           "number"
+          ],
+          "presentIn": "2/2"
+         },
+         "heading": {
+          "types": [
+           "null"
+          ],
+          "presentIn": "2/2"
+         },
+         "confidenceLevel": {
+          "types": [
+           "string"
+          ],
+          "presentIn": "2/2"
+         },
+         "sourceCount": {
+          "types": [
+           "number"
+          ],
+          "presentIn": "2/2"
+         },
+         "updatedAt": {
+          "types": [
+           "string"
+          ],
+          "presentIn": "2/2"
+         },
+         "explanationShort": {
+          "types": [
+           "string"
+          ],
+          "presentIn": "2/2"
+         },
+         "status": {
+          "types": [
+           "string"
+          ],
+          "presentIn": "2/2"
+         },
+         "uncertaintyKm": {
+          "types": [
+           "number"
+          ],
+          "presentIn": "2/2"
+         },
+         "positionQuality": {
+          "types": [
+           "string"
+          ],
+          "presentIn": "2/2"
+         },
+         "lifecycle": {
+          "types": [
+           "string"
+          ],
+          "presentIn": "2/2"
+         },
+         "displayConfidence": {
+          "types": [
+           "string"
+          ],
+          "presentIn": "2/2"
+         },
+         "confirmedAt": {
+          "types": [
+           "string"
+          ],
+          "presentIn": "1/2"
+         }
+        }
+       }
+      }
+     }
+    },
+    "sample": {
+     "threats": [
+      {
+       "id": "trk_00298539",
+       "type": "fpv",
+       "title": "FPV-дрон",
+       "region": "",
+       "district": "",
+       "locality": "Токарі",
+       "lat": 50.91794,
+       "lon": 34.89746,
+       "heading": null,
+       "confidenceLevel": "medium",
+       "sourceCount": 1,
+       "updatedAt": "2026-10-24T22:18:55Z",
+       "explanationShort": "FPV-дрон — Токарі. Підтверджень: 1.",
+       "status": "active",
+       "uncertaintyKm": 25,
+       "positionQuality": "approx",
+       "lifecycle": "uncertain",
+       "displayConfidence": "medium"
+      },
+      {
+       "id": "trk_00298540",
+       "type": "uav",
+       "title": "БпЛА",
+       "region": "Сумська область",
+       "district": "",
+       "locality": "Суми",
+       "lat": 50.9077,
+       "lon": 34.7981,
+       "heading": null,
+       "confidenceLevel": "high",
+       "sourceCount": 2,
+       "updatedAt": "2026-10-24T22:14:41Z",
+       "explanationShort": "БпЛА — Суми, Сумська область. Підтверджень: 2.",
+       "status": "active",
+       "confirmedAt": "2026-10-24T22:11:36Z",
+       "uncertaintyKm": 4,
+       "positionQuality": "confirmed",
+       "lifecycle": "confirmed",
+       "displayConfidence": "high"
+      }
+     ]
+    }
+   },
+   {
+    "type": "alerts",
+    "keys": [
+     "type",
+     "ts",
+     "data"
+    ],
+    "shape": {
+     "type": "object",
+     "fields": {
+      "version": {
+       "type": "number"
+      },
+      "updatedAt": {
+       "type": "string"
+      },
+      "raions": {
+       "type": "array",
+       "length": 18,
+       "item": {
+        "type": "object",
+        "fields": {
+         "key": {
+          "types": [
+           "string"
+          ],
+          "presentIn": "18/18"
+         },
+         "name": {
+          "types": [
+           "string"
+          ],
+          "presentIn": "18/18"
+         },
+         "oblast": {
+          "types": [
+           "string"
+          ],
+          "presentIn": "18/18"
+         },
+         "since": {
+          "types": [
+           "string"
+          ],
+          "presentIn": "18/18"
+         },
+         "level": {
+          "types": [
+           "string"
+          ],
+          "presentIn": "18/18"
+         },
+         "reasons": {
+          "types": [
+           "array"
+          ],
+          "presentIn": "17/18",
+          "nested": {
+           "type": "array",
+           "length": 1,
+           "item": {
+            "types": [
+             "string"
+            ]
+           }
+          }
+         }
+        }
+       }
+      },
+      "oblasts": {
+       "type": "array",
+       "length": 3,
+       "item": {
+        "type": "object",
+        "fields": {
+         "key": {
+          "types": [
+           "string"
+          ],
+          "presentIn": "3/3"
+         },
+         "name": {
+          "types": [
+           "string"
+          ],
+          "presentIn": "3/3"
+         },
+         "oblast": {
+          "types": [
+           "string"
+          ],
+          "presentIn": "3/3"
+         },
+         "since": {
+          "types": [
+           "string"
+          ],
+          "presentIn": "3/3"
+         },
+         "level": {
+          "types": [
+           "string"
+          ],
+          "presentIn": "3/3"
+         }
+        }
+       }
+      }
+     }
+    },
+    "sample": {
+     "version": 1792879813,
+     "updatedAt": "2026-10-24T22:10:13.608623968Z",
+     "raions": [
+      {
+       "key": "бахмутський",
+       "name": "Бахмутський район",
+       "oblast": "Донецька область",
+       "since": "2026-10-24T21:42:30.534609Z",
+       "level": "red",
+       "reasons": [
+        "Ракетна загроза (червоний рівень)"
+       ]
+      },
+      {
+       "key": "бердянський",
+       "name": "Бердянський район",
+       "oblast": "Запорізька область",
+       "since": "2026-10-24T21:42:30.691268Z",
+       "level": "red",
+       "reasons": [
+        "Ракетна загроза (червоний рівень)"
+       ]
+      },
+      {
+       "key": "василівський",
+       "name": "Василівський район",
+       "oblast": "Запорізька область",
+       "since": "2026-10-24T21:42:32.451512Z",
+       "level": "red",
+       "reasons": [
+        "Ракетна загроза (червоний рівень)"
+       ]
+      },
+      {
+       "key": "волноваський",
+       "name": "Волноваський район",
+       "oblast": "Донецька область",
+       "since": "2026-10-24T21:42:32.130488Z",
+       "level": "red",
+       "reasons": [
+        "Ракетна загроза (червоний рівень)"
+       ]
+      },
+      {
+       "key": "горлівський",
+       "name": "Горлівський район",
+       "oblast": "Донецька область",
+       "since": "2026-10-24T21:42:31.651189Z",
+       "level": "red",
+       "reasons": [
+        "Ракетна загроза (червоний рівень)"
+       ]
+      }
+     ],
+     "oblasts": [
+      {
+       "key": "автономна республіка крим",
+       "name": "Автономна Республіка Крим",
+       "oblast": "Автономна Республіка Крим",
+       "since": "2022-12-10T22:22:00Z",
+       "level": "red"
+      },
+      {
+       "key": "луганська",
+       "name": "Луганська область",
+       "oblast": "Луганська область",
+       "since": "2022-04-04T16:45:00Z",
+       "level": "red"
+      },
+      {
+       "key": "севастополь",
+       "name": "Севастополь",
+       "oblast": "Автономна Республіка Крим",
+       "since": "2022-12-10T22:22:00Z",
+       "level": "red"
+      }
+     ]
+    }
+   },
+   {
+    "type": "heartbeat",
+    "keys": [
+     "type",
+     "ts"
+    ],
+    "shape": {
+     "type": "null"
+    },
+    "sample": {
+     "type": "heartbeat",
+     "ts": "2026-10-24T22:20:10.8Z"
+    }
+   },
+   {
+    "type": "heartbeat",
+    "keys": [
+     "type",
+     "ts"
+    ],
+    "shape": {
+     "type": "null"
+    },
+    "sample": {
+     "type": "heartbeat",
+     "ts": "2026-10-24T22:20:25.8Z"
+    }
+   }
+  ],
+  "opened": true
+ }
+}
