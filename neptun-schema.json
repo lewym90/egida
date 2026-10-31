@@ -1,0 +1,1328 @@
+{
+ "generatedAt": "2026-10-31T16:20:07.233Z",
+ "note": "Raport o strukturze danych NEPTUN (neptun.in.ua). Próbki ucięte, tylko do diagnostyki formatu.",
+ "rest": [
+  {
+   "path": "threats",
+   "status": 200,
+   "ms": 123,
+   "contentType": "application/json",
+   "bytes": 32386,
+   "cors": "*",
+   "enums": {
+    "type": {
+     "uav": 61
+    },
+    "status": {
+     "active": 61
+    },
+    "lifecycle": {
+     "confirmed": 11,
+     "uncertain": 49,
+     "created": 1
+    },
+    "positionQuality": {
+     "confirmed": 12,
+     "approx": 49
+    },
+    "confidenceLevel": {
+     "medium": 56,
+     "high": 5
+    },
+    "displayConfidence": {
+     "medium": 56,
+     "high": 5
+    }
+   },
+   "withTrail": [
+    {
+     "id": "trk_00315127",
+     "type": "uav",
+     "title": "БпЛА",
+     "region": "Дніпропетровська область",
+     "district": "",
+     "locality": "Павлоград",
+     "lat": 48.53858687835492,
+     "lon": 35.856783935708435,
+     "heading": null,
+     "confidenceLevel": "medium",
+     "sourceCount": 8,
+     "updatedAt": "2026-10-31T16:17:15Z",
+     "explanationShort": "БпЛА — Павлоград, Дніпропетровська область. Підтверджень: 8.",
+     "status": "active",
+     "confirmedAt": "2026-10-31T16:17:15Z",
+     "uncertaintyKm": 4,
+     "positionQuality": "confirmed",
+     "trail": [
+      {
+       "lat": 48.54762262331072,
+       "lon": 35.82349120190437,
+       "t": "2026-10-31T15:52:20Z"
+      },
+      {
+       "lat": 48.543821270760304,
+       "lon": 35.83749750898536,
+       "t": "2026-10-31T15:59:04Z"
+      },
+      {
+       "lat": 48.53858687835492,
+       "lon": 35.856783935708435,
+       "t": "2026-10-31T16:16:01Z"
+      }
+     ],
+     "lifecycle": "confirmed",
+     "displayConfidence": "medium"
+    },
+    {
+     "id": "trk_00315742",
+     "type": "uav",
+     "title": "БпЛА",
+     "region": "Полтавська область",
+     "district": "",
+     "locality": "Заводське",
+     "lat": 50.36186655734408,
+     "lon": 33.48493397759479,
+     "heading": 240.094,
+     "confidenceLevel": "medium",
+     "sourceCount": 7,
+     "count": 1,
+     "updatedAt": "2026-10-31T16:14:30Z",
+     "explanationShort": "БпЛА курсом на Заводське. Підтверджень: 7.",
+     "status": "active",
+     "confirmedAt": "2026-10-31T16:08:10Z",
+     "uncertaintyKm": 10,
+     "positionQuality": "approx",
+     "trail": [
+      {
+       "lat": 50.29898250475646,
+       "lon": 33.36213747464405,
+       "t": "2026-10-31T15:58:21Z"
+      },
+      {
+       "lat": 50.31696434959238,
+       "lon": 33.362847308652235,
+       "t": "2026-10-31T16:05:54Z"
+      }
+     ],
+     "lifecycle": "uncertain",
+     "displayConfidence": "medium",
+     "destination": true,
+     "presumptiveCourse": true
+    }
+   ],
+   "withCount": [
+    {
+     "id": "trk_00315153",
+     "type": "uav",
+     "title": "Група БпЛА (2+)",
+     "region": "Сумська область",
+     "district": "",
+     "locality": "Ромни",
+     "lat": 50.74966530853274,
+     "lon": 33.47461818315785,
+     "heading": null,
+     "confidenceLevel": "medium",
+     "sourceCount": 5,
+     "count": 2,
+     "updatedAt": "2026-10-31T16:17:15Z",
+     "explanationShort": "БпЛА — Ромни, Сумська область. Підтверджень: 5.",
+     "status": "active",
+     "confirmedAt": "2026-10-31T16:17:15Z",
+     "uncertaintyKm": 4,
+     "positionQuality": "confirmed",
+     "lifecycle": "confirmed",
+     "displayConfidence": "medium"
+    },
+    {
+     "id": "trk_00315502",
+     "type": "uav",
+     "title": "БпЛА",
+     "region": "Полтавська область",
+     "district": "",
+     "locality": "Ромодан",
+     "lat": 50.01906445399154,
+     "lon": 33.45937479948415,
+     "heading": 252.102,
+     "confidenceLevel": "medium",
+     "sourceCount": 7,
+     "count": 3,
+     "updatedAt": "2026-10-31T16:17:15Z",
+     "explanationShort": "БпЛА курсом на Ромодан. Підтверджень: 7.",
+     "status": "active",
+     "confirmedAt": "2026-10-31T16:17:15Z",
+     "uncertaintyKm": 4,
+     "positionQuality": "approx",
+     "lifecycle": "uncertain",
+     "displayConfidence": "medium",
+     "destination": true,
+     "presumptiveCourse": true
+    }
+   ],
+   "areaOnly": [],
+   "stale": [],
+   "topLevel": [
+    "epoch",
+    "seq",
+    "serverTime",
+    "threats"
+   ],
+   "shape": {
+    "type": "object",
+    "fields": {
+     "epoch": {
+      "type": "string"
+     },
+     "seq": {
+      "type": "number"
+     },
+     "serverTime": {
+      "type": "string"
+     },
+     "threats": {
+      "type": "array",
+      "length": 61,
+      "item": {
+       "type": "object",
+       "fields": {
+        "id": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "50/50"
+        },
+        "type": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "50/50"
+        },
+        "title": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "50/50"
+        },
+        "region": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "50/50"
+        },
+        "district": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "50/50"
+        },
+        "locality": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "50/50"
+        },
+        "lat": {
+         "types": [
+          "number"
+         ],
+         "presentIn": "50/50"
+        },
+        "lon": {
+         "types": [
+          "number"
+         ],
+         "presentIn": "50/50"
+        },
+        "heading": {
+         "types": [
+          "null",
+          "number"
+         ],
+         "presentIn": "50/50"
+        },
+        "confidenceLevel": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "50/50"
+        },
+        "sourceCount": {
+         "types": [
+          "number"
+         ],
+         "presentIn": "50/50"
+        },
+        "updatedAt": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "50/50"
+        },
+        "explanationShort": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "50/50"
+        },
+        "status": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "50/50"
+        },
+        "confirmedAt": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "47/50"
+        },
+        "uncertaintyKm": {
+         "types": [
+          "number"
+         ],
+         "presentIn": "50/50"
+        },
+        "positionQuality": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "50/50"
+        },
+        "trail": {
+         "types": [
+          "array"
+         ],
+         "presentIn": "6/50",
+         "nested": {
+          "type": "array",
+          "length": 3,
+          "item": {
+           "types": [
+            "object"
+           ]
+          }
+         }
+        },
+        "lifecycle": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "50/50"
+        },
+        "displayConfidence": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "50/50"
+        },
+        "destination": {
+         "types": [
+          "boolean"
+         ],
+         "presentIn": "39/50"
+        },
+        "presumptiveCourse": {
+         "types": [
+          "boolean"
+         ],
+         "presentIn": "38/50"
+        },
+        "count": {
+         "types": [
+          "number"
+         ],
+         "presentIn": "13/50"
+        }
+       }
+      }
+     }
+    }
+   },
+   "samples": [
+    {
+     "id": "trk_00315127",
+     "type": "uav",
+     "title": "БпЛА",
+     "region": "Дніпропетровська область",
+     "district": "",
+     "locality": "Павлоград",
+     "lat": 48.53858687835492,
+     "lon": 35.856783935708435,
+     "heading": null,
+     "confidenceLevel": "medium",
+     "sourceCount": 8,
+     "updatedAt": "2026-10-31T16:17:15Z",
+     "explanationShort": "БпЛА — Павлоград, Дніпропетровська область. Підтверджень: 8.",
+     "status": "active",
+     "confirmedAt": "2026-10-31T16:17:15Z",
+     "uncertaintyKm": 4,
+     "positionQuality": "confirmed",
+     "trail": [
+      {
+       "lat": 48.54762262331072,
+       "lon": 35.82349120190437,
+       "t": "2026-10-31T15:52:20Z"
+      },
+      {
+       "lat": 48.543821270760304,
+       "lon": 35.83749750898536,
+       "t": "2026-10-31T15:59:04Z"
+      },
+      {
+       "lat": 48.53858687835492,
+       "lon": 35.856783935708435,
+       "t": "2026-10-31T16:16:01Z"
+      }
+     ],
+     "lifecycle": "confirmed",
+     "displayConfidence": "medium"
+    },
+    {
+     "id": "trk_00315140",
+     "type": "uav",
+     "title": "БпЛА",
+     "region": "Полтавська область",
+     "district": "",
+     "locality": "Миргород",
+     "lat": 50.00115551324022,
+     "lon": 33.73962006768825,
+     "heading": 249.1,
+     "confidenceLevel": "medium",
+     "sourceCount": 2,
+     "updatedAt": "2026-10-31T16:17:15Z",
+     "explanationShort": "БпЛА курсом на Миргород. Підтверджень: 2.",
+     "status": "active",
+     "confirmedAt": "2026-10-31T16:17:15Z",
+     "uncertaintyKm": 10,
+     "positionQuality": "approx",
+     "lifecycle": "uncertain",
+     "displayConfidence": "medium",
+     "destination": true,
+     "presumptiveCourse": true
+    },
+    {
+     "id": "trk_00315153",
+     "type": "uav",
+     "title": "Група БпЛА (2+)",
+     "region": "Сумська область",
+     "district": "",
+     "locality": "Ромни",
+     "lat": 50.74966530853274,
+     "lon": 33.47461818315785,
+     "heading": null,
+     "confidenceLevel": "medium",
+     "sourceCount": 5,
+     "count": 2,
+     "updatedAt": "2026-10-31T16:17:15Z",
+     "explanationShort": "БпЛА — Ромни, Сумська область. Підтверджень: 5.",
+     "status": "active",
+     "confirmedAt": "2026-10-31T16:17:15Z",
+     "uncertaintyKm": 4,
+     "positionQuality": "confirmed",
+     "lifecycle": "confirmed",
+     "displayConfidence": "medium"
+    }
+   ],
+   "scalarFields": {
+    "epoch": "rt-5ea3e304",
+    "seq": 179676,
+    "serverTime": "2026-10-31T16:20:04.32Z"
+   }
+  },
+  {
+   "path": "alerts",
+   "status": 200,
+   "ms": 32,
+   "contentType": "application/json",
+   "bytes": 12110,
+   "cors": "*",
+   "topLevel": [
+    "version",
+    "updatedAt",
+    "raions",
+    "oblasts"
+   ],
+   "shape": {
+    "type": "object",
+    "fields": {
+     "version": {
+      "type": "number"
+     },
+     "updatedAt": {
+      "type": "string"
+     },
+     "raions": {
+      "type": "array",
+      "length": 63,
+      "item": {
+       "type": "object",
+       "fields": {
+        "key": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "50/50"
+        },
+        "name": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "50/50"
+        },
+        "oblast": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "50/50"
+        },
+        "since": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "50/50"
+        },
+        "level": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "50/50"
+        },
+        "reasons": {
+         "types": [
+          "array"
+         ],
+         "presentIn": "50/50",
+         "nested": {
+          "type": "array",
+          "length": 1,
+          "item": {
+           "types": [
+            "string"
+           ]
+          }
+         }
+        }
+       }
+      }
+     },
+     "oblasts": {
+      "type": "array",
+      "length": 4,
+      "item": {
+       "type": "object",
+       "fields": {
+        "key": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "4/4"
+        },
+        "name": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "4/4"
+        },
+        "oblast": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "4/4"
+        },
+        "since": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "4/4"
+        },
+        "level": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "4/4"
+        },
+        "reasons": {
+         "types": [
+          "array"
+         ],
+         "presentIn": "1/4",
+         "nested": {
+          "type": "array",
+          "length": 1,
+          "item": {
+           "types": [
+            "string"
+           ]
+          }
+         }
+        }
+       }
+      }
+     }
+    }
+   },
+   "samples": [
+    {
+     "key": "бахмутський",
+     "name": "Бахмутський район",
+     "oblast": "Донецька область",
+     "since": "2026-10-30T17:36:15.017703Z",
+     "level": "red",
+     "reasons": [
+      "Ракетна загроза (червоний рівень)"
+     ]
+    },
+    {
+     "key": "бердичівський",
+     "name": "Бердичівський район",
+     "oblast": "Житомирська область",
+     "since": "2026-10-31T12:06:33.923275Z",
+     "level": "yellow",
+     "reasons": [
+      "Дронова загроза (жовтий рівень)"
+     ]
+    },
+    {
+     "key": "бердянський",
+     "name": "Бердянський район",
+     "oblast": "Запорізька область",
+     "since": "2026-10-31T13:46:23.148336Z",
+     "level": "red",
+     "reasons": [
+      "Ракетна загроза (червоний рівень)"
+     ]
+    }
+   ],
+   "scalarFields": {
+    "version": 1793463488,
+    "updatedAt": "2026-10-31T16:18:08.094252535Z"
+   }
+  },
+  {
+   "path": "messages",
+   "status": 200,
+   "ms": 35,
+   "contentType": "application/json",
+   "bytes": 21543,
+   "cors": "*",
+   "topLevel": [
+    "messages",
+    "updatedAt"
+   ],
+   "shape": {
+    "type": "object",
+    "fields": {
+     "messages": {
+      "type": "array",
+      "length": 120,
+      "item": {
+       "type": "object",
+       "fields": {
+        "channel": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "50/50"
+        },
+        "text": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "50/50"
+        },
+        "date": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "50/50"
+        }
+       }
+      }
+     },
+     "updatedAt": {
+      "type": "string"
+     }
+    }
+   },
+   "samples": [
+    {
+     "channel": "@kramatorsk_radar",
+     "text": "Оновлення мапи DeepStateMap\n\nВорог просунувся поблизу Миколаївки.",
+     "date": "2026-10-31T16:20:00Z"
+    },
+    {
+     "channel": "@cherkasy_nebbo",
+     "text": "реактивний на Косарі ⚠️‼️",
+     "date": "2026-10-31T16:19:48Z"
+    },
+    {
+     "channel": "@UkraineAlarmSignal",
+     "text": "🛸 Вінниця (Вінницька обл.)\nЗагроза застосування БПЛА. Перейдіть в укриття!",
+     "date": "2026-10-31T16:19:41Z"
+    }
+   ],
+   "scalarFields": {
+    "updatedAt": "2026-10-31T16:20:04.793190732Z"
+   }
+  }
+ ],
+ "ws": {
+  "url": "/stream",
+  "frames": [
+   {
+    "type": "snapshot",
+    "keys": [
+     "type",
+     "ts",
+     "data"
+    ],
+    "shape": {
+     "type": "object",
+     "fields": {
+      "threats": {
+       "type": "array",
+       "length": 61,
+       "item": {
+        "type": "object",
+        "fields": {
+         "id": {
+          "types": [
+           "string"
+          ],
+          "presentIn": "50/50"
+         },
+         "type": {
+          "types": [
+           "string"
+          ],
+          "presentIn": "50/50"
+         },
+         "title": {
+          "types": [
+           "string"
+          ],
+          "presentIn": "50/50"
+         },
+         "region": {
+          "types": [
+           "string"
+          ],
+          "presentIn": "50/50"
+         },
+         "district": {
+          "types": [
+           "string"
+          ],
+          "presentIn": "50/50"
+         },
+         "locality": {
+          "types": [
+           "string"
+          ],
+          "presentIn": "50/50"
+         },
+         "lat": {
+          "types": [
+           "number"
+          ],
+          "presentIn": "50/50"
+         },
+         "lon": {
+          "types": [
+           "number"
+          ],
+          "presentIn": "50/50"
+         },
+         "heading": {
+          "types": [
+           "null",
+           "number"
+          ],
+          "presentIn": "50/50"
+         },
+         "confidenceLevel": {
+          "types": [
+           "string"
+          ],
+          "presentIn": "50/50"
+         },
+         "sourceCount": {
+          "types": [
+           "number"
+          ],
+          "presentIn": "50/50"
+         },
+         "updatedAt": {
+          "types": [
+           "string"
+          ],
+          "presentIn": "50/50"
+         },
+         "explanationShort": {
+          "types": [
+           "string"
+          ],
+          "presentIn": "50/50"
+         },
+         "status": {
+          "types": [
+           "string"
+          ],
+          "presentIn": "50/50"
+         },
+         "confirmedAt": {
+          "types": [
+           "string"
+          ],
+          "presentIn": "47/50"
+         },
+         "uncertaintyKm": {
+          "types": [
+           "number"
+          ],
+          "presentIn": "50/50"
+         },
+         "positionQuality": {
+          "types": [
+           "string"
+          ],
+          "presentIn": "50/50"
+         },
+         "trail": {
+          "types": [
+           "array"
+          ],
+          "presentIn": "6/50",
+          "nested": {
+           "type": "array",
+           "length": 3,
+           "item": {
+            "types": [
+             "object"
+            ]
+           }
+          }
+         },
+         "lifecycle": {
+          "types": [
+           "string"
+          ],
+          "presentIn": "50/50"
+         },
+         "displayConfidence": {
+          "types": [
+           "string"
+          ],
+          "presentIn": "50/50"
+         },
+         "destination": {
+          "types": [
+           "boolean"
+          ],
+          "presentIn": "39/50"
+         },
+         "presumptiveCourse": {
+          "types": [
+           "boolean"
+          ],
+          "presentIn": "38/50"
+         },
+         "count": {
+          "types": [
+           "number"
+          ],
+          "presentIn": "13/50"
+         }
+        }
+       }
+      }
+     }
+    },
+    "sample": {
+     "threats": [
+      {
+       "id": "trk_00315127",
+       "type": "uav",
+       "title": "БпЛА",
+       "region": "Дніпропетровська область",
+       "district": "",
+       "locality": "Павлоград",
+       "lat": 48.53858687835492,
+       "lon": 35.856783935708435,
+       "heading": null,
+       "confidenceLevel": "medium",
+       "sourceCount": 8,
+       "updatedAt": "2026-10-31T16:17:15Z",
+       "explanationShort": "БпЛА — Павлоград, Дніпропетровська область. Підтверджень: 8.",
+       "status": "active",
+       "confirmedAt": "2026-10-31T16:17:15Z",
+       "uncertaintyKm": 4,
+       "positionQuality": "confirmed",
+       "trail": [
+        "{…}",
+        "{…}",
+        "{…}"
+       ],
+       "lifecycle": "confirmed",
+       "displayConfidence": "medium"
+      },
+      {
+       "id": "trk_00315140",
+       "type": "uav",
+       "title": "БпЛА",
+       "region": "Полтавська область",
+       "district": "",
+       "locality": "Миргород",
+       "lat": 50.00115551324022,
+       "lon": 33.73962006768825,
+       "heading": 249.1,
+       "confidenceLevel": "medium",
+       "sourceCount": 2,
+       "updatedAt": "2026-10-31T16:17:15Z",
+       "explanationShort": "БпЛА курсом на Миргород. Підтверджень: 2.",
+       "status": "active",
+       "confirmedAt": "2026-10-31T16:17:15Z",
+       "uncertaintyKm": 10,
+       "positionQuality": "approx",
+       "lifecycle": "uncertain",
+       "displayConfidence": "medium",
+       "destination": true,
+       "presumptiveCourse": true
+      },
+      {
+       "id": "trk_00315153",
+       "type": "uav",
+       "title": "Група БпЛА (2+)",
+       "region": "Сумська область",
+       "district": "",
+       "locality": "Ромни",
+       "lat": 50.74966530853274,
+       "lon": 33.47461818315785,
+       "heading": null,
+       "confidenceLevel": "medium",
+       "sourceCount": 5,
+       "count": 2,
+       "updatedAt": "2026-10-31T16:17:15Z",
+       "explanationShort": "БпЛА — Ромни, Сумська область. Підтверджень: 5.",
+       "status": "active",
+       "confirmedAt": "2026-10-31T16:17:15Z",
+       "uncertaintyKm": 4,
+       "positionQuality": "confirmed",
+       "lifecycle": "confirmed",
+       "displayConfidence": "medium"
+      },
+      {
+       "id": "trk_00315373",
+       "type": "uav",
+       "title": "БпЛА",
+       "region": "Черкаська область",
+       "district": "",
+       "locality": "Канів",
+       "lat": 49.84113057874554,
+       "lon": 31.487024591931302,
+       "heading": 187.013,
+       "confidenceLevel": "medium",
+       "sourceCount": 5,
+       "updatedAt": "2026-10-31T16:18:34Z",
+       "explanationShort": "БпЛА курсом на Канів. Підтверджень: 5.",
+       "status": "active",
+       "confirmedAt": "2026-10-31T16:18:34Z",
+       "uncertaintyKm": 4,
+       "positionQuality": "approx",
+       "lifecycle": "uncertain",
+       "displayConfidence": "medium",
+       "destination": true,
+       "presumptiveCourse": true
+      },
+      {
+       "id": "trk_00315443",
+       "type": "uav",
+       "title": "БпЛА",
+       "region": "Дніпропетровська область",
+       "district": "",
+       "locality": "Солоне",
+       "lat": 48.140929839909205,
+       "lon": 34.77988408739902,
+       "heading": 23.959,
+       "confidenceLevel": "medium",
+       "sourceCount": 6,
+       "updatedAt": "2026-10-31T16:17:15Z",
+       "explanationShort": "БпЛА курсом на Солоне. Підтверджень: 6.",
+       "status": "active",
+       "confirmedAt": "2026-10-31T16:17:15Z",
+       "uncertaintyKm": 4,
+       "positionQuality": "approx",
+       "lifecycle": "uncertain",
+       "displayConfidence": "medium",
+       "destination": true,
+       "presumptiveCourse": true
+      }
+     ]
+    }
+   },
+   {
+    "type": "alerts",
+    "keys": [
+     "type",
+     "ts",
+     "data"
+    ],
+    "shape": {
+     "type": "object",
+     "fields": {
+      "version": {
+       "type": "number"
+      },
+      "updatedAt": {
+       "type": "string"
+      },
+      "raions": {
+       "type": "array",
+       "length": 63,
+       "item": {
+        "type": "object",
+        "fields": {
+         "key": {
+          "types": [
+           "string"
+          ],
+          "presentIn": "50/50"
+         },
+         "name": {
+          "types": [
+           "string"
+          ],
+          "presentIn": "50/50"
+         },
+         "oblast": {
+          "types": [
+           "string"
+          ],
+          "presentIn": "50/50"
+         },
+         "since": {
+          "types": [
+           "string"
+          ],
+          "presentIn": "50/50"
+         },
+         "level": {
+          "types": [
+           "string"
+          ],
+          "presentIn": "50/50"
+         },
+         "reasons": {
+          "types": [
+           "array"
+          ],
+          "presentIn": "50/50",
+          "nested": {
+           "type": "array",
+           "length": 1,
+           "item": {
+            "types": [
+             "string"
+            ]
+           }
+          }
+         }
+        }
+       }
+      },
+      "oblasts": {
+       "type": "array",
+       "length": 4,
+       "item": {
+        "type": "object",
+        "fields": {
+         "key": {
+          "types": [
+           "string"
+          ],
+          "presentIn": "4/4"
+         },
+         "name": {
+          "types": [
+           "string"
+          ],
+          "presentIn": "4/4"
+         },
+         "oblast": {
+          "types": [
+           "string"
+          ],
+          "presentIn": "4/4"
+         },
+         "since": {
+          "types": [
+           "string"
+          ],
+          "presentIn": "4/4"
+         },
+         "level": {
+          "types": [
+           "string"
+          ],
+          "presentIn": "4/4"
+         },
+         "reasons": {
+          "types": [
+           "array"
+          ],
+          "presentIn": "1/4",
+          "nested": {
+           "type": "array",
+           "length": 1,
+           "item": {
+            "types": [
+             "string"
+            ]
+           }
+          }
+         }
+        }
+       }
+      }
+     }
+    },
+    "sample": {
+     "version": 1793463488,
+     "updatedAt": "2026-10-31T16:18:08.094252535Z",
+     "raions": [
+      {
+       "key": "бахмутський",
+       "name": "Бахмутський район",
+       "oblast": "Донецька область",
+       "since": "2026-10-30T17:36:15.017703Z",
+       "level": "red",
+       "reasons": [
+        "Ракетна загроза (червоний рівень)"
+       ]
+      },
+      {
+       "key": "бердичівський",
+       "name": "Бердичівський район",
+       "oblast": "Житомирська область",
+       "since": "2026-10-31T12:06:33.923275Z",
+       "level": "yellow",
+       "reasons": [
+        "Дронова загроза (жовтий рівень)"
+       ]
+      },
+      {
+       "key": "бердянський",
+       "name": "Бердянський район",
+       "oblast": "Запорізька область",
+       "since": "2026-10-31T13:46:23.148336Z",
+       "level": "red",
+       "reasons": [
+        "Ракетна загроза (червоний рівень)"
+       ]
+      },
+      {
+       "key": "богодухівський",
+       "name": "Богодухівський район",
+       "oblast": "Харківська область",
+       "since": "2026-10-31T12:43:23.261088Z",
+       "level": "red",
+       "reasons": [
+        "Ракетна загроза (червоний рівень)"
+       ]
+      },
+      {
+       "key": "бориспільський",
+       "name": "Бориспільський район",
+       "oblast": "Київська область",
+       "since": "2026-10-31T12:02:32.565581Z",
+       "level": "yellow",
+       "reasons": [
+        "Дронова загроза (жовтий рівень)"
+       ]
+      }
+     ],
+     "oblasts": [
+      {
+       "key": "автономна республіка крим",
+       "name": "Автономна Республіка Крим",
+       "oblast": "Автономна Республіка Крим",
+       "since": "2022-12-10T22:22:00Z",
+       "level": "red"
+      },
+      {
+       "key": "луганська",
+       "name": "Луганська область",
+       "oblast": "Луганська область",
+       "since": "2022-04-04T16:45:00Z",
+       "level": "red"
+      },
+      {
+       "key": "м. київ",
+       "name": "м. Київ",
+       "oblast": "м. Київ",
+       "since": "2026-10-31T15:53:29.455861Z",
+       "level": "yellow",
+       "reasons": [
+        "Дронова загроза (жовтий рівень)"
+       ]
+      },
+      {
+       "key": "севастополь",
+       "name": "Севастополь",
+       "oblast": "Автономна Республіка Крим",
+       "since": "2022-12-10T22:22:00Z",
+       "level": "red"
+      }
+     ]
+    }
+   },
+   {
+    "type": "heartbeat",
+    "keys": [
+     "type",
+     "ts"
+    ],
+    "shape": {
+     "type": "null"
+    },
+    "sample": {
+     "type": "heartbeat",
+     "ts": "2026-10-31T16:20:10.804Z"
+    }
+   },
+   {
+    "type": "upsert",
+    "keys": [
+     "type",
+     "ts",
+     "data"
+    ],
+    "shape": {
+     "type": "object",
+     "fields": {
+      "id": {
+       "type": "string"
+      },
+      "type": {
+       "type": "string"
+      },
+      "title": {
+       "type": "string"
+      },
+      "region": {
+       "type": "string"
+      },
+      "district": {
+       "type": "string"
+      },
+      "locality": {
+       "type": "string"
+      },
+      "lat": {
+       "type": "number"
+      },
+      "lon": {
+       "type": "number"
+      },
+      "heading": {
+       "type": "null"
+      },
+      "confidenceLevel": {
+       "type": "string"
+      },
+      "sourceCount": {
+       "type": "number"
+      },
+      "count": {
+       "type": "number"
+      },
+      "updatedAt": {
+       "type": "string"
+      },
+      "explanationShort": {
+       "type": "string"
+      },
+      "status": {
+       "type": "string"
+      },
+      "confirmedAt": {
+       "type": "string"
+      },
+      "uncertaintyKm": {
+       "type": "number"
+      },
+      "positionQuality": {
+       "type": "string"
+      },
+      "lifecycle": {
+       "type": "string"
+      },
+      "displayConfidence": {
+       "type": "string"
+      }
+     }
+    },
+    "sample": {
+     "id": "trk_00315153",
+     "type": "uav",
+     "title": "Група БпЛА (2+)",
+     "region": "Сумська область",
+     "district": "",
+     "locality": "Ромни",
+     "lat": 50.74966530853274,
+     "lon": 33.47461818315785,
+     "heading": null,
+     "confidenceLevel": "medium",
+     "sourceCount": 4,
+     "count": 2,
+     "updatedAt": "2026-10-31T16:17:15Z",
+     "explanationShort": "БпЛА — Ромни, Сумська область. Підтверджень: 4.",
+     "status": "active",
+     "confirmedAt": "2026-10-31T16:17:15Z",
+     "uncertaintyKm": 4,
+     "positionQuality": "confirmed",
+     "lifecycle": "confirmed",
+     "displayConfidence": "medium"
+    }
+   },
+   {
+    "type": "remove",
+    "keys": [
+     "type",
+     "ts",
+     "data"
+    ],
+    "shape": {
+     "type": "object",
+     "fields": {
+      "id": {
+       "type": "string"
+      }
+     }
+    },
+    "sample": {
+     "id": "trk_00315868"
+    }
+   },
+   {
+    "type": "remove",
+    "keys": [
+     "type",
+     "ts",
+     "data"
+    ],
+    "shape": {
+     "type": "object",
+     "fields": {
+      "id": {
+       "type": "string"
+      }
+     }
+    },
+    "sample": {
+     "id": "trk_00315871"
+    }
+   }
+  ],
+  "opened": true
+ }
+}

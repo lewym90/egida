@@ -1,0 +1,98 @@
+{
+ "at": "2026-10-31T08:05:07.545Z",
+ "steps": [
+  "Map.aspx: HTTP 200, 23807 znaków",
+  "Znalezione punkty: 0",
+  "Za mało punktów (< 20) – nie zapisuję /opt/egida/data-repo/aed-ratuj.json. Dane na stronie są ładowane inaczej; zobacz ratuj-probe.json."
+ ],
+ "robots": {
+  "status": 200,
+  "disallow": [
+   "/Admin/",
+   "/App_Browser/",
+   "/App_Code/",
+   "/App_Data/",
+   "/App_GlobalResources/",
+   "/bin/",
+   "/Components/",
+   "/Config/",
+   "/Controls/",
+   "/DesktopModules/",
+   "/Documentation/",
+   "/Install/",
+   "/js/",
+   "/Providers/",
+   "/Resources/"
+  ]
+ },
+ "page": {
+  "url": "https://www.ratujzsercem.pl/Map.aspx",
+  "bytes": 23807,
+  "title": "Mapa AED",
+  "scriptSrc": [
+   "/Resources/Shared/Scripts/jquery/jquery.min.js",
+   "/js/dnncore.js",
+   "/ScriptResource.axd?d=zUkSJlDOWX9uzO_Al3a6NU2m7KpIqIcaWFl3KeCQ7aZkJajZP8WPI5ROgmxXaOLzbL6myGe7KvAwILz_NJh29x5xhgxucwkWhuKeR0TiG0x7cgVv0EvQYoxmPrvN1uCMMCKhn0Arxidf9Jwoh4iHHXMXX2c1&amp;t=ffffffff9bc22534",
+   "/Resources/Scripts/jquery.flow.1.2.js",
+   "Resources/Scripts/map.js?d=20130513",
+   "Resources/Scripts/thickbox.js",
+   "Resources/Scripts/jquery.jcarousel.js",
+   "https://maps.googleapis.com/maps/api/js?key=AIzaSyAQXkMoB99Gp0Zh9VORcpVjFgy-yTcWWXw&callback=initialize",
+   "/Resources/Shared/scripts/initWidgets.js"
+  ],
+  "inlineScripts": 8,
+  "inlineBytes": 4639,
+  "iframes": [],
+  "counts": {
+   "LatLng": 0,
+   "googleMarker": 0,
+   "latKeys": 0,
+   "lngKeys": 0,
+   "ajax": 0,
+   "pageMethods": 1,
+   "ashx": 1,
+   "json": 0
+  },
+  "hiddenFields": [
+   "__VIEWSTATE",
+   "__VIEWSTATEGENERATOR"
+  ],
+  "snippets": {
+   "LatLng": [],
+   "ajax": [],
+   "endpoints": [
+    "er src=\"https://maps.googleapis.com/maps/api/js?key=AIzaSyAQXkMoB99Gp0Zh9VORcpVjFgy-yTcWWXw&callback=initialize\"></script> <input name=\"ScrollTop\" type=\"hidden\" id=\"ScrollTop\" /> <input name=\"__dnnVariable\" type=\"hidden\" id=\"__dnnVariable\" /> <script type=\"text/javascript\" s"
+   ],
+   "latKeys": []
+  },
+  "extractedPoints": 0,
+  "sample": []
+ },
+ "scripts": [
+  {
+   "src": "/Resources/Shared/Scripts/jquery/jquery.min.js",
+   "skipped": "robots.txt"
+  },
+  {
+   "src": "/js/dnncore.js",
+   "skipped": "robots.txt"
+  },
+  {
+   "src": "/ScriptResource.axd",
+   "bytes": 100149,
+   "points": 0
+  },
+  {
+   "src": "/Resources/Scripts/jquery.flow.1.2.js",
+   "skipped": "robots.txt"
+  },
+  {
+   "src": "/Resources/Scripts/map.js",
+   "skipped": "robots.txt"
+  },
+  {
+   "src": "/Resources/Scripts/thickbox.js",
+   "skipped": "robots.txt"
+  }
+ ]
+}

@@ -1,0 +1,935 @@
+{
+ "since": "2026-10-11T10:40:02.455Z",
+ "updatedAt": "2026-10-31T16:24:51.977Z",
+ "runs": 175397,
+ "records": 3117599,
+ "types": {
+  "uav": {
+   "count": 2642710,
+   "firstSeen": "2026-10-11T10:40:02.455Z",
+   "lastSeen": "2026-10-31T16:24:51.977Z"
+  },
+  "fpv": {
+   "count": 251927,
+   "firstSeen": "2026-10-11T10:40:02.455Z",
+   "lastSeen": "2026-10-31T16:14:12.206Z"
+  },
+  "kab": {
+   "count": 158617,
+   "firstSeen": "2026-10-11T10:46:02.316Z",
+   "lastSeen": "2026-10-31T14:44:21.411Z"
+  },
+  "missile": {
+   "count": 21880,
+   "firstSeen": "2026-10-11T12:58:01.870Z",
+   "lastSeen": "2026-10-31T13:55:42.452Z"
+  },
+  "recon": {
+   "count": 26915,
+   "firstSeen": "2026-10-11T13:09:01.830Z",
+   "lastSeen": "2026-10-31T16:10:12.302Z"
+  },
+  "ballistic": {
+   "count": 15550,
+   "firstSeen": "2026-10-11T23:19:02.491Z",
+   "lastSeen": "2026-10-31T15:38:21.919Z"
+  }
+ },
+ "enums": {
+  "type": {
+   "uav": {
+    "count": 2642710,
+    "firstSeen": "2026-10-11T10:40:02.455Z"
+   },
+   "fpv": {
+    "count": 251927,
+    "firstSeen": "2026-10-11T10:40:02.455Z"
+   },
+   "kab": {
+    "count": 158617,
+    "firstSeen": "2026-10-11T10:46:02.316Z"
+   },
+   "missile": {
+    "count": 21880,
+    "firstSeen": "2026-10-11T12:58:01.870Z"
+   },
+   "recon": {
+    "count": 26915,
+    "firstSeen": "2026-10-11T13:09:01.830Z"
+   },
+   "ballistic": {
+    "count": 15550,
+    "firstSeen": "2026-10-11T23:19:02.491Z"
+   }
+  },
+  "status": {
+   "active": {
+    "count": 3117599,
+    "firstSeen": "2026-10-11T10:40:02.455Z"
+   }
+  },
+  "lifecycle": {
+   "uncertain": {
+    "count": 1957561,
+    "firstSeen": "2026-10-11T10:40:02.455Z"
+   },
+   "confirmed": {
+    "count": 1059380,
+    "firstSeen": "2026-10-11T10:40:02.455Z"
+   },
+   "created": {
+    "count": 70131,
+    "firstSeen": "2026-10-11T10:43:02.248Z"
+   },
+   "tracking": {
+    "count": 30527,
+    "firstSeen": "2026-10-11T12:15:03.060Z"
+   }
+  },
+  "positionQuality": {
+   "approx": {
+    "count": 1957561,
+    "firstSeen": "2026-10-11T10:40:02.455Z"
+   },
+   "confirmed": {
+    "count": 1160038,
+    "firstSeen": "2026-10-11T10:40:02.455Z"
+   }
+  },
+  "confidenceLevel": {
+   "medium": {
+    "count": 2490650,
+    "firstSeen": "2026-10-11T10:40:02.455Z"
+   },
+   "high": {
+    "count": 626949,
+    "firstSeen": "2026-10-11T10:40:02.455Z"
+   }
+  },
+  "displayConfidence": {
+   "medium": {
+    "count": 2490650,
+    "firstSeen": "2026-10-11T10:40:02.455Z"
+   },
+   "high": {
+    "count": 626949,
+    "firstSeen": "2026-10-11T10:40:02.455Z"
+   }
+  }
+ },
+ "fields": {
+  "id": {
+   "count": 3117599,
+   "types": [
+    "string"
+   ],
+   "firstSeen": "2026-10-11T10:40:02.455Z"
+  },
+  "type": {
+   "count": 3117599,
+   "types": [
+    "string"
+   ],
+   "firstSeen": "2026-10-11T10:40:02.455Z"
+  },
+  "title": {
+   "count": 3117599,
+   "types": [
+    "string"
+   ],
+   "firstSeen": "2026-10-11T10:40:02.455Z"
+  },
+  "region": {
+   "count": 3117599,
+   "types": [
+    "string"
+   ],
+   "firstSeen": "2026-10-11T10:40:02.455Z"
+  },
+  "district": {
+   "count": 3117599,
+   "types": [
+    "string"
+   ],
+   "firstSeen": "2026-10-11T10:40:02.455Z"
+  },
+  "locality": {
+   "count": 3088685,
+   "types": [
+    "string"
+   ],
+   "firstSeen": "2026-10-11T10:40:02.455Z"
+  },
+  "lat": {
+   "count": 3117599,
+   "types": [
+    "number"
+   ],
+   "firstSeen": "2026-10-11T10:40:02.455Z"
+  },
+  "lon": {
+   "count": 3117599,
+   "types": [
+    "number"
+   ],
+   "firstSeen": "2026-10-11T10:40:02.455Z"
+  },
+  "heading": {
+   "count": 3117599,
+   "types": [
+    "number",
+    "null"
+   ],
+   "firstSeen": "2026-10-11T10:40:02.455Z"
+  },
+  "confidenceLevel": {
+   "count": 3117599,
+   "types": [
+    "string"
+   ],
+   "firstSeen": "2026-10-11T10:40:02.455Z"
+  },
+  "sourceCount": {
+   "count": 3117599,
+   "types": [
+    "number"
+   ],
+   "firstSeen": "2026-10-11T10:40:02.455Z"
+  },
+  "count": {
+   "count": 806515,
+   "types": [
+    "number"
+   ],
+   "firstSeen": "2026-10-11T10:40:02.455Z"
+  },
+  "updatedAt": {
+   "count": 3117599,
+   "types": [
+    "string"
+   ],
+   "firstSeen": "2026-10-11T10:40:02.455Z"
+  },
+  "explanationShort": {
+   "count": 3117599,
+   "types": [
+    "string"
+   ],
+   "firstSeen": "2026-10-11T10:40:02.455Z"
+  },
+  "status": {
+   "count": 3117599,
+   "types": [
+    "string"
+   ],
+   "firstSeen": "2026-10-11T10:40:02.455Z"
+  },
+  "uncertaintyKm": {
+   "count": 3101301,
+   "types": [
+    "number"
+   ],
+   "firstSeen": "2026-10-11T10:40:02.455Z"
+  },
+  "positionQuality": {
+   "count": 3117599,
+   "types": [
+    "string"
+   ],
+   "firstSeen": "2026-10-11T10:40:02.455Z"
+  },
+  "trail": {
+   "count": 412430,
+   "types": [
+    "array"
+   ],
+   "firstSeen": "2026-10-11T10:40:02.455Z"
+  },
+  "lifecycle": {
+   "count": 3117599,
+   "types": [
+    "string"
+   ],
+   "firstSeen": "2026-10-11T10:40:02.455Z"
+  },
+  "displayConfidence": {
+   "count": 3117599,
+   "types": [
+    "string"
+   ],
+   "firstSeen": "2026-10-11T10:40:02.455Z"
+  },
+  "presumptiveCourse": {
+   "count": 1541830,
+   "types": [
+    "boolean"
+   ],
+   "firstSeen": "2026-10-11T10:40:02.455Z"
+  },
+  "confirmedAt": {
+   "count": 2588228,
+   "types": [
+    "string"
+   ],
+   "firstSeen": "2026-10-11T10:40:02.455Z"
+  },
+  "areaOnly": {
+   "count": 34233,
+   "types": [
+    "boolean"
+   ],
+   "firstSeen": "2026-10-11T10:40:02.455Z"
+  },
+  "destination": {
+   "count": 1710147,
+   "types": [
+    "boolean"
+   ],
+   "firstSeen": "2026-10-11T10:40:02.455Z"
+  },
+  "regionKey": {
+   "count": 50804,
+   "types": [
+    "string"
+   ],
+   "firstSeen": "2026-10-11T10:42:02.055Z"
+  },
+  "sea": {
+   "count": 30413,
+   "types": [
+    "boolean"
+   ],
+   "firstSeen": "2026-10-11T10:46:32.672Z"
+  },
+  "velocity": {
+   "count": 39928,
+   "types": [
+    "object"
+   ],
+   "firstSeen": "2026-10-11T12:15:03.060Z"
+  },
+  "seaLoiter": {
+   "count": 482,
+   "types": [
+    "boolean"
+   ],
+   "firstSeen": "2026-10-12T12:23:01.790Z"
+  }
+ },
+ "samples": {
+  "trail": [
+   {
+    "at": "2026-10-11T10:40:02.455Z",
+    "record": {
+     "id": "trk_00256515",
+     "type": "uav",
+     "title": "БпЛА",
+     "region": "Сумська область",
+     "district": "",
+     "locality": "Жуківка",
+     "lat": 51.05423,
+     "lon": 33.83236,
+     "heading": 72,
+     "confidenceLevel": "medium",
+     "sourceCount": 3,
+     "count": 1,
+     "updatedAt": "2026-10-11T10:36:59Z",
+     "explanationShort": "БпЛА — Жуківка, Сумська область. Підтверджень: 3.",
+     "status": "active",
+     "uncertaintyKm": 25,
+     "positionQuality": "approx",
+     "trail": [
+      {
+       "lat": 51.07319553422913,
+       "lon": 34.13165131797818,
+       "t": "2026-10-11T10:17:15Z"
+      },
+      {
+       "lat": 51.05423,
+       "lon": 33.83236,
+       "t": "2026-10-11T10:29:29Z"
+      }
+     ],
+     "lifecycle": "uncertain",
+     "displayConfidence": "medium",
+     "presumptiveCourse": true
+    }
+   },
+   {
+    "at": "2026-10-11T10:40:02.455Z",
+    "record": {
+     "id": "trk_00256493",
+     "type": "uav",
+     "title": "БпЛА",
+     "region": "Чернігівська область",
+     "district": "",
+     "locality": "Олишівка",
+     "lat": 51.53884842115774,
+     "lon": 31.598387721485434,
+     "heading": 207,
+     "confidenceLevel": "medium",
+     "sourceCount": 5,
+     "count": 1,
+     "updatedAt": "2026-10-11T10:36:59Z",
+     "explanationShort": "БпЛА курсом на Олишівка. Підтверджень: 5.",
+     "status": "active",
+     "confirmedAt": "2026-10-11T10:36:59Z",
+     "uncertaintyKm": 10,
+     "positionQuality": "approx",
+     "trail": [
+      {
+       "lat": 51.3645049148264,
+       "lon": 32.04995756466877,
+       "t": "2026-10-11T10:09:26Z"
+      },
+      {
+       "lat": 51.21862,
+       "lon": 31.33582,
+       "t": "2026-10-11T10:35:32Z"
+      }
+     ],
+     "lifecycle": "uncertain",
+     "displayConfidence": "medium",
+     "destination": true,
+     "presumptiveCourse": true
+    }
+   }
+  ],
+  "type:uav": [
+   {
+    "at": "2026-10-11T10:40:02.455Z",
+    "record": {
+     "id": "trk_00256515",
+     "type": "uav",
+     "title": "БпЛА",
+     "region": "Сумська область",
+     "district": "",
+     "locality": "Жуківка",
+     "lat": 51.05423,
+     "lon": 33.83236,
+     "heading": 72,
+     "confidenceLevel": "medium",
+     "sourceCount": 3,
+     "count": 1,
+     "updatedAt": "2026-10-11T10:36:59Z",
+     "explanationShort": "БпЛА — Жуківка, Сумська область. Підтверджень: 3.",
+     "status": "active",
+     "uncertaintyKm": 25,
+     "positionQuality": "approx",
+     "trail": [
+      {
+       "lat": 51.07319553422913,
+       "lon": 34.13165131797818,
+       "t": "2026-10-11T10:17:15Z"
+      },
+      {
+       "lat": 51.05423,
+       "lon": 33.83236,
+       "t": "2026-10-11T10:29:29Z"
+      }
+     ],
+     "lifecycle": "uncertain",
+     "displayConfidence": "medium",
+     "presumptiveCourse": true
+    }
+   },
+   {
+    "at": "2026-10-11T10:40:02.455Z",
+    "record": {
+     "id": "trk_00256539",
+     "type": "uav",
+     "title": "БпЛА",
+     "region": "",
+     "district": "",
+     "locality": "Солоне",
+     "lat": 48.2231,
+     "lon": 34.8347,
+     "heading": null,
+     "confidenceLevel": "medium",
+     "sourceCount": 4,
+     "updatedAt": "2026-10-11T10:35:18Z",
+     "explanationShort": "БпЛА — Солоне. Підтверджень: 4.",
+     "status": "active",
+     "uncertaintyKm": 25,
+     "positionQuality": "approx",
+     "lifecycle": "uncertain",
+     "displayConfidence": "medium"
+    }
+   }
+  ],
+  "areaOnly": [
+   {
+    "at": "2026-10-11T10:40:02.455Z",
+    "record": {
+     "id": "trk_00256550",
+     "type": "uav",
+     "title": "БпЛА — по області",
+     "region": "Чернігівська область",
+     "district": "",
+     "locality": "Чернігівська область",
+     "lat": 51.3645049148264,
+     "lon": 32.04995756466877,
+     "heading": null,
+     "confidenceLevel": "medium",
+     "sourceCount": 2,
+     "updatedAt": "2026-10-11T10:36:45Z",
+     "explanationShort": "БпЛА — Чернігівська область: попередження по області, точка невідома. Підтверджень: 2.",
+     "status": "active",
+     "uncertaintyKm": 70,
+     "positionQuality": "approx",
+     "lifecycle": "uncertain",
+     "displayConfidence": "medium",
+     "areaOnly": true
+    }
+   },
+   {
+    "at": "2026-10-11T10:40:12.684Z",
+    "record": {
+     "id": "trk_00256550",
+     "type": "uav",
+     "title": "БпЛА — по області",
+     "region": "Чернігівська область",
+     "district": "",
+     "locality": "Чернігівська область",
+     "lat": 51.3645049148264,
+     "lon": 32.04995756466877,
+     "heading": null,
+     "confidenceLevel": "medium",
+     "sourceCount": 2,
+     "updatedAt": "2026-10-11T10:36:45Z",
+     "explanationShort": "БпЛА — Чернігівська область: попередження по області, точка невідома. Підтверджень: 2.",
+     "status": "active",
+     "uncertaintyKm": 70,
+     "positionQuality": "approx",
+     "lifecycle": "uncertain",
+     "displayConfidence": "medium",
+     "areaOnly": true
+    }
+   }
+  ],
+  "type:fpv": [
+   {
+    "at": "2026-10-11T10:40:02.455Z",
+    "record": {
+     "id": "trk_00256554",
+     "type": "fpv",
+     "title": "FPV-дрон",
+     "region": "Херсонська область",
+     "district": "",
+     "locality": "Наддніпрянське",
+     "lat": 46.7425,
+     "lon": 32.70778,
+     "heading": null,
+     "confidenceLevel": "medium",
+     "sourceCount": 1,
+     "updatedAt": "2026-10-11T10:37:19Z",
+     "explanationShort": "FPV-дрон курсом на Наддніпрянське. Підтверджень: 1.",
+     "status": "active",
+     "confirmedAt": "2026-10-11T10:37:19Z",
+     "uncertaintyKm": 4,
+     "positionQuality": "approx",
+     "lifecycle": "uncertain",
+     "displayConfidence": "medium",
+     "destination": true
+    }
+   },
+   {
+    "at": "2026-10-11T10:40:12.684Z",
+    "record": {
+     "id": "trk_00256554",
+     "type": "fpv",
+     "title": "FPV-дрон",
+     "region": "Херсонська область",
+     "district": "",
+     "locality": "Наддніпрянське",
+     "lat": 46.7425,
+     "lon": 32.70778,
+     "heading": null,
+     "confidenceLevel": "medium",
+     "sourceCount": 1,
+     "updatedAt": "2026-10-11T10:37:19Z",
+     "explanationShort": "FPV-дрон курсом на Наддніпрянське. Підтверджень: 1.",
+     "status": "active",
+     "confirmedAt": "2026-10-11T10:37:19Z",
+     "uncertaintyKm": 4,
+     "positionQuality": "approx",
+     "lifecycle": "uncertain",
+     "displayConfidence": "medium",
+     "destination": true
+    }
+   }
+  ],
+  "type:kab": [
+   {
+    "at": "2026-10-11T10:46:02.316Z",
+    "record": {
+     "id": "trk_00256566",
+     "type": "kab",
+     "title": "Керована авіабомба",
+     "region": "",
+     "district": "",
+     "locality": "Вовчанськ",
+     "lat": 50.291,
+     "lon": 36.945,
+     "heading": null,
+     "confidenceLevel": "medium",
+     "sourceCount": 1,
+     "updatedAt": "2026-10-11T10:45:14Z",
+     "explanationShort": "Керована авіабомба — Вовчанськ. Підтверджень: 1.",
+     "status": "active",
+     "uncertaintyKm": 25,
+     "positionQuality": "approx",
+     "lifecycle": "uncertain",
+     "displayConfidence": "medium"
+    }
+   },
+   {
+    "at": "2026-10-11T10:46:12.475Z",
+    "record": {
+     "id": "trk_00256566",
+     "type": "kab",
+     "title": "Керована авіабомба",
+     "region": "",
+     "district": "",
+     "locality": "Вовчанськ",
+     "lat": 50.291,
+     "lon": 36.945,
+     "heading": null,
+     "confidenceLevel": "medium",
+     "sourceCount": 1,
+     "updatedAt": "2026-10-11T10:45:14Z",
+     "explanationShort": "Керована авіабомба — Вовчанськ. Підтверджень: 1.",
+     "status": "active",
+     "uncertaintyKm": 25,
+     "positionQuality": "approx",
+     "lifecycle": "uncertain",
+     "displayConfidence": "medium"
+    }
+   }
+  ],
+  "count>1": [
+   {
+    "at": "2026-10-11T10:56:32.230Z",
+    "record": {
+     "id": "trk_00256592",
+     "type": "kab",
+     "title": "Керована авіабомба",
+     "region": "Харківська область",
+     "district": "",
+     "locality": "Салтівка",
+     "lat": 50.02207,
+     "lon": 36.34901,
+     "heading": null,
+     "confidenceLevel": "medium",
+     "sourceCount": 1,
+     "count": 2,
+     "updatedAt": "2026-10-11T10:56:05Z",
+     "explanationShort": "Керована авіабомба — Салтівка, Харківська область. Підтверджень: 1.",
+     "status": "active",
+     "confirmedAt": "2026-10-11T10:56:05Z",
+     "uncertaintyKm": 10,
+     "positionQuality": "confirmed",
+     "trail": [
+      {
+       "lat": 50.02207,
+       "lon": 36.34901,
+       "t": "2026-10-11T10:56:05Z"
+      }
+     ],
+     "lifecycle": "created",
+     "displayConfidence": "medium"
+    }
+   },
+   {
+    "at": "2026-10-11T10:56:42.317Z",
+    "record": {
+     "id": "trk_00256592",
+     "type": "kab",
+     "title": "Керована авіабомба",
+     "region": "Харківська область",
+     "district": "",
+     "locality": "Салтівка",
+     "lat": 50.02207,
+     "lon": 36.34901,
+     "heading": null,
+     "confidenceLevel": "medium",
+     "sourceCount": 1,
+     "count": 2,
+     "updatedAt": "2026-10-11T10:56:05Z",
+     "explanationShort": "Керована авіабомба — Салтівка, Харківська область. Підтверджень: 1.",
+     "status": "active",
+     "confirmedAt": "2026-10-11T10:56:05Z",
+     "uncertaintyKm": 10,
+     "positionQuality": "confirmed",
+     "trail": [
+      {
+       "lat": 50.02207,
+       "lon": 36.34901,
+       "t": "2026-10-11T10:56:05Z"
+      }
+     ],
+     "lifecycle": "created",
+     "displayConfidence": "medium"
+    }
+   }
+  ],
+  "speed": [
+   {
+    "at": "2026-10-11T12:15:03.060Z",
+    "record": {
+     "…": "{\"id\":\"trk_00256686\",\"type\":\"uav\",\"title\":\"БпЛА\",\"region\":\"Чернігівська область\",\"district\":\"\",\"locality\":\"Козелець\",\"lat\":50.891018765909294,\"lon\":31.125842504864007,\"heading\":185.96908177148475,\"confidenceLevel\":\"high\",\"sourceCount\":5,\"count\":1,\"updatedAt\":\"2026-10-11T12:14:30Z\",\"explanationShort\":\"БпЛА — Козелець, Чернігівська область. Підтверджень: 5.\",\"status\":\"active\",\"velocity\":{\"bearingDeg\":186,\"speedKmh\":97.7},\"confirmedAt\":\"2026-10-11T12:14:30Z\",\"uncertaintyKm\":4,\"positionQuality\":\"confirmed\",\"trail\":[{\"lat\":51.05656,\"lon\":31.15338,\"t\":\"2026-10-11T12:00:35Z\"},{\"lat\":50.91165879850965,\"lon\":31.129275938234617,\"t\":\"2026-10-11T12:09:04Z\"}],\"lifecycle\":\"tracking\",\"displayConfidence\":\"h"
+    }
+   },
+   {
+    "at": "2026-10-11T12:15:13.327Z",
+    "record": {
+     "…": "{\"id\":\"trk_00256686\",\"type\":\"uav\",\"title\":\"БпЛА\",\"region\":\"Чернігівська область\",\"district\":\"\",\"locality\":\"Козелець\",\"lat\":50.891018765909294,\"lon\":31.125842504864007,\"heading\":185.96908177148475,\"confidenceLevel\":\"high\",\"sourceCount\":5,\"count\":1,\"updatedAt\":\"2026-10-11T12:14:30Z\",\"explanationShort\":\"БпЛА — Козелець, Чернігівська область. Підтверджень: 5.\",\"status\":\"active\",\"velocity\":{\"bearingDeg\":186,\"speedKmh\":97.7},\"confirmedAt\":\"2026-10-11T12:14:30Z\",\"uncertaintyKm\":4,\"positionQuality\":\"confirmed\",\"trail\":[{\"lat\":51.05656,\"lon\":31.15338,\"t\":\"2026-10-11T12:00:35Z\"},{\"lat\":50.91165879850965,\"lon\":31.129275938234617,\"t\":\"2026-10-11T12:09:04Z\"}],\"lifecycle\":\"tracking\",\"displayConfidence\":\"h"
+    }
+   }
+  ],
+  "type:missile": [
+   {
+    "at": "2026-10-11T12:58:01.870Z",
+    "record": {
+     "id": "trk_00256786",
+     "type": "missile",
+     "title": "Ракета",
+     "region": "Дніпропетровська область",
+     "district": "",
+     "locality": "Перещепине",
+     "lat": 49.02512,
+     "lon": 35.36885,
+     "heading": null,
+     "confidenceLevel": "medium",
+     "sourceCount": 1,
+     "updatedAt": "2026-10-11T12:57:22Z",
+     "explanationShort": "Ракета курсом на Перещепине. Підтверджень: 1.",
+     "status": "active",
+     "confirmedAt": "2026-10-11T12:57:22Z",
+     "uncertaintyKm": 4,
+     "positionQuality": "approx",
+     "lifecycle": "uncertain",
+     "displayConfidence": "medium",
+     "destination": true
+    }
+   },
+   {
+    "at": "2026-10-11T12:58:12.047Z",
+    "record": {
+     "id": "trk_00256786",
+     "type": "missile",
+     "title": "Ракета",
+     "region": "Дніпропетровська область",
+     "district": "",
+     "locality": "Перещепине",
+     "lat": 49.02512,
+     "lon": 35.36885,
+     "heading": null,
+     "confidenceLevel": "medium",
+     "sourceCount": 1,
+     "updatedAt": "2026-10-11T12:57:22Z",
+     "explanationShort": "Ракета курсом на Перещепине. Підтверджень: 1.",
+     "status": "active",
+     "confirmedAt": "2026-10-11T12:57:22Z",
+     "uncertaintyKm": 4,
+     "positionQuality": "approx",
+     "lifecycle": "uncertain",
+     "displayConfidence": "medium",
+     "destination": true
+    }
+   }
+  ],
+  "type:recon": [
+   {
+    "at": "2026-10-11T13:09:01.830Z",
+    "record": {
+     "id": "trk_00256782",
+     "type": "recon",
+     "title": "Розвідувальний БпЛА",
+     "region": "",
+     "district": "",
+     "locality": "Просторе",
+     "lat": 47.37695604063342,
+     "lon": 35.95887419771279,
+     "heading": 149,
+     "confidenceLevel": "medium",
+     "sourceCount": 1,
+     "updatedAt": "2026-10-11T13:08:36Z",
+     "explanationShort": "Розвідувальний БпЛА курсом на Просторе. Підтверджень: 1.",
+     "status": "active",
+     "uncertaintyKm": 25,
+     "positionQuality": "approx",
+     "lifecycle": "uncertain",
+     "displayConfidence": "medium",
+     "destination": true,
+     "presumptiveCourse": true
+    }
+   },
+   {
+    "at": "2026-10-11T13:09:11.967Z",
+    "record": {
+     "id": "trk_00256782",
+     "type": "recon",
+     "title": "Розвідувальний БпЛА",
+     "region": "",
+     "district": "",
+     "locality": "Просторе",
+     "lat": 47.37695604063342,
+     "lon": 35.95887419771279,
+     "heading": 149,
+     "confidenceLevel": "medium",
+     "sourceCount": 1,
+     "updatedAt": "2026-10-11T13:08:36Z",
+     "explanationShort": "Розвідувальний БпЛА курсом на Просторе. Підтверджень: 1.",
+     "status": "active",
+     "uncertaintyKm": 25,
+     "positionQuality": "approx",
+     "lifecycle": "uncertain",
+     "displayConfidence": "medium",
+     "destination": true,
+     "presumptiveCourse": true
+    }
+   }
+  ],
+  "type:ballistic": [
+   {
+    "at": "2026-10-11T23:19:02.491Z",
+    "record": {
+     "id": "trk_00258024",
+     "type": "ballistic",
+     "title": "Балістична загроза",
+     "region": "Одеська область",
+     "district": "",
+     "locality": "Білгород-Дністровський",
+     "lat": 46.187,
+     "lon": 30.349,
+     "heading": null,
+     "confidenceLevel": "medium",
+     "sourceCount": 1,
+     "updatedAt": "2026-10-11T23:18:09Z",
+     "explanationShort": "Балістична загроза курсом на Білгород-Дністровський. Підтверджень: 1.",
+     "status": "active",
+     "confirmedAt": "2026-10-11T23:18:09Z",
+     "uncertaintyKm": 4,
+     "positionQuality": "approx",
+     "lifecycle": "uncertain",
+     "displayConfidence": "medium",
+     "destination": true
+    }
+   },
+   {
+    "at": "2026-10-11T23:19:12.672Z",
+    "record": {
+     "id": "trk_00258024",
+     "type": "ballistic",
+     "title": "Балістична загроза",
+     "region": "Одеська область",
+     "district": "",
+     "locality": "Білгород-Дністровський",
+     "lat": 46.187,
+     "lon": 30.349,
+     "heading": null,
+     "confidenceLevel": "medium",
+     "sourceCount": 1,
+     "updatedAt": "2026-10-11T23:18:09Z",
+     "explanationShort": "Балістична загроза курсом на Білгород-Дністровський. Підтверджень: 1.",
+     "status": "active",
+     "confirmedAt": "2026-10-11T23:18:09Z",
+     "uncertaintyKm": 4,
+     "positionQuality": "approx",
+     "lifecycle": "uncertain",
+     "displayConfidence": "medium",
+     "destination": true
+    }
+   }
+  ]
+ },
+ "ws": {
+  "snapshot": {
+   "count": 820,
+   "firstSeen": "2026-10-11T10:45:23.257Z",
+   "lastSeen": "2026-10-31T16:20:27.432Z",
+   "keys": [
+    "type",
+    "ts",
+    "data"
+   ],
+   "sample": {
+    "…": "{\"threats\":[{\"id\":\"trk_00256555\",\"type\":\"uav\",\"title\":\"БпЛА\",\"region\":\"Чернігівська область\",\"district\":\"\",\"locality\":\"Ладан\",\"lat\":50.718470609898624,\"lon\":33.05520961764373,\"heading\":236,\"confidenceLevel\":\"medium\",\"sourceCount\":1,\"updatedAt\":\"2026-10-11T10:37:41Z\",\"explanationShort\":\"БпЛА курсом на Ладан. Підтверджень: 1.\",\"status\":\"active\",\"confirmedAt\":\"2026-10-11T10:37:41Z\",\"uncertaintyKm\":4,\"positionQuality\":\"approx\",\"lifecycle\":\"uncertain\",\"displayConfidence\":\"medium\",\"destination\":true,\"presumptiveCourse\":true},{\"id\":\"trk_00256559\",\"type\":\"uav\",\"title\":\"БпЛА\",\"region\":\"Одеська область\",\"district\":\"\",\"locality\":\"Затока\",\"lat\":46.07016,\"lon\":30.46265,\"heading\":180,\"confidenceLevel\":\"hi"
+   }
+  },
+  "alerts": {
+   "count": 878,
+   "firstSeen": "2026-10-11T10:45:23.257Z",
+   "lastSeen": "2026-10-31T16:20:27.432Z",
+   "keys": [
+    "type",
+    "ts",
+    "data"
+   ],
+   "sample": {
+    "…": "{\"version\":1791715342,\"updatedAt\":\"2026-10-11T10:42:22.693267774Z\",\"raions\":[{\"key\":\"бахмутський\",\"name\":\"Бахмутський район\",\"oblast\":\"Донецька область\",\"since\":\"2026-10-10T17:05:50.098184Z\",\"level\":\"red\",\"reasons\":[\"Ракетна загроза (червоний рівень)\"]},{\"key\":\"бердянський\",\"name\":\"Бердянський район\",\"oblast\":\"Запорізька область\",\"since\":\"2026-10-11T07:37:43.630145Z\",\"level\":\"red\",\"reasons\":[\"Ракетна загроза (червоний рівень)\"]},{\"key\":\"богодухівський\",\"name\":\"Богодухівський район\",\"oblast\":\"Харківська область\",\"since\":\"2026-10-11T09:51:38.324251Z\",\"level\":\"red\",\"reasons\":[\"Ракетна загроза (червоний рівень)\"]},{\"key\":\"броварський\",\"name\":\"Броварський район\",\"oblast\":\"Київська область\",\"since"
+   }
+  },
+  "heartbeat": {
+   "count": 931,
+   "firstSeen": "2026-10-11T10:45:23.257Z",
+   "lastSeen": "2026-10-31T16:20:27.432Z",
+   "keys": [
+    "type",
+    "ts"
+   ],
+   "sample": {
+    "type": "heartbeat",
+    "ts": "2026-10-11T10:45:09.641Z"
+   }
+  },
+  "upsert": {
+   "count": 787,
+   "firstSeen": "2026-10-11T16:00:24.196Z",
+   "lastSeen": "2026-10-31T16:20:27.432Z",
+   "keys": [
+    "type",
+    "ts",
+    "data"
+   ],
+   "sample": {
+    "id": "trk_00257145",
+    "type": "uav",
+    "title": "БпЛА",
+    "region": "Київська область",
+    "district": "",
+    "locality": "Славутич",
+    "lat": 51.69430804151902,
+    "lon": 31.26358128520602,
+    "heading": 241,
+    "confidenceLevel": "medium",
+    "sourceCount": 4,
+    "count": 1,
+    "updatedAt": "2026-10-11T15:59:44Z",
+    "explanationShort": "БпЛА курсом на Славутич. Підтверджень: 4.",
+    "status": "active",
+    "confirmedAt": "2026-10-11T15:59:44Z",
+    "uncertaintyKm": 4,
+    "positionQuality": "approx",
+    "lifecycle": "uncertain",
+    "displayConfidence": "medium",
+    "destination": true,
+    "presumptiveCourse": true
+   }
+  },
+  "remove": {
+   "count": 363,
+   "firstSeen": "2026-10-11T23:00:24.102Z",
+   "lastSeen": "2026-10-31T16:20:27.432Z",
+   "keys": [
+    "type",
+    "ts",
+    "data"
+   ],
+   "sample": {
+    "id": "trk_00257968"
+   }
+  }
+ }
+}
