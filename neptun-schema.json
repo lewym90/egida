@@ -1,0 +1,1160 @@
+{
+ "generatedAt": "2026-11-07T18:55:11.345Z",
+ "note": "Raport o strukturze danych NEPTUN (neptun.in.ua). Próbki ucięte, tylko do diagnostyki formatu.",
+ "rest": [
+  {
+   "path": "threats",
+   "status": 200,
+   "ms": 138,
+   "contentType": "application/json",
+   "bytes": 21820,
+   "cors": "*",
+   "enums": {
+    "type": {
+     "uav": 39,
+     "fpv": 2
+    },
+    "status": {
+     "active": 41
+    },
+    "lifecycle": {
+     "uncertain": 31,
+     "confirmed": 8,
+     "created": 2
+    },
+    "positionQuality": {
+     "approx": 31,
+     "confirmed": 10
+    },
+    "confidenceLevel": {
+     "medium": 37,
+     "high": 4
+    },
+    "displayConfidence": {
+     "medium": 37,
+     "high": 4
+    }
+   },
+   "withTrail": [
+    {
+     "id": "trk_00341015",
+     "type": "uav",
+     "title": "БпЛА",
+     "region": "Сумська область",
+     "district": "",
+     "locality": "Суми",
+     "lat": 50.90289647057756,
+     "lon": 34.919141527183314,
+     "heading": 274.094,
+     "confidenceLevel": "medium",
+     "sourceCount": 6,
+     "count": 1,
+     "updatedAt": "2026-11-07T18:48:11Z",
+     "explanationShort": "БпЛА курсом на Суми. Підтверджень: 6.",
+     "status": "active",
+     "confirmedAt": "2026-11-07T18:48:11Z",
+     "uncertaintyKm": 4,
+     "positionQuality": "approx",
+     "trail": [
+      {
+       "lat": 50.9077,
+       "lon": 34.7981,
+       "t": "2026-11-07T18:27:41Z"
+      },
+      {
+       "lat": 50.778641036591566,
+       "lon": 34.8282916700301,
+       "t": "2026-11-07T18:32:09Z"
+      },
+      {
+       "lat": 50.859874321786265,
+       "lon": 34.80928819690985,
+       "t": "2026-11-07T18:35:56Z"
+      },
+      {
+       "lat": 50.891329327565884,
+       "lon": 34.80192970641673,
+       "t": "2026-11-07T18:39:47Z"
+      },
+      {
+       "lat": 50.908303152948015,
+       "lon": 34.79795890019334,
+       "t": "2026-11-07T18:48:11Z"
+      }
+     ],
+     "lifecycle": "uncertain",
+     "displayConfidence": "medium",
+     "destination": true,
+     "presumptiveCourse": true
+    },
+    {
+     "id": "trk_00341029",
+     "type": "uav",
+     "title": "БпЛА",
+     "region": "Чернігівська область",
+     "district": "",
+     "locality": "Вертіївка",
+     "lat": 51.16553,
+     "lon": 31.85957,
+     "heading": null,
+     "confidenceLevel": "high",
+     "sourceCount": 2,
+     "updatedAt": "2026-11-07T18:54:24Z",
+     "explanationShort": "БпЛА — Вертіївка, Чернігівська область. Підтверджень: 2.",
+     "status": "active",
+     "confirmedAt": "2026-11-07T18:54:24Z",
+     "uncertaintyKm": 10,
+     "positionQuality": "confirmed",
+     "trail": [
+      {
+       "lat": 51.3645049148264,
+       "lon": 32.04995756466877,
+       "t": "2026-11-07T18:31:56Z"
+      },
+      {
+       "lat": 51.16553,
+       "lon": 31.85957,
+       "t": "2026-11-07T18:54:24Z"
+      }
+     ],
+     "lifecycle": "confirmed",
+     "displayConfidence": "high"
+    }
+   ],
+   "withCount": [
+    {
+     "id": "trk_00340637",
+     "type": "uav",
+     "title": "БпЛА",
+     "region": "Чернігівська область",
+     "district": "",
+     "locality": "Городня",
+     "lat": 51.892308470038984,
+     "lon": 31.669765795016204,
+     "heading": 267.086,
+     "confidenceLevel": "medium",
+     "sourceCount": 5,
+     "count": 2,
+     "updatedAt": "2026-11-07T18:54:24Z",
+     "explanationShort": "БпЛА курсом на Городня. Підтверджень: 5.",
+     "status": "active",
+     "confirmedAt": "2026-11-07T18:54:24Z",
+     "uncertaintyKm": 10,
+     "positionQuality": "approx",
+     "lifecycle": "uncertain",
+     "displayConfidence": "medium",
+     "destination": true,
+     "presumptiveCourse": true
+    },
+    {
+     "id": "trk_00340997",
+     "type": "uav",
+     "title": "БпЛА",
+     "region": "Чернігівська область",
+     "district": "",
+     "locality": "Сновськ",
+     "lat": 51.86786143386315,
+     "lon": 31.91778622383843,
+     "heading": 159.978,
+     "confidenceLevel": "medium",
+     "sourceCount": 7,
+     "count": 2,
+     "updatedAt": "2026-11-07T18:50:30Z",
+     "explanationShort": "БпЛА курсом на Сновськ. Підтверджень: 7.",
+     "status": "active",
+     "confirmedAt": "2026-11-07T18:50:30Z",
+     "uncertaintyKm": 10,
+     "positionQuality": "approx",
+     "lifecycle": "uncertain",
+     "displayConfidence": "medium",
+     "destination": true,
+     "presumptiveCourse": true
+    }
+   ],
+   "areaOnly": [
+    {
+     "id": "trk_00340831",
+     "type": "uav",
+     "title": "БпЛА — по області",
+     "region": "Київська область",
+     "district": "",
+     "locality": "Київська область",
+     "lat": 50.31196936332766,
+     "lon": 30.41056337011886,
+     "heading": null,
+     "confidenceLevel": "medium",
+     "sourceCount": 2,
+     "updatedAt": "2026-11-07T18:49:57Z",
+     "explanationShort": "БпЛА — Київська область: попередження по області, точка невідома. Підтверджень: 2.",
+     "status": "active",
+     "uncertaintyKm": 70,
+     "positionQuality": "approx",
+     "lifecycle": "uncertain",
+     "displayConfidence": "medium",
+     "areaOnly": true
+    }
+   ],
+   "stale": [],
+   "topLevel": [
+    "epoch",
+    "seq",
+    "serverTime",
+    "threats"
+   ],
+   "shape": {
+    "type": "object",
+    "fields": {
+     "epoch": {
+      "type": "string"
+     },
+     "seq": {
+      "type": "number"
+     },
+     "serverTime": {
+      "type": "string"
+     },
+     "threats": {
+      "type": "array",
+      "length": 41,
+      "item": {
+       "type": "object",
+       "fields": {
+        "id": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "41/41"
+        },
+        "type": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "41/41"
+        },
+        "title": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "41/41"
+        },
+        "region": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "41/41"
+        },
+        "district": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "41/41"
+        },
+        "locality": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "41/41"
+        },
+        "lat": {
+         "types": [
+          "number"
+         ],
+         "presentIn": "41/41"
+        },
+        "lon": {
+         "types": [
+          "number"
+         ],
+         "presentIn": "41/41"
+        },
+        "heading": {
+         "types": [
+          "number",
+          "null"
+         ],
+         "presentIn": "41/41"
+        },
+        "confidenceLevel": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "41/41"
+        },
+        "sourceCount": {
+         "types": [
+          "number"
+         ],
+         "presentIn": "41/41"
+        },
+        "count": {
+         "types": [
+          "number"
+         ],
+         "presentIn": "19/41"
+        },
+        "updatedAt": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "41/41"
+        },
+        "explanationShort": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "41/41"
+        },
+        "status": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "41/41"
+        },
+        "confirmedAt": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "35/41"
+        },
+        "uncertaintyKm": {
+         "types": [
+          "number"
+         ],
+         "presentIn": "41/41"
+        },
+        "positionQuality": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "41/41"
+        },
+        "lifecycle": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "41/41"
+        },
+        "displayConfidence": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "41/41"
+        },
+        "destination": {
+         "types": [
+          "boolean"
+         ],
+         "presentIn": "29/41"
+        },
+        "presumptiveCourse": {
+         "types": [
+          "boolean"
+         ],
+         "presentIn": "28/41"
+        },
+        "areaOnly": {
+         "types": [
+          "boolean"
+         ],
+         "presentIn": "1/41"
+        },
+        "trail": {
+         "types": [
+          "array"
+         ],
+         "presentIn": "5/41",
+         "nested": {
+          "type": "array",
+          "length": 5,
+          "item": {
+           "types": [
+            "object"
+           ]
+          }
+         }
+        }
+       }
+      }
+     }
+    }
+   },
+   "samples": [
+    {
+     "id": "trk_00340637",
+     "type": "uav",
+     "title": "БпЛА",
+     "region": "Чернігівська область",
+     "district": "",
+     "locality": "Городня",
+     "lat": 51.892308470038984,
+     "lon": 31.669765795016204,
+     "heading": 267.086,
+     "confidenceLevel": "medium",
+     "sourceCount": 5,
+     "count": 2,
+     "updatedAt": "2026-11-07T18:54:24Z",
+     "explanationShort": "БпЛА курсом на Городня. Підтверджень: 5.",
+     "status": "active",
+     "confirmedAt": "2026-11-07T18:54:24Z",
+     "uncertaintyKm": 10,
+     "positionQuality": "approx",
+     "lifecycle": "uncertain",
+     "displayConfidence": "medium",
+     "destination": true,
+     "presumptiveCourse": true
+    },
+    {
+     "id": "trk_00340831",
+     "type": "uav",
+     "title": "БпЛА — по області",
+     "region": "Київська область",
+     "district": "",
+     "locality": "Київська область",
+     "lat": 50.31196936332766,
+     "lon": 30.41056337011886,
+     "heading": null,
+     "confidenceLevel": "medium",
+     "sourceCount": 2,
+     "updatedAt": "2026-11-07T18:49:57Z",
+     "explanationShort": "БпЛА — Київська область: попередження по області, точка невідома. Підтверджень: 2.",
+     "status": "active",
+     "uncertaintyKm": 70,
+     "positionQuality": "approx",
+     "lifecycle": "uncertain",
+     "displayConfidence": "medium",
+     "areaOnly": true
+    },
+    {
+     "id": "trk_00340979",
+     "type": "uav",
+     "title": "БпЛА",
+     "region": "Київська область",
+     "district": "",
+     "locality": "Чорнобиль",
+     "lat": 51.31772341389508,
+     "lon": 30.341706681162027,
+     "heading": 238.095,
+     "confidenceLevel": "medium",
+     "sourceCount": 4,
+     "count": 1,
+     "updatedAt": "2026-11-07T18:54:54Z",
+     "explanationShort": "БпЛА курсом на Чорнобиль. Підтверджень: 4.",
+     "status": "active",
+     "confirmedAt": "2026-11-07T18:54:54Z",
+     "uncertaintyKm": 4,
+     "positionQuality": "approx",
+     "lifecycle": "uncertain",
+     "displayConfidence": "medium",
+     "destination": true,
+     "presumptiveCourse": true
+    }
+   ],
+   "scalarFields": {
+    "epoch": "rt-5ea3e304",
+    "seq": 299409,
+    "serverTime": "2026-11-07T18:55:03.517Z"
+   }
+  },
+  {
+   "path": "alerts",
+   "status": 200,
+   "ms": 33,
+   "contentType": "application/json",
+   "bytes": 6551,
+   "cors": "*",
+   "topLevel": [
+    "version",
+    "updatedAt",
+    "raions",
+    "oblasts"
+   ],
+   "shape": {
+    "type": "object",
+    "fields": {
+     "version": {
+      "type": "number"
+     },
+     "updatedAt": {
+      "type": "string"
+     },
+     "raions": {
+      "type": "array",
+      "length": 45,
+      "item": {
+       "type": "object",
+       "fields": {
+        "key": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "45/45"
+        },
+        "name": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "45/45"
+        },
+        "oblast": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "45/45"
+        },
+        "since": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "45/45"
+        },
+        "level": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "45/45"
+        }
+       }
+      }
+     },
+     "oblasts": {
+      "type": "array",
+      "length": 3,
+      "item": {
+       "type": "object",
+       "fields": {
+        "key": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "3/3"
+        },
+        "name": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "3/3"
+        },
+        "oblast": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "3/3"
+        },
+        "since": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "3/3"
+        },
+        "level": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "3/3"
+        }
+       }
+      }
+     }
+    }
+   },
+   "samples": [
+    {
+     "key": "бахмутський",
+     "name": "Бахмутський район",
+     "oblast": "Донецька область",
+     "since": "2026-11-07T17:48:54.206097Z",
+     "level": "red"
+    },
+    {
+     "key": "бердянський",
+     "name": "Бердянський район",
+     "oblast": "Запорізька область",
+     "since": "2026-11-07T15:58:24.743875Z",
+     "level": "red"
+    },
+    {
+     "key": "бориспільський",
+     "name": "Бориспільський район",
+     "oblast": "Київська область",
+     "since": "2026-11-07T18:43:40.738114Z",
+     "level": "yellow"
+    }
+   ],
+   "scalarFields": {
+    "version": 1794077669,
+    "updatedAt": "2026-11-07T18:54:29.942896878Z"
+   }
+  },
+  {
+   "path": "messages",
+   "status": 200,
+   "ms": 37,
+   "contentType": "application/json",
+   "bytes": 19515,
+   "cors": "*",
+   "topLevel": [
+    "messages",
+    "updatedAt"
+   ],
+   "shape": {
+    "type": "object",
+    "fields": {
+     "messages": {
+      "type": "array",
+      "length": 120,
+      "item": {
+       "type": "object",
+       "fields": {
+        "channel": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "50/50"
+        },
+        "text": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "50/50"
+        },
+        "date": {
+         "types": [
+          "string"
+         ],
+         "presentIn": "50/50"
+        }
+       }
+      }
+     },
+     "updatedAt": {
+      "type": "string"
+     }
+    }
+   },
+   "samples": [
+    {
+     "channel": "@shovnebi",
+     "text": "На Медичне",
+     "date": "2026-11-07T18:54:58Z"
+    },
+    {
+     "channel": "@cxidua",
+     "text": "🔴 20:54, Ізюмський район - повітряна тривога!",
+     "date": "2026-11-07T18:54:58Z"
+    },
+    {
+     "channel": "@ua_radar_raket",
+     "text": "📡⚠️ Станом на зараз:\n\nЧернігівська область:\n2 реактивних на Мену.\nРеактивний БпЛА на Славутич.\nРеактивний БпЛА на Десну.\n\nКиївська область:\nРеактивний БпЛА на …",
+     "date": "2026-11-07T18:54:54Z"
+    }
+   ],
+   "scalarFields": {
+    "updatedAt": "2026-11-07T18:55:09.491009327Z"
+   }
+  }
+ ],
+ "ws": {
+  "url": "/stream",
+  "frames": [
+   {
+    "type": "snapshot",
+    "keys": [
+     "type",
+     "ts",
+     "data"
+    ],
+    "shape": {
+     "type": "object",
+     "fields": {
+      "threats": {
+       "type": "array",
+       "length": 41,
+       "item": {
+        "type": "object",
+        "fields": {
+         "id": {
+          "types": [
+           "string"
+          ],
+          "presentIn": "41/41"
+         },
+         "type": {
+          "types": [
+           "string"
+          ],
+          "presentIn": "41/41"
+         },
+         "title": {
+          "types": [
+           "string"
+          ],
+          "presentIn": "41/41"
+         },
+         "region": {
+          "types": [
+           "string"
+          ],
+          "presentIn": "41/41"
+         },
+         "district": {
+          "types": [
+           "string"
+          ],
+          "presentIn": "41/41"
+         },
+         "locality": {
+          "types": [
+           "string"
+          ],
+          "presentIn": "41/41"
+         },
+         "lat": {
+          "types": [
+           "number"
+          ],
+          "presentIn": "41/41"
+         },
+         "lon": {
+          "types": [
+           "number"
+          ],
+          "presentIn": "41/41"
+         },
+         "heading": {
+          "types": [
+           "number",
+           "null"
+          ],
+          "presentIn": "41/41"
+         },
+         "confidenceLevel": {
+          "types": [
+           "string"
+          ],
+          "presentIn": "41/41"
+         },
+         "sourceCount": {
+          "types": [
+           "number"
+          ],
+          "presentIn": "41/41"
+         },
+         "count": {
+          "types": [
+           "number"
+          ],
+          "presentIn": "19/41"
+         },
+         "updatedAt": {
+          "types": [
+           "string"
+          ],
+          "presentIn": "41/41"
+         },
+         "explanationShort": {
+          "types": [
+           "string"
+          ],
+          "presentIn": "41/41"
+         },
+         "status": {
+          "types": [
+           "string"
+          ],
+          "presentIn": "41/41"
+         },
+         "confirmedAt": {
+          "types": [
+           "string"
+          ],
+          "presentIn": "35/41"
+         },
+         "uncertaintyKm": {
+          "types": [
+           "number"
+          ],
+          "presentIn": "41/41"
+         },
+         "positionQuality": {
+          "types": [
+           "string"
+          ],
+          "presentIn": "41/41"
+         },
+         "lifecycle": {
+          "types": [
+           "string"
+          ],
+          "presentIn": "41/41"
+         },
+         "displayConfidence": {
+          "types": [
+           "string"
+          ],
+          "presentIn": "41/41"
+         },
+         "destination": {
+          "types": [
+           "boolean"
+          ],
+          "presentIn": "29/41"
+         },
+         "presumptiveCourse": {
+          "types": [
+           "boolean"
+          ],
+          "presentIn": "28/41"
+         },
+         "areaOnly": {
+          "types": [
+           "boolean"
+          ],
+          "presentIn": "1/41"
+         },
+         "trail": {
+          "types": [
+           "array"
+          ],
+          "presentIn": "5/41",
+          "nested": {
+           "type": "array",
+           "length": 5,
+           "item": {
+            "types": [
+             "object"
+            ]
+           }
+          }
+         }
+        }
+       }
+      }
+     }
+    },
+    "sample": {
+     "threats": [
+      {
+       "id": "trk_00340637",
+       "type": "uav",
+       "title": "БпЛА",
+       "region": "Чернігівська область",
+       "district": "",
+       "locality": "Городня",
+       "lat": 51.892308470038984,
+       "lon": 31.669765795016204,
+       "heading": 267.086,
+       "confidenceLevel": "medium",
+       "sourceCount": 5,
+       "count": 2,
+       "updatedAt": "2026-11-07T18:54:24Z",
+       "explanationShort": "БпЛА курсом на Городня. Підтверджень: 5.",
+       "status": "active",
+       "confirmedAt": "2026-11-07T18:54:24Z",
+       "uncertaintyKm": 10,
+       "positionQuality": "approx",
+       "lifecycle": "uncertain",
+       "displayConfidence": "medium",
+       "destination": true,
+       "presumptiveCourse": true
+      },
+      {
+       "id": "trk_00340831",
+       "type": "uav",
+       "title": "БпЛА — по області",
+       "region": "Київська область",
+       "district": "",
+       "locality": "Київська область",
+       "lat": 50.31196936332766,
+       "lon": 30.41056337011886,
+       "heading": null,
+       "confidenceLevel": "medium",
+       "sourceCount": 2,
+       "updatedAt": "2026-11-07T18:49:57Z",
+       "explanationShort": "БпЛА — Київська область: попередження по області, точка невідома. Підтверджень: 2.",
+       "status": "active",
+       "uncertaintyKm": 70,
+       "positionQuality": "approx",
+       "lifecycle": "uncertain",
+       "displayConfidence": "medium",
+       "areaOnly": true
+      },
+      {
+       "id": "trk_00340979",
+       "type": "uav",
+       "title": "БпЛА",
+       "region": "Київська область",
+       "district": "",
+       "locality": "Чорнобиль",
+       "lat": 51.31772341389508,
+       "lon": 30.341706681162027,
+       "heading": 238.095,
+       "confidenceLevel": "medium",
+       "sourceCount": 4,
+       "count": 1,
+       "updatedAt": "2026-11-07T18:54:54Z",
+       "explanationShort": "БпЛА курсом на Чорнобиль. Підтверджень: 4.",
+       "status": "active",
+       "confirmedAt": "2026-11-07T18:54:54Z",
+       "uncertaintyKm": 4,
+       "positionQuality": "approx",
+       "lifecycle": "uncertain",
+       "displayConfidence": "medium",
+       "destination": true,
+       "presumptiveCourse": true
+      },
+      {
+       "id": "trk_00340997",
+       "type": "uav",
+       "title": "БпЛА",
+       "region": "Чернігівська область",
+       "district": "",
+       "locality": "Сновськ",
+       "lat": 51.86786143386315,
+       "lon": 31.91778622383843,
+       "heading": 159.978,
+       "confidenceLevel": "medium",
+       "sourceCount": 7,
+       "count": 2,
+       "updatedAt": "2026-11-07T18:50:30Z",
+       "explanationShort": "БпЛА курсом на Сновськ. Підтверджень: 7.",
+       "status": "active",
+       "confirmedAt": "2026-11-07T18:50:30Z",
+       "uncertaintyKm": 10,
+       "positionQuality": "approx",
+       "lifecycle": "uncertain",
+       "displayConfidence": "medium",
+       "destination": true,
+       "presumptiveCourse": true
+      },
+      {
+       "id": "trk_00341015",
+       "type": "uav",
+       "title": "БпЛА",
+       "region": "Сумська область",
+       "district": "",
+       "locality": "Суми",
+       "lat": 50.90289647057756,
+       "lon": 34.919141527183314,
+       "heading": 274.094,
+       "confidenceLevel": "medium",
+       "sourceCount": 6,
+       "count": 1,
+       "updatedAt": "2026-11-07T18:48:11Z",
+       "explanationShort": "БпЛА курсом на Суми. Підтверджень: 6.",
+       "status": "active",
+       "confirmedAt": "2026-11-07T18:48:11Z",
+       "uncertaintyKm": 4,
+       "positionQuality": "approx",
+       "trail": [
+        "{…}",
+        "{…}",
+        "{…}",
+        "{…}",
+        "{…}"
+       ],
+       "lifecycle": "uncertain",
+       "displayConfidence": "medium",
+       "destination": true,
+       "presumptiveCourse": true
+      }
+     ]
+    }
+   },
+   {
+    "type": "alerts",
+    "keys": [
+     "type",
+     "ts",
+     "data"
+    ],
+    "shape": {
+     "type": "object",
+     "fields": {
+      "version": {
+       "type": "number"
+      },
+      "updatedAt": {
+       "type": "string"
+      },
+      "raions": {
+       "type": "array",
+       "length": 45,
+       "item": {
+        "type": "object",
+        "fields": {
+         "key": {
+          "types": [
+           "string"
+          ],
+          "presentIn": "45/45"
+         },
+         "name": {
+          "types": [
+           "string"
+          ],
+          "presentIn": "45/45"
+         },
+         "oblast": {
+          "types": [
+           "string"
+          ],
+          "presentIn": "45/45"
+         },
+         "since": {
+          "types": [
+           "string"
+          ],
+          "presentIn": "45/45"
+         },
+         "level": {
+          "types": [
+           "string"
+          ],
+          "presentIn": "45/45"
+         }
+        }
+       }
+      },
+      "oblasts": {
+       "type": "array",
+       "length": 3,
+       "item": {
+        "type": "object",
+        "fields": {
+         "key": {
+          "types": [
+           "string"
+          ],
+          "presentIn": "3/3"
+         },
+         "name": {
+          "types": [
+           "string"
+          ],
+          "presentIn": "3/3"
+         },
+         "oblast": {
+          "types": [
+           "string"
+          ],
+          "presentIn": "3/3"
+         },
+         "since": {
+          "types": [
+           "string"
+          ],
+          "presentIn": "3/3"
+         },
+         "level": {
+          "types": [
+           "string"
+          ],
+          "presentIn": "3/3"
+         }
+        }
+       }
+      }
+     }
+    },
+    "sample": {
+     "version": 1794077669,
+     "updatedAt": "2026-11-07T18:54:29.942896878Z",
+     "raions": [
+      {
+       "key": "бахмутський",
+       "name": "Бахмутський район",
+       "oblast": "Донецька область",
+       "since": "2026-11-07T17:48:54.206097Z",
+       "level": "red"
+      },
+      {
+       "key": "бердянський",
+       "name": "Бердянський район",
+       "oblast": "Запорізька область",
+       "since": "2026-11-07T15:58:24.743875Z",
+       "level": "red"
+      },
+      {
+       "key": "бориспільський",
+       "name": "Бориспільський район",
+       "oblast": "Київська область",
+       "since": "2026-11-07T18:43:40.738114Z",
+       "level": "yellow"
+      },
+      {
+       "key": "броварський",
+       "name": "Броварський район",
+       "oblast": "Київська область",
+       "since": "2026-11-07T18:41:59.8822Z",
+       "level": "yellow"
+      },
+      {
+       "key": "бучанський",
+       "name": "Бучанський район",
+       "oblast": "Київська область",
+       "since": "2026-11-07T18:32:39.617891Z",
+       "level": "yellow"
+      }
+     ],
+     "oblasts": [
+      {
+       "key": "автономна республіка крим",
+       "name": "Автономна Республіка Крим",
+       "oblast": "Автономна Республіка Крим",
+       "since": "2022-12-10T22:22:00Z",
+       "level": "red"
+      },
+      {
+       "key": "луганська",
+       "name": "Луганська область",
+       "oblast": "Луганська область",
+       "since": "2026-11-02T02:06:27.934655Z",
+       "level": "red"
+      },
+      {
+       "key": "севастополь",
+       "name": "Севастополь",
+       "oblast": "Автономна Республіка Крим",
+       "since": "2022-12-10T22:22:00Z",
+       "level": "red"
+      }
+     ]
+    }
+   },
+   {
+    "type": "remove",
+    "keys": [
+     "type",
+     "ts",
+     "data"
+    ],
+    "shape": {
+     "type": "object",
+     "fields": {
+      "id": {
+       "type": "string"
+      }
+     }
+    },
+    "sample": {
+     "id": "trk_00341074"
+    }
+   },
+   {
+    "type": "heartbeat",
+    "keys": [
+     "type",
+     "ts"
+    ],
+    "shape": {
+     "type": "null"
+    },
+    "sample": {
+     "type": "heartbeat",
+     "ts": "2026-11-07T18:55:25.802Z"
+    }
+   }
+  ],
+  "opened": true
+ }
+}
