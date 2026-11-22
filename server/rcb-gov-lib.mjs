@@ -36,20 +36,26 @@ export const AIR_TOPIC_RE = /(z\s+powietrza|powietrzn|rakiet|\bdron|nalot|obiekt
 export const isAirTopic = (...parts) => AIR_TOPIC_RE.test(norm(parts.join(" ")));
 
 /**
- * Data z tytułu: „(20.11)”, „(20.11.2026)”, „(21-22.11)”, „20.11 – aktualizacja” – bierzemy OSTATNIĄ datę w tytule.
- * Bez roku: rok najbliższy dacie „teraz” (przełom roku). Zwraca { y, m, d } albo null (wtedy datę bierzemy ze strony alertu).
+ * Data z tytułu: „(20.11)”, „(20.11.2026)”, „(21-22.11)”, „20.11 – aktualizacja”. Najpierw data w NAWIASIE (ostatnia w nim),
+ * potem pierwsza data w tytule – godzina zapisana z kropką („g. 10.05”) nie może udawać daty. Bez roku: rok najbliższy dacie „teraz”.
+ * Data dalej niż 3 dni od „teraz” = podejrzana → null (wtedy datę bierzemy ze strony alertu).
  */
 export function dateFromTitle(title, now = Date.now()) {
-  const all = [...String(title || "").matchAll(/(?<![\d.])(\d{1,2})\.(\d{1,2})(?:\.(20\d{2}))?(?![\d])/g)];
-  const m = all[all.length - 1];
+  const t = String(title || "");
+  const DATE = /(?<![\d.])(\d{1,2})\.(\d{1,2})(?:\.(20\d{2}))?(?![\d])/g;
+  let m = null;
+  for (const par of t.matchAll(/\(([^()]*)\)/g)) { const inP = [...par[1].matchAll(DATE)]; if (inP.length) m = inP[inP.length - 1]; }
+  if (!m) m = [...t.matchAll(DATE)][0] || null;
   if (!m) return null;
   const d = Number(m[1]), mo = Number(m[2]);
   if (!(d >= 1 && d <= 31 && mo >= 1 && mo <= 12)) return null;
-  if (m[3]) return { y: Number(m[3]), m: mo, d };
-  const y0 = new Date(now).getUTCFullYear();
-  const cand = [y0 - 1, y0, y0 + 1].map((y) => ({ y, m: mo, d, t: Date.UTC(y, mo - 1, d) }));
-  cand.sort((a, b) => Math.abs(a.t - now) - Math.abs(b.t - now));
-  const { y } = cand[0];
+  let y;
+  if (m[3]) y = Number(m[3]);
+  else {
+    const y0 = new Date(now).getUTCFullYear();
+    y = [y0 - 1, y0, y0 + 1].sort((a, b) => Math.abs(Date.UTC(a, mo - 1, d) - now) - Math.abs(Date.UTC(b, mo - 1, d) - now))[0];
+  }
+  if (Math.abs(Date.UTC(y, mo - 1, d) - now) > 4 * 864e5) return null;
   return { y, m: mo, d };
 }
 
@@ -168,7 +174,9 @@ export function regionsOf(recipients) {
 export function regionsFromPlaces(text) {
   // Biała Podlaska i powiat bialski leżą w LUBELSKIM – „Podlaska” nie może dać województwa podlaskiego.
   const t = String(text || "").replace(/bia[łl]\p{L}*\s+podlask\p{L}*/giu, " lubelszczyzna ").replace(/\b(pow|powiat\p{L}*|gm|gmin\p{L}*|m|miast\p{L}*)\.?\s*:?/giu, " ");
-  const words = t.split(/[\s,;()]+/).filter((w) => w.length >= 4);
+  // Powiaty o tej samej nazwie w dwóch województwach (opolski: lubelskie i opolskie, tomaszowski: lubelskie i łódzkie, świdnicki: lubelskie
+  // i dolnośląskie…) – z samej nazwy nie wiadomo, gdzie leżą, więc ich nie używamy.
+  const words = t.split(/[\s,;()]+/).filter((w) => w.length >= 4 && !AMBIGUOUS_POWIAT.test(norm(w)));
   const stems = [];
   for (const w of words) {
     const a = /^(.*?)(sk|ck|dzk)(?:iego|iemu|ich|im|ie|i|a|iej)$/iu.exec(w);
@@ -177,25 +185,30 @@ export function regionsFromPlaces(text) {
     if (a[2].toLowerCase() === "ck") stems.push(a[1] + "k"); // sanockiego → sanok
   }
   const found = regionsMentioned(`${t} , ${stems.join(" , ")}`);
-  return found.length && found.length <= 3 ? found.sort() : [];
+  // Tylko jednoznaczny wynik: przy alarmie lepiej nie wysłać (wysyłka idzie wtedy zapasowo wg innych wysyłek z tej strony) niż wysłać do złego województwa.
+  return found.length === 1 ? found : [];
 }
+const AMBIGUOUS_POWIAT = /^(opolsk|tomaszowsk|swidnick|bielsk|brzesk|grodzisk|krosniensk|nowodworsk|ostrowsk|sredzk|bialsk|nowomiejsk|kamiensk|strzelec)/;
 
 /**
  * Strona → komunikaty w formacie alerts.json (jeden na województwo i wysyłkę).
  * firstSeen: { [klucz wpisu]: ms } – kiedy pierwszy raz widzieliśmy wpis bez godziny (wtedy to jego czas).
  */
-export function toItems(page, { slug, url, firstSeen = {}, now = Date.now() } = {}) {
+export function toItems(page, { slug, url, firstSeen = {}, regionMemo = null, now = Date.now() } = {}) {
   const items = [];
   if (!page?.date) return items;
   const { y, m, d } = page.date;
   let dayShift = 0, prevMin = -1;
   // Województwa całej strony – zapas dla wysyłki, której odbiorców nie da się przypisać (ta sama akcja RCB, te same okolice).
   const pageRegions = [...new Set(page.entries.flatMap((e) => regionsOf(e.recipients)).filter((r) => r !== "all"))].sort();
+  const seenTimes = {};
   for (let idx = 0; idx < page.entries.length; idx++) {
     const e = page.entries[idx];
-    // Klucz: strona + numer wysyłki licząc od najstarszej. RCB dopisuje nowe wysyłki na górze, więc numer się nie zmienia –
-    // także gdy RCB poprawi literówkę albo dopisze godzinę (wtedy ten sam wpis nie pójdzie drugi raz na Telegram).
-    const key = `${slug}|${idx}`;
+    // Klucz: strona + GODZINA wysyłki (+ numer kolejny przy dwóch wysyłkach o tej samej godzinie). Nie zmienia się, gdy RCB poprawi
+    // literówkę, odbiorców albo układ innych wpisów (numer pozycji na stronie mógłby się przesunąć i „zabrać” identyfikator nowej wysyłce).
+    const hm = `${e.hh ?? "-"}:${e.mm ?? "-"}`;
+    const k = (seenTimes[hm] = (seenTimes[hm] ?? -1) + 1);
+    const key = `${slug}|${hm}|${k}`;
     let published;
     if (e.hh != null) {
       const min = e.hh * 60 + e.mm;
@@ -209,7 +222,12 @@ export function toItems(page, { slug, url, firstSeen = {}, now = Date.now() } = 
     }
     if (Date.parse(published) > now + 2 * 6e4) continue; // data z przyszłości (poza różnicą zegarów) = błąd odczytu, pomijamy
     let regions = regionsOf(e.recipients), approx = false;
-    if (!regions.length && pageRegions.length) { regions = pageRegions; approx = true; }
+    if (!regions.length && pageRegions.length) {
+      // Zapas: województwa z innych wysyłek tej strony – ZAMROŻONE przy pierwszym przypisaniu (późniejsza wysyłka do innego
+      // województwa nie może „dopisać” tamtego województwa do starego wpisu i wysłać go tam z opóźnieniem).
+      regions = regionMemo?.[key] || pageRegions; approx = true;
+      if (regionMemo && !regionMemo[key]) regionMemo[key] = regions;
+    }
     const recip = e.recipients ? `Alert RCB wysłano do odbiorców na terenie ${e.recipients.replace(/[.\s]+$/, "")}.` : "";
     const { title, rest } = headline(e.text);
     const base = {

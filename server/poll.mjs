@@ -93,8 +93,9 @@ async function main() {
     const govItems = (Array.isArray(gov.items) ? gov.items : []).filter((g) => g?.id && typeof g.title === "string" && g.published).map(({ key, slug, sig, regionApprox, ...c }) => c);
     const prevRso = (previous.items || []).filter((a) => a.source !== GOV_SOURCE);
     const merged = [...new Map([...prevRso, ...govItems].map((a) => [a.id, a])).values()].sort((a, b) => (b.published || "").localeCompare(a.published || "")).slice(0, MAX_ITEMS);
-    const before = JSON.stringify((previous.items || []).map((a) => a.id).sort()), after = JSON.stringify(merged.map((a) => a.id).sort());
-    if (govItems.length && before !== after) {
+    // Zawsze zapisujemy i zwracamy 3, gdy są alerty z gov.pl: o publikacji decyduje run.sh (porównanie z ostatnio opublikowaną treścią),
+    // więc nieudana publikacja zostanie ponowiona przy następnym przebiegu, nawet gdy plik się już nie zmienia.
+    if (govItems.length) {
       await mkdir(path.dirname(OUT), { recursive: true });
       await writeFile(OUT, JSON.stringify({ ...previous, updated: previous.updated || null, items: merged }, null, 1));
       console.log(`RSO nie działa – zapisano poprzednie komunikaty RSO i ${govItems.length} Alertów RCB z gov.pl (bez zmiany „updated”).`);

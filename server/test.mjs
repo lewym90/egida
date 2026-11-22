@@ -238,10 +238,26 @@ import { newsMessage, isAirDefence, levelOf as nLevel, categoryOf as nCat, selec
   const withPage = toItems({ date: { y: 2026, m: 11, d: 22 }, entries: [{ hh: 9, mm: 0, text: "UWAGA! Rosyjski atak powietrzny na Ukrainie.", recipients: "woj. podkarpackiego." }, { hh: 10, mm: 0, text: "UWAGA! Zagrożenie atakiem z powietrza.", recipients: "pow. stalowowolskiego." }] }, { slug: "s", url: "u", now: T("2026-11-22T12:00:00Z") });
   assert.deepEqual(withPage.map((i) => i.voivodeship), ["podkarpackie", "podkarpackie"]);
   assert.equal(withPage[1].regionApprox, true);
-  // Identyfikator wysyłki nie zmienia się, gdy RCB poprawi treść albo dopisze godzinę.
-  const v1 = toItems({ date: { y: 2026, m: 11, d: 22 }, entries: [{ hh: null, mm: null, text: "UWAGA! Rosyjski atak powietrzny na Ukrainie.", recipients: "woj. lubelskiego." }] }, { slug: "s", url: "u", now: NOWD });
+  // Identyfikator wysyłki nie zmienia się, gdy RCB poprawi treść lub odbiorców (klucz = strona + godzina).
+  const v1 = toItems({ date: { y: 2026, m: 11, d: 22 }, entries: [{ hh: 9, mm: 5, text: "UWAGA! Rosyjski atak powietrzny na Ukrainie.", recipients: "woj. lubelskiego." }] }, { slug: "s", url: "u", now: NOWD });
   const v2 = toItems({ date: { y: 2026, m: 11, d: 22 }, entries: [{ hh: 9, mm: 5, text: "UWAGA! Rosyjski atak powietrzny na Ukrainę.", recipients: "woj. lubelskiego" }] }, { slug: "s", url: "u", now: NOWD });
   assert.equal(v1[0].id, v2[0].id);
+  // Po scaleniu dwóch starszych wpisów (zmiana zdania „został wysłany”) nowa wysyłka NIE dostaje identyfikatora starej.
+  const slug20 = "alert-rcb---atak-z-powietrza-2011";
+  const ids20 = new Set(toItems(p20, { slug: slug20, url: "x", now: T("2026-11-20T09:00:00Z") }).map((i) => i.id));
+  const merged = { ...p20, entries: [...p20.entries.slice(0, 4), { hh: 10, mm: 40, text: "UWAGA! Zagrożenie atakiem z powietrza. Znajdź bezpieczne miejsce.", recipients: "woj. lubelskiego." }] };
+  const newIt = toItems(merged, { slug: slug20, url: "x", now: T("2026-11-20T10:00:00Z") }).filter((i) => i.published === "2026-11-20T09:40:00.000Z");
+  assert.equal(newIt.length, 1); assert.ok(!ids20.has(newIt[0].id), "nowa wysyłka ma nowy identyfikator");
+  // Niejednoznaczne nazwy powiatów nie wskazują województwa; godzina z kropką w tytule nie udaje daty.
+  assert.deepEqual(regionsOf("pow. opolskiego, puławskiego"), ["lubelskie"]);
+  assert.deepEqual(regionsOf("pow. świdnickiego"), []);
+  assert.deepEqual(dateFromTitle("Alert RCB - atak (20.11) g. 10.05", NOWD), { y: 2026, m: 11, d: 20 });
+  // Zapasowe województwa wpisu są zamrażane: późniejsza wysyłka do innego województwa ich nie rozszerza.
+  const memo = {};
+  const pA = { date: { y: 2026, m: 11, d: 22 }, entries: [{ hh: 9, mm: 0, text: "UWAGA! Rosyjski atak powietrzny na Ukrainie.", recipients: "woj. podkarpackiego." }, { hh: 10, mm: 0, text: "UWAGA! Zagrożenie atakiem z powietrza.", recipients: "pow. stalowowolskiego." }] };
+  toItems(pA, { slug: "m", url: "u", regionMemo: memo, now: NOWD });
+  const pB = { ...pA, entries: [...pA.entries, { hh: 11, mm: 0, text: "UWAGA! Zagrożenie atakiem z powietrza.", recipients: "woj. lubelskiego." }] };
+  assert.deepEqual(toItems(pB, { slug: "m", url: "u", regionMemo: memo, now: NOWD }).filter((i) => i.published.includes("T09:00")).map((i) => i.voivodeship), ["podkarpackie"]);
   assert.equal(headline("UWAGA! UWAGA! UWAGA! Zagrożenie atakiem z powietrza. Znajdź bezpieczne miejsce.").title, "Zagrożenie atakiem z powietrza");
 
   // Odtworzenie piątku 20.11.2026 minuta po minucie: co widzi aplikacja i co idzie na Telegram.

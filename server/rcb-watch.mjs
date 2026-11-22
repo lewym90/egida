@@ -103,7 +103,7 @@ function publishNow() {
 async function main() {
   const now = Date.now();
   const state = readJson(STATE_FILE, {});
-  state.sent ||= {}; state.sentTo ||= {}; state.sig ||= {}; state.danger ||= {}; state.firstSeen ||= {}; state.pages ||= {};
+  state.sent ||= {}; state.sentTo ||= {}; state.sig ||= {}; state.danger ||= {}; state.firstSeen ||= {}; state.pages ||= {}; state.regionMemo ||= {};
   const saveState = () => { if (!DRY) writeAtomic(STATE_FILE, JSON.stringify(state)); };
   const prev = readJson(OUT, { items: [] });
 
@@ -146,10 +146,9 @@ async function main() {
       if (page.date && Math.abs(ageDays(page.date)) > KEEP_DAYS) { state.pages[c.slug] = { t: now, n: page.entries.length, date: page.date }; continue; }
       // Pierwsze zobaczenie wpisów bez godziny (ich czas = kiedy je zobaczyliśmy; przy pierwszym uruchomieniu – data strony).
       for (const it of toItems(page, { slug: c.slug, url: c.url, firstSeen: state.firstSeen, now })) {
-        const e = page.entries[Number(it.key.split("|").pop())];
-        if (e && e.hh == null && !state.firstSeen[it.key]) state.firstSeen[it.key] = state.seeded ? now : Date.parse(it.published);
+        if (it.key.includes("|-:-|") && !state.firstSeen[it.key]) state.firstSeen[it.key] = state.seeded ? now : Date.parse(it.published);
       }
-      const fresh = toItems(page, { slug: c.slug, url: c.url, firstSeen: state.firstSeen, now });
+      const fresh = toItems(page, { slug: c.slug, url: c.url, firstSeen: state.firstSeen, regionMemo: state.regionMemo, now });
       if (fresh.unresolved) log(`Strona ${c.slug}: ${fresh.unresolved} wysyłek bez rozpoznanego województwa – pominięte (sprawdź opis odbiorców na stronie)`);
       if (!page.entries.length) log(`Strona ${c.slug}: nie rozpoznano żadnej wysyłki (zmiana układu strony?) – zostają poprzednie wpisy`);
       items.push(...(fresh.length || !page.entries.length ? fresh.map((i) => ({ ...i, slug: c.slug })) : []), ...(!page.entries.length ? keepPrev.get(c.slug) || [] : []));
@@ -222,6 +221,7 @@ async function main() {
   for (const [k, t] of Object.entries(state.danger)) if (t < now - 2 * DAY) delete state.danger[k];
   for (const [k, t] of Object.entries(state.firstSeen)) if (t < now - 14 * DAY) delete state.firstSeen[k];
   for (const [k, p] of Object.entries(state.pages)) if (p.t < now - 14 * DAY) delete state.pages[k];
+  { const live = new Set(Object.keys(state.pages)); for (const k of Object.keys(state.regionMemo)) if (!live.has(k.split("|")[0])) delete state.regionMemo[k]; }
   saveState();
   log(`Alerty RCB (gov.pl): stron ${cands.length}, wpisów ${all.length}${newOnes.length ? `, NOWE: ${newOnes.length}` : ""}${sentN ? `, Telegram: ${sentN}` : ""}${errors ? `, błędy: ${errors}` : ""}`);
   retryPending();

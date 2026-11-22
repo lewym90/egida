@@ -12,6 +12,7 @@ fi
 exec 9>"$BASE/run.lock"                                 # nie uruchamiaj dwóch naraz
 if [ -n "${EGIDA_ALERTS_ONLY:-}" ]; then flock -w 280 9 || exit 0   # czeka, aż skończy się bieżący przebieg
 else flock -w 60 9 || exit 0; fi                       # cron: krótko poczekaj (np. na publikację po Alercie RCB), zamiast tracić cały cykl
+SECONDS=0                                               # budżet czasu liczymy od zdobycia blokady (czekanie nie zjada zadań dodatkowych)
 set -a; . "$BASE/env"; set +a
 export PATH="$BASE/node/bin:$PATH"
 export EGIDA_REMOTE="${EGIDA_REMOTE:-https://github.com/${EGIDA_REPO:-lewym90/egida}.git}"
@@ -35,6 +36,8 @@ budget() { [ "$SECONDS" -lt 100 ]; }
 
 # Licznik kolejnych porażek: po 3 z rzędu (≈15 min) wysyłamy wiadomość administratorowi (jeśli ustawiono ADMIN_CHAT_ID).
 fail() {
+  # Publikacje „po Alercie RCB” mogą startować co minutę – licznik porażek (≈15 min) prowadzi tylko zwykły przebieg z crona.
+  [ -n "${EGIDA_ALERTS_ONLY:-}" ] && return 0
   local n=$(( $(cat "$BASE/fails" 2>/dev/null || echo 0) + 1 )); echo "$n" > "$BASE/fails"
   [ "$n" -eq 3 ] && node notify.mjs "EGIDA: serwer nie może pobrać/opublikować komunikatów od ok. 15 min. Aplikacja pokazuje „Brak aktualnych danych”. Zajrzyj do /opt/egida/log.txt"
   return 0

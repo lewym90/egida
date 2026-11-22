@@ -79,6 +79,15 @@ await t("RCB poprawia literówkę i dopisuje godzinę w starszym wpisie → bez 
   pages[SLUG].entries = [e3, e2.replace("biłgorajskiego", "biłgorajskiego oraz"), e1.replace("Podniesiono", "Podniesiono&nbsp;")];
   const r = await run(); assert.deepEqual(take(), [], r.out);
 });
+await t("RCB zmienia zdanie w starszym wpisie (wpisy się scalają), potem dopisuje nową wysyłkę → nowa wysyłka idzie", async () => {
+  const e2b = e2.replace("został wysłany do odbiorc&oacute;w na terenie", "wysłano do:");
+  const ex = entry(at(5), MON, "woj. podlaskiego.");
+  pages[SLUG].entries = [e3, e2b, e1];
+  await run(); take();
+  pages[SLUG].entries = [ex, e3, e2b, e1];
+  const r = await run(); assert.deepEqual(take(), ["podlaskie:important"], r.out);
+  pages[SLUG].entries = [e3, e2, e1];
+});
 await t("odwołanie → ODWOŁANIE do wszystkich 4 województw", async () => {
   pages[SLUG].entries = [e4, e3, e2, e1];
   const r = await run(); assert.deepEqual(take(), ["lubelskie:cancel", "mazowieckie:cancel", "podkarpackie:cancel", "podlaskie:cancel"], r.out);
