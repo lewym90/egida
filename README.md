@@ -129,3 +129,14 @@ Alerty poziomu 2 z torem po weryfikacji formatu NEPTUN, zatwierdzenie treści (`
 - **Parser** `server/rcb-gov-lib.mjs`: różne zapisy godzin („Aktualizacja - g. 09:48”, „Aktualizacja! - 22:41”, „g. 2:30”, „10:20”, wpis bez godziny), województwa tylko z nazw województw (powiat opolski leży w lubelskim), przejście przez północ. Testy na prawdziwych stronach RCB: `server/test-fixtures/rcb/`, w tym odtworzenie piątku 20.11 minuta po minucie.
 - **Ocena wagi** (`js/classify.js`): „Zagrożenie atakiem z powietrza. Znajdź bezpieczne miejsce” = czerwone; „Rosyjski atak powietrzny na Ukrainie. Sytuacja jest monitorowana” = żółte ostrzeżenie; odwołanie kończy oba, ale nie kasuje np. ostrzeżenia powodziowego 3. stopnia w tym samym województwie.
 - **Strażnik** zgłasza, gdy strony RCB nie dało się odczytać przez 20 min.
+
+## Wersja 49: przekaźnik NEPTUN na serwerze EGIDA
+- **Dlaczego:** każdy telefon łączył się z NEPTUN sam. Przy słabym zasięgu, aplikacji w tle albo przeciążeniu NEPTUN w czasie zmasowanego ataku widać było „Brak połączenia z NEPTUN”, a historii nocy nie było nigdzie.
+- **`server/neptun-relay.mjs`** (proces stały, start i wznawianie co minutę z `run-neptun-watch.sh` → `run-neptun-relay.sh`): jedno połączenie WebSocket z NEPTUN + REST `/threats` co 15 s (resynchronizacja), `/alerts` i `/messages` co 30 s. Nasłuchuje tylko na `127.0.0.1:8790` (`NEPTUN_RELAY_PORT`); na zewnątrz wystawia go Caddy pod `/egida/neptun/*`.
+  - `GET /egida/neptun/snapshot` – obiekty (format NEPTUN /threats) + alarmy obwodów, gzip; `?since=<version>` → 204, gdy bez zmian.
+  - `GET /egida/neptun/messages` – wiadomości z kanałów (aplikacja pobiera co 60 s).
+  - `GET /egida/neptun/health` – stan przekaźnika.
+  - Gdy NEPTUN milczy > 90 s: 503 – aplikacja przechodzi na NEPTUN bezpośrednio.
+- **Historia:** `/opt/egida/neptun-history/RRRR-MM-DD.jsonl` (starsze dni `.jsonl.gz`, 60 dni): zmiany obiektów do 400 km od granicy Polski. Log: `/opt/egida/neptun-relay-log.txt`. Wyłączenie: `touch /opt/egida/relay.off`.
+- **Aplikacja** (`js/neptun-feed.js`): gdy `CONFIG.neptun.relayUrl` jest ustawione – najpierw przekaźnik; po 2 błędach z rzędu NEPTUN bezpośrednio (jak dotąd), co 30 s próba powrotu na przekaźnik. Puste `relayUrl` = zachowanie sprzed v49.
+- **Strażnik** zgłasza przekaźnik bez świeżych danych > 15 min.

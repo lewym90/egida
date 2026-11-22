@@ -305,7 +305,7 @@ export function initMapScreen(ctx, { demo = false, diag = false } = {}) {
       } else if (!view.rows.length && !view.areaRows.length) {
         msg = `W danych NEPTUN nie ma teraz żadnych obiektów z pozycją. To nie znaczy, że jest bezpiecznie: NEPTUN może nie obejmować wszystkich kierunków (np. od strony Białorusi i Kaliningradu) ani nisko lecących obiektów.`;
       } else {
-        msg = `Źródło odpowiada (${fs.via === "ws" ? "na żywo" : "odświeżanie co " + Math.round(CONFIG.neptun.pollMs / 1000) + " s"}). Obiektów z pozycją: ${view.rows.length}.${view.areaOnly ? ` Bez dokładnej pozycji (tylko obwód): ${view.areaOnly}.` : ""}`;
+        msg = `Źródło odpowiada (${fs.via === "ws" ? "na żywo" : fs.via === "relay" ? "przez serwer EGIDA, odświeżanie co " + Math.round(CONFIG.neptun.pollMs / 1000) + " s" : "odświeżanie co " + Math.round(CONFIG.neptun.pollMs / 1000) + " s"}). Obiektów z pozycją: ${view.rows.length}.${view.areaOnly ? ` Bez dokładnej pozycji (tylko obwód): ${view.areaOnly}.` : ""}`;
       }
       const dataOk = demo || (feed.isFresh() && !fs.formatWarning);
       const shadeMiss = drawShade(view.alerts, dataOk && ml().uaShade !== false); // bez świeżych danych nie zostawiamy na mapie starego cieniowania
@@ -377,7 +377,7 @@ export function initMapScreen(ctx, { demo = false, diag = false } = {}) {
 
     function startFeed() {
       if (demo || feed) return;
-      feed = createFeed({ alertsUrl: CONFIG.neptun.alertsUrl, extrasMs: CONFIG.neptun.extrasMs, restUrl: CONFIG.neptun.restUrl, wsUrl: CONFIG.neptun.wsUrl, pollMs: CONFIG.neptun.pollMs, onChange: scheduleRefresh, onStatus: scheduleRefresh });
+      feed = createFeed({ alertsUrl: CONFIG.neptun.alertsUrl, extrasMs: CONFIG.neptun.extrasMs, restUrl: CONFIG.neptun.restUrl, wsUrl: CONFIG.neptun.wsUrl, pollMs: CONFIG.neptun.pollMs, relayUrl: CONFIG.neptun.relayUrl || "", relayMessagesUrl: CONFIG.neptun.relayMessagesUrl || "", onChange: scheduleRefresh, onStatus: scheduleRefresh });
       cleanups.push(() => { feed?.stop(); feed = null; });
       feed.start();
     }

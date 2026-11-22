@@ -7,7 +7,7 @@
   "scripts": {
     "poll": "node poll.mjs",
     "dump": "node poll.mjs --dump",
-    "test": "node test.mjs && node test-rcb-watch.mjs"
+    "test": "node test.mjs && node test-rcb-watch.mjs && node test-neptun-relay.mjs"
   },
   "dependencies": {
     "fast-xml-parser": "^4.5.0"

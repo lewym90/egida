@@ -238,7 +238,7 @@ await t("podpięcie: menu Więcej i boczne, trasa, sw.js, config, run.sh, publis
   assert.match(src("js/config.js"), /alarmUrl: "https:\/\/raw\.githubusercontent\.com\/lewym90\/egida\/data\/alarm-levels\.json"/);
   assert.match(src("server/run.sh"), /node alarm-sync\.mjs/); assert.match(src("server/publish.sh"), /git add alarm-levels\.json/);
   assert.match(src("server/watchdog.mjs"), /"alarm-levels\.json": 30/); assert.match(src("server/watchdog.mjs"), /"water\.json", "alarm-levels\.json"/);
-  assert.match(src("js/version.js"), /APP_VERSION = "v48"/); assert.match(sw, /const VERSION = "egida-v48"/);
+  assert.match(src("js/version.js"), /APP_VERSION = "v49"/); assert.match(sw, /const VERSION = "egida-v49"/);
 });
 await t("nazwy: bez pseudonimu autora w nowych plikach", () => {
   for (const f of ["js/alarm.js", "js/alarm-table.js", "server/alarm-lib.mjs", "server/alarm-sync.mjs", "server/alarm-seed.json"]) assert.ok(!/lewym90\/(?!egida)/.test(src(f)), f);

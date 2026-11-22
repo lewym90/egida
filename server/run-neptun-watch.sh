@@ -6,6 +6,9 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 [ -f "$BASE/env" ] && { set -a; . "$BASE/env"; set +a; }
 export PATH="$BASE/node/bin:$PATH" CHANNELS_FILE="${CHANNELS_FILE:-$BASE/channels.json}" NEPTUN_STATE="$BASE/neptun-state.json" NEPTUN_SEEN="$BASE/neptun-seen.json" NEPTUN_HEALTH="$BASE/neptun-health.json"
 
+# 0. Przekaźnik NEPTUN (proces stały): jeśli nie działa – uruchom. Osobna sesja, żadnych otwartych blokad tego skryptu.
+setsid -f bash "$HERE/run-neptun-relay.sh" </dev/null >/dev/null 2>&1
+
 # 1. Alerty RCB z gov.pl – PRZED blokadą NEPTUN, żeby przeciągający się obserwator NEPTUN nie zabierał im minuty.
 #    W tle, z własną blokadą i logiem; nie opóźnia obserwatora NEPTUN.
 RCB_LOG="$BASE/rcb-log.txt"

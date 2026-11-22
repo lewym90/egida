@@ -9,13 +9,13 @@ import { readFile, writeFile, stat } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-export const LIMITS = { pushMin: 30, remoteMin: 40, newsMin: 90, newsOkRatio: 0.6, remindH: 6, airMin: 180, neptunMin: 20, rcbMin: 20, dailyH: 48, fileH: { "hospitals.json": 200, "alarm-levels.json": 30 }, gddkiaH: 6, addrStallH: 72, addrMinPct: 90 };
+export const LIMITS = { pushMin: 30, remoteMin: 40, newsMin: 90, newsOkRatio: 0.6, remindH: 6, airMin: 180, neptunMin: 20, rcbMin: 20, relayMin: 15, dailyH: 48, fileH: { "hospitals.json": 200, "alarm-levels.json": 30 }, gddkiaH: 6, addrStallH: 72, addrMinPct: 90 };
 /** Terminy, o których przypominamy administratorowi (data|opis; zmienna WD_DEADLINES nadpisuje, rozdzielone średnikiem). */
 export const DEADLINES = [{ date: "2026-10-30", label: "Odnowienie serwera (VPS)" }, { date: "2027-01-07", label: "Wygaśnięcie tokenu GitHub (GH_TOKEN w /opt/egida/env)" }];
 export const REMIND_DAYS = [14, 3];
 
 /** Czysta ocena: { pushAgeMin, remoteAgeMin, newsAgeMin, newsSources, newsOk, airAgeMin, dailyAgesH, gddkiaBadH, addrPct, addrStallH } (null/undefined = nieznane) → { problem, reasons }. */
-export function evaluate({ pushAgeMin, remoteAgeMin, newsAgeMin = null, newsSources = null, newsOk = null, airAgeMin = null, dailyAgesH = null, gddkiaBadH = null, addrPct = null, addrStallH = null, neptunAgeMin = null, rcbAgeMin = null }, limits = LIMITS) {
+export function evaluate({ pushAgeMin, remoteAgeMin, newsAgeMin = null, newsSources = null, newsOk = null, airAgeMin = null, dailyAgesH = null, gddkiaBadH = null, addrPct = null, addrStallH = null, neptunAgeMin = null, rcbAgeMin = null, relayAgeMin = null }, limits = LIMITS) {
   const reasons = [];
   if (pushAgeMin == null) reasons.push("serwer jeszcze nigdy nie opublikował danych");
   else if (pushAgeMin > limits.pushMin) reasons.push(`ostatnia udana publikacja była ${Math.round(pushAgeMin)} min temu`);
@@ -25,6 +25,7 @@ export function evaluate({ pushAgeMin, remoteAgeMin, newsAgeMin = null, newsSour
   if (airAgeMin != null && airAgeMin > limits.airMin) reasons.push(`jakość powietrza (air.json) ma ${Math.round(airAgeMin)} min`);
   if (neptunAgeMin != null && neptunAgeMin > limits.neptunMin) reasons.push(`NEPTUN nie dał poprawnych danych od ${Math.round(neptunAgeMin)} min (źródło nie odpowiada albo obserwator nie działa)`);
   if (rcbAgeMin != null && rcbAgeMin > limits.rcbMin) reasons.push(`Alerty RCB o zagrożeniu z powietrza (gov.pl) nie były odczytane od ${Math.round(rcbAgeMin)} min (zajrzyj do /opt/egida/rcb-log.txt)`);
+  if (relayAgeMin != null && relayAgeMin > limits.relayMin) reasons.push(`przekaźnik NEPTUN nie ma świeżych danych od ${Math.round(relayAgeMin)} min – telefony łączą się z NEPTUN bezpośrednio (zajrzyj do /opt/egida/neptun-relay-log.txt)`);
   for (const [name, h] of Object.entries(dailyAgesH || {})) if (h != null && h > (limits.fileH?.[name] ?? limits.dailyH)) reasons.push(`plik ${name} nie był odświeżany od ${Math.round(h)} h`);
   if (gddkiaBadH != null && gddkiaBadH > limits.gddkiaH) reasons.push(`źródło GDDKiA (drogi) nie zwraca danych od ${Math.round(gddkiaBadH)} h`);
   if (addrPct != null && addrPct < limits.addrMinPct && addrStallH != null && addrStallH > limits.addrStallH) reasons.push(`adresy AED stoją na ${addrPct}% od ${Math.round(addrStallH)} h`);
@@ -129,7 +130,10 @@ async function main() {
   // Alerty RCB z gov.pl: obserwator zapisuje lastOk po każdym udanym odczycie; brak pliku = obserwator jeszcze nie działa (nie oceniamy).
   let rcbAgeMin = null;
   try { const h = JSON.parse(await readFile(path.join(BASE, "rcb-gov.json"), "utf8")); if (Number.isFinite(h?.lastOk)) rcbAgeMin = (now - h.lastOk) / 6e4; } catch { /* brak pliku */ }
-  const ev = evaluate({ pushAgeMin, remoteAgeMin, newsAgeMin, newsSources, newsOk, airAgeMin, dailyAgesH, gddkiaBadH, addrPct, addrStallH, neptunAgeMin, rcbAgeMin });
+  // Przekaźnik NEPTUN: znacznik co 30 s; brak pliku = przekaźnik nie działa jeszcze (nie oceniamy). Proces, który padł, nie odświeża pliku – też wyłapiemy.
+  let relayAgeMin = null;
+  try { const h = JSON.parse(await readFile(path.join(BASE, "neptun-relay-health.json"), "utf8")); const last = Number.isFinite(h?.lastOk) ? h.lastOk : h?.started; if (Number.isFinite(h?.at) && Number.isFinite(last)) relayAgeMin = Math.max(now - h.at, now - last) / 6e4; /* proces padł (at stoi) albo NEPTUN milczy (lastOk stoi) */ } catch { /* brak pliku */ }
+  const ev = evaluate({ pushAgeMin, remoteAgeMin, newsAgeMin, newsSources, newsOk, airAgeMin, dailyAgesH, gddkiaBadH, addrPct, addrStallH, neptunAgeMin, rcbAgeMin, relayAgeMin });
   const d = decide(ev.problem, state, now);
   const extras = { gddkiaSince, addr: addrState };
   const dl = dueReminders(parseDeadlines(process.env.WD_DEADLINES), state.sent || {}, now);
