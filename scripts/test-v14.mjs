@@ -168,7 +168,7 @@ ok("polityka prywatności: sekcje i brak obietnic, których nie spełniamy", () 
   const all = PRIVACY.sections.map((s) => s.h + " " + s.p.join(" ")).join(" ");
   assert.ok(PRIVACY.sections.length >= 7); assert.match(all, /GitHub/); assert.match(all, /Telegram/); assert.match(all, /NEPTUN/); assert.match(all, /EOX/);
   assert.ok(!/nie zbieramy żadnych danych/i.test(all), "nie twierdzimy, że nikt nigdy nie widzi IP");
-  assert.equal(PRIVACY.reviewed, "2026-10-12");
+  assert.match(PRIVACY.reviewed, /^\d{4}-\d{2}-\d{2}$/); assert.ok(PRIVACY.reviewed >= "2026-10-12", "przegląd nie starszy niż v14");
 });
 
 console.log(`OK: ${n} grup testów v14 przeszło (wersja ${APP_VERSION})`);

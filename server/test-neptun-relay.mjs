@@ -81,20 +81,22 @@ await t("obserwator/dziennik: najpierw lokalny przekaźnik, przy 503 lub braku �
 });
 
 // ---------- proces przekaźnika na atrapie NEPTUN ----------
-let up = true, threatsCalls = 0;
+let up = true, threatsCalls = 0, tgCalls = 0;
+const TG_HTML = readFileSync(path.join(here, "test-fixtures/tg/kpszsu.html"), "utf8");
 const fake = http.createServer((req, res) => {
   if (!up) { res.statusCode = 500; return res.end("x"); }
   const p = new URL(req.url, "http://x").pathname;
   res.setHeader("Content-Type", "application/json");
   if (p === "/api/v1/threats") { threatsCalls++; return res.end(JSON.stringify({ serverTime: new Date().toISOString(), threats: [LVIV, KHARKIV] })); }
   if (p === "/api/v1/alerts") return res.end(JSON.stringify({ raions: [], oblasts: [{ key: "lvivska", name: "Львівська область" }] }));
-  if (p === "/api/v1/messages") return res.end(JSON.stringify({ messages: [{ channel: "@kpszsu", text: "Ракета курсом на захід", date: new Date().toISOString() }] }));
+  if (p === "/api/v1/messages") return res.end(JSON.stringify({ messages: [{ channel: "@kpszsu", text: "Ракета курсом на захід", date: new Date().toISOString() }, { channel: "@monitor1", text: "Шахеди на Ковель", date: new Date().toISOString() }] }));
+  if (p === "/tg/kpszsu") { tgCalls++; res.setHeader("Content-Type", "text/html"); return res.end(TG_HTML.replace(/datetime="[^"]+"/g, `datetime="${new Date(Date.now() - 60000).toISOString()}"`)); }
   res.statusCode = 404; res.end("{}");
 });
 await new Promise((r) => fake.listen(0, "127.0.0.1", r));
 const base = mkdtempSync(path.join(tmpdir(), "relay-"));
 const PORT = 20000 + Math.floor(Math.random() * 20000);
-const relayEnv = { ...process.env, EGIDA_BASE: base, NEPTUN_RELAY_PORT: String(PORT), NEPTUN_BASE: `http://127.0.0.1:${fake.address().port}/api/v1`, NEPTUN_WS: "ws://127.0.0.1:1/", NEPTUN_RELAY_FRESH_MS: "2500", NEPTUN_RELAY_REST_MS: "400", NEPTUN_RELAY_EXTRAS_MS: "400" };
+const relayEnv = { ...process.env, EGIDA_BASE: base, NEPTUN_RELAY_PORT: String(PORT), NEPTUN_BASE: `http://127.0.0.1:${fake.address().port}/api/v1`, NEPTUN_WS: "ws://127.0.0.1:1/", NEPTUN_RELAY_FRESH_MS: "2500", NEPTUN_RELAY_REST_MS: "400", NEPTUN_RELAY_EXTRAS_MS: "400", EARLY_TG_BASE: `http://127.0.0.1:${fake.address().port}/tg/`, EARLY_TG_MS: "500" };
 const proc = spawn(process.execPath, [path.join(here, "neptun-relay.mjs")], { cwd: here, env: relayEnv });
 let out = ""; proc.stdout.on("data", (c) => (out += c)); proc.stderr.on("data", (c) => (out += c));
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -108,12 +110,22 @@ try {
     const plain = await get("/egida/neptun/snapshot"); assert.equal(plain.headers["content-encoding"], undefined); assert.equal(JSON.parse(plain.body).threats.length, 2);
   });
   await t("„bez zmian”: ?since=<wersja> → 204 z czasem serwera; inna wersja → pełne dane", async () => {
-    const j = JSON.parse((await get("/egida/neptun/snapshot")).body);
-    const r = await get(`/egida/neptun/snapshot?since=${j.version}`);
+    let r; // wersja może urosnąć tylko przy prawdziwej zmianie (np. pierwszy odczyt t.me) – wtedy próbujemy jeszcze raz
+    for (let i = 0; i < 3; i++) { const j = JSON.parse((await get("/egida/neptun/snapshot")).body); r = await get(`/egida/neptun/snapshot?since=${j.version}`); if (r.status === 204) break; await sleep(300); }
     assert.equal(r.status, 204, "atrapa zwraca ciągle te same obiekty – wersja nie może rosnąć");
     assert.ok(r.headers["x-server-time"]); assert.match(r.headers["access-control-expose-headers"], /X-Server-Time/);
     assert.ok(Number(r.headers["x-relay-age-ms"]) >= 0 && Number(r.headers["x-relay-age-ms"]) < 2500, "wiek danych w nagłówku");
     assert.equal((await get("/egida/neptun/snapshot?since=-5")).status, 200);
+  });
+  await t("wczesne ostrzeżenie: /early z t.me (Siły Powietrzne) i wiadomości NEPTUN; to samo pole w /snapshot", async () => {
+    assert.ok(tgCalls >= 1, out);
+    const e = JSON.parse((await get("/egida/neptun/early")).body);
+    assert.equal(e.early.level, "border", JSON.stringify(e)); assert.equal(e.early.weapon, "rakieta");
+    assert.ok(e.early.items.some((x) => x.official && x.oblasts.includes("volyn")), "Wołyń z t.me/kpszsu");
+    assert.ok(e.early.items.some((x) => x.channels.includes("@monitor1")), "Ковель z NEPTUN /messages");
+    assert.ok(!e.early.items.some((x) => /Вінниччина|Дніпропетровщина/.test(x.text)), "wschód i centrum pominięte");
+    assert.ok(e.sources.tg.kpszsu);
+    const j = JSON.parse((await get("/egida/neptun/snapshot")).body); assert.equal(j.early.level, "border");
   });
   await t("wiadomości osobno: /egida/neptun/messages", async () => { const r = await get("/egida/neptun/messages"); assert.equal(r.status, 200); assert.equal(JSON.parse(r.body).messages[0].channel, "@kpszsu"); });
   await t("bez WebSocket: REST do NEPTUN co zadany czas (atrapa: 0,4 s; dla neptun.in.ua minimum 5 s wymuszone w kodzie)", async () => { assert.ok(threatsCalls >= 2); assert.match(readFileSync(path.join(here, "neptun-relay.mjs"), "utf8"), /neptun\\.in\\.ua\/\.test\(API\) \? 5000/); });
@@ -133,6 +145,7 @@ try {
   await t("NEPTUN milczy dłużej niż próg → 503 (aplikacja przejdzie na NEPTUN bezpośrednio); /health mówi prawdę", async () => {
     up = false; await sleep(3500);
     assert.equal((await get("/egida/neptun/snapshot")).status, 503);
+    const e = await get("/egida/neptun/early"); assert.equal(e.status, 200, "ostrzeżenie z t.me działa bez NEPTUN"); assert.equal(JSON.parse(e.body).sources.neptun, false);
     const h = JSON.parse((await get("/egida/neptun/health")).body); assert.equal(h.ok, false);
     up = true; await sleep(1500);
     assert.equal((await get("/egida/neptun/snapshot")).status, 200, "po powrocie NEPTUN znów 200");

@@ -12,6 +12,7 @@ import { storyTokens, sameStory } from "./similar.js";
 import { emptyPlan, normalizePlan, normalizePlaces, importState, normalizeKit, normalizeExpiry, normalizeExercise, normalizeSupply, supplyNeeds, SUPPLY_DAYS, kitDue, kitSorted, kitStatus, kitDays, todayYmd, exportState, KIT_LIMIT } from "./personal.js";
 import { renderEmergency, initEmergency, renderPlan, initPlan, renderPlaces, initPlaces, renderPrivacy, shareText, shareNote, printSheet, planPrintHtml, packPrintHtml, guidePrintHtml } from "./screens2.js";
 import { renderMapHtml, initMapScreen, destroyScreens } from "./mapscreen.js";
+import { earlyHtml, earlyActive } from "./early.js";
 import { renderSheltersHtml, initSheltersScreen } from "./sheltersscreen.js";
 import { makePspCache } from "./shelters.js";
 import { offlineCenters, downloadOffline, offlineSummary } from "./offline.js";
@@ -98,6 +99,16 @@ const FETCH_LIMIT_MS = 10 * 1000;
 async function getJsonT(url, ms = FETCH_LIMIT_MS) {
   const c = new AbortController(), t = setTimeout(() => c.abort(), ms);
   try { const r = await fetch(url, { cache: "no-store", signal: c.signal }); if (!r.ok) throw new Error(r.status); return await r.json(); } finally { clearTimeout(t); }
+}
+/* Wczesne ostrzeżenie (nieoficjalne, serwer EGIDA): tylko przy włączonej warstwie NEPTUN (ta sama zgoda), co 30 s na Pulpicie. Błąd = brak karty. */
+let earlyData = null, earlyAt = 0;
+const earlyWanted = () => !!(CONFIG.neptun?.enabled && CONFIG.neptun.earlyUrl && state.consent?.neptun === true);
+const earlySig = () => (earlyActive(earlyData) ? JSON.stringify([earlyData.level, earlyData.lastAt, earlyData.items.map((x) => x.key)]) : "");
+async function loadEarly() {
+  if (!earlyWanted()) { earlyData = null; return; }
+  earlyAt = Date.now();
+  try { const j = await getJsonT(CONFIG.neptun.earlyUrl, 8000); earlyData = j && typeof j === "object" ? j.early ?? null : null; }
+  catch { earlyData = null; } // nie pokazujemy starego ostrzeżenia, gdy serwer nie odpowiada
 }
 let alertsData = { loaded: false, ok: false, updated: null, items: [] };
 const ALERTS_CACHE = "egida.alerts.v1";
@@ -479,7 +490,8 @@ function screenPulpit() {
     } else if (lvl === "warn") {
       status = `<div class="status warn"><span class="ico">${I.alert}</span><div class="sbody"><h2>${important.length === 1 ? "Ostrzeżenie" : `Ostrzeżenia (${important.length})`}</h2>${rows(important, 2)}<p class="smeta">Śledź rozwój sytuacji. ${meta}</p><a class="slink" href="#/alerty">Zobacz szczegóły ${I.chevr}</a></div></div>`;
     } else {
-      status = `<div class="status ok"><span class="ico">${I.check}</span><div class="sbody"><h2>W Twojej okolicy jest spokojnie</h2><p class="slead">Brak aktywnych ostrzeżeń w znanych nam źródłach.</p><p class="smeta">${meta}</p><p class="sfine">Aplikacja nie zastępuje syren ani Alertu RCB.</p></div></div>`;
+      const earlyOn = earlyWanted() && earlyActive(earlyData); // nieoficjalne wczesne ostrzeżenie – wtedy nie piszemy „spokojnie”
+      status = `<div class="status ok"><span class="ico">${I.check}</span><div class="sbody"><h2>${earlyOn ? "Brak oficjalnych ostrzeżeń" : "W Twojej okolicy jest spokojnie"}</h2><p class="slead">${earlyOn ? "Żaden oficjalny komunikat dla Twojego województwa. Zobacz wczesne ostrzeżenie poniżej." : "Brak aktywnych ostrzeżeń w znanych nam źródłach."}</p><p class="smeta">${meta}</p><p class="sfine">Aplikacja nie zastępuje syren ani Alertu RCB.</p></div></div>`;
     }
     const roads = roadRows();
     if (info.length || roads.length) {
@@ -494,6 +506,9 @@ function screenPulpit() {
     const roads = roadRows();
     if (roads.length) status += `<div class="goodtoknow"><h2><span class="tri">${I.alert}</span>Dobrze wiedzieć</h2><ul class="slist">${roads.slice(0, 3).map(roadLi).join("")}</ul>${roadMore(roads.length)}</div>`;
   }
+  // Wczesne ostrzeżenie (nieoficjalne) zaraz pod głównym statusem, przed „Dobrze wiedzieć”.
+  const early = earlyWanted() ? earlyHtml(earlyData) : "";
+  if (early) { const i = status.indexOf('<div class="goodtoknow">'); status = i >= 0 ? status.slice(0, i) + early + status.slice(i) : status + early; }
   const nm = nearestMinutes();
   const tile = (h, cls, i, t, sub, soon) => `<a class="tile ${soon ? "soon" : ""}" href="${h}"><span class="ti ${cls}">${i}</span><b>${t}</b><span class="muted small">${sub}</span>${soon ? '<span class="badge soon" style="align-self:flex-start">wkrótce</span>' : ""}</a>`;
   const nPack = plecakDone(), tPack = PLECAK.start.length;
@@ -1151,6 +1166,7 @@ testAnswers = { ...(state.test?.answers || {}) };
 render();
 loadNews().then(() => { if (state.onboarded && ["pulpit", "wazne", ""].includes(parse().route) && !document.activeElement?.closest?.("select,input,textarea")) render(); });
 loadAir().then(() => { if (state.onboarded && ["pulpit", ""].includes(parse().route) && !editingNow()) render(); });
+loadEarly().then(() => { if (earlyActive(earlyData) && state.onboarded && ["pulpit", ""].includes(parse().route) && !editingNow()) render(); });
 loadAlarm().then(() => { if (state.onboarded && ["alarmowe", "wiecej"].includes(parse().route) && !editingNow()) render(); });
 loadAlerts().then(() => { if (state.onboarded && ["pulpit", "alerty", "ustawienia", "telegram", ""].includes(parse().route) && !document.activeElement?.closest?.("select,input,textarea")) render(); });
 
@@ -1189,7 +1205,14 @@ async function refreshAlarm() {
   if (alarmSig() !== before && ["alarmowe", "wiecej"].includes(parse().route) && !editingNow()) softRender();
 }
 setInterval(refreshAlarm, 60 * 1000);
-const resumeLive = () => { if (document.hidden) return; refreshAlarm();
+async function refreshEarly(force = false) {
+  if ((document.hidden && !force) || !state.onboarded || !earlyWanted() || !["pulpit", ""].includes(parse().route)) return;
+  if (!force && Date.now() - earlyAt < 25 * 1000) return;
+  const before = earlySig(); await loadEarly();
+  if (earlySig() !== before && ["pulpit", ""].includes(parse().route) && !editingNow()) softRender();
+}
+setInterval(refreshEarly, 30 * 1000);
+const resumeLive = () => { if (document.hidden) return; refreshAlarm(); refreshEarly(true);
   if (Date.now() - airAt > 15 * 60 * 1000) loadAir().then(() => { if (state.onboarded && parse().route === "pulpit" && !editingNow()) softRender(); });
   try { navigator.serviceWorker?.getRegistration?.().then((r) => r?.update?.()).catch(() => {}); } catch { /* */ } const gap = Date.now() - Math.max(liveLast.alerts, liveLast.news); if (gap >= LIVE_MIN_GAP) refreshLive(["alerts", "news"], { force: true }); };
 document.addEventListener("visibilitychange", resumeLive);

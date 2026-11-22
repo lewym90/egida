@@ -130,6 +130,15 @@ Alerty poziomu 2 z torem po weryfikacji formatu NEPTUN, zatwierdzenie treści (`
 - **Ocena wagi** (`js/classify.js`): „Zagrożenie atakiem z powietrza. Znajdź bezpieczne miejsce” = czerwone; „Rosyjski atak powietrzny na Ukrainie. Sytuacja jest monitorowana” = żółte ostrzeżenie; odwołanie kończy oba, ale nie kasuje np. ostrzeżenia powodziowego 3. stopnia w tym samym województwie.
 - **Strażnik** zgłasza, gdy strony RCB nie dało się odczytać przez 20 min.
 
+## Wersja 50: wczesne ostrzeżenie (nieoficjalne)
+
+- **Źródła (bez kluczy i rejestracji):** wiadomości 89 kanałów z NEPTUN (przekaźnik już je odbiera) oraz publiczny podgląd kanału Sił Powietrznych ZSU `t.me/s/kpszsu`, czytany przez przekaźnik raz na minutę. Kanał „Повітряна тривога” (`air_alert_ua`) od 7.09.2026 nie publikuje alarmów – nie używamy.
+- **`server/early-lib.mjs`:** parser podglądu t.me, ocena wiadomości (obwody wołyński i lwowski lub wzmianka o Polsce = strefa „granica”; rówieński, tarnopolski, iwanofrankiwski, zakarpacki = „zachód”; wymagany obiekt: rakieta/dron/cel; wiadomości wielowierszowe wiersz po wierszu; „відбій” gasi wpisy obwodu; dłuższe niż 400 znaków pomijane). Ostrzeżenie trwa 30 min od ostatniej pasującej wiadomości. Sprawdzone na prawdziwych wpisach (m.in. 20.11.2026 rano i noc 9/10.09.2025).
+- **Przekaźnik:** pole `early` w `/egida/neptun/snapshot` oraz `/egida/neptun/early` (działa też, gdy NEPTUN milczy). `EARLY_TG_CHANNELS` (domyślnie `kpszsu`), `EARLY_TG_MS` (min. 60 s).
+- **Telegram** (`neptun-watch.mjs`): tylko strefa „granica” i tylko potwierdzone (Siły Powietrzne albo 2 różne kanały w 10 min); Wołyń → lubelskie, Lwów i wzmianka o Polsce → lubelskie + podkarpackie; najwyżej raz na 20 min na województwo (wyjątek: eskalacja do rakiet); bez zaległości starszych niż 10 min. Stan `/opt/egida/early-state.json`, wyłączenie `EARLY_TG=off`.
+- **Aplikacja:** karta „Wczesne ostrzeżenie · nieoficjalne” na Pulpicie (co 30 s, przy zgodzie na warstwę NEPTUN) i nad mapą; gdy jest aktywna, zielony status mówi „Brak oficjalnych ostrzeżeń” zamiast „spokojnie”.
+- **Strażnik:** kanał Sił Powietrznych nieodczytany > 60 min.
+
 ## Wersja 49: przekaźnik NEPTUN na serwerze EGIDA
 - **Dlaczego:** każdy telefon łączył się z NEPTUN sam. Przy słabym zasięgu, aplikacji w tle albo przeciążeniu NEPTUN w czasie zmasowanego ataku widać było „Brak połączenia z NEPTUN”, a historii nocy nie było nigdzie.
 - **`server/neptun-relay.mjs`** (proces stały; pilnujący `run-neptun-relay.sh` restartuje go po 2 s, a cron – `run-neptun-watch.sh` co minutę i `run.sh` co 5 min – sprawdza, czy pilnujący działa): jedno połączenie WebSocket z NEPTUN. REST `/threats` tylko gdy WebSocket milczy > 60 s (wtedy co 15 s) i resynchronizacja co 5 min; `/alerts` i `/messages` co 60 s tylko gdy WebSocket ich nie dostarcza. Wersja stanu rośnie tylko przy prawdziwej zmianie (telefony dostają wtedy 204). Port zajęty → kod 3, bez zapytań do NEPTUN. Nasłuchuje tylko na `127.0.0.1:18960` (`NEPTUN_RELAY_PORT`); na zewnątrz wystawia go Caddy pod `/egida/neptun/*`.

@@ -221,6 +221,7 @@ export const SOURCES = [
   { n: "GIOŚ: Państwowy Monitoring Środowiska", l: "Dane publiczne udostępniane przez API GIOŚ; EGIDA pokazuje indeks jakości powietrza najbliższej stacji i podaje źródło", u: "https://powietrze.gios.gov.pl", w: "Jakość powietrza na Pulpicie (indeks ze stacji pomiarowej, odświeżany co godzinę)" },
   { n: "Polska Rada Resuscytacji / ERC", l: "Wytyczne 2025", u: "https://www.prc.krakow.pl", w: "Pierwsza pomoc (opracowanie własne zgodne z wytycznymi)" },
   { n: "NEPTUN (neptun.in.ua)", l: "Otwarte API, warunki: neptun.in.ua/api-terms. Nieoficjalny agregator, nie system ostrzegania", u: "https://neptun.in.ua", w: "Obserwacje dronów i rakiet nad Ukrainą (mapa, beta, nieoficjalne; powiadomienia na kanałach Telegram). Dane: Karta powitryanykh tryvoh — NEPTUN" },
+  { n: "Siły Powietrzne ZSU (t.me/kpszsu)", l: "Publiczny kanał Telegram Sił Powietrznych Ukrainy, czytany przez serwer EGIDA raz na minutę z publicznego podglądu kanału", u: "https://t.me/s/kpszsu", w: "Wczesne ostrzeżenie (nieoficjalne): cele powietrzne w obwodach przy granicy z Polską" },
   { n: "Rejestr Punktów Schronienia (MSWiA / Państwowa Straż Pożarna)", l: "Dane publiczne udostępniane przez PSP w pakiecie offline aplikacji „Gdzie się ukryć”. Licencja nie jest określona w repozytorium PSP; do zgody KG PSP: patrz uwagi wydawcy", u: "https://gdziesieukryc.pl", w: "Punkty schronienia (adres, dostępność). EGIDA nie jest aplikacją PSP; dane bywają niepełne lub nieaktualne" },
   { n: "OpenStreetMap", l: "ODbL, © współtwórcy OpenStreetMap", u: "https://www.openstreetmap.org/copyright", w: "Podkład „Mapa”, schrony (znaczniki shelter_type i bunker_type = bomb_shelter), defibrylatory AED (emergency=defibrillator) i szpitale (amenity=hospital); dane niezweryfikowane" },
   { n: "OpenTopoMap", l: "CC-BY-SA 3.0", u: "https://opentopomap.org", w: "Podkład „Teren”" },
@@ -246,8 +247,8 @@ export const EMERGENCY = {
 
 // --- Polityka prywatności (wydawca jest anonimowy) ---
 export const PRIVACY = {
-  updated: "2026-10-12",
-  reviewed: "2026-10-12",
+  updated: "2026-11-22",
+  reviewed: "2026-11-22",
   sections: [
     { h: "Kim jesteśmy", p: ["EGIDA to nieoficjalna, bezpłatna aplikacja informacyjna prowadzona przez osobę prywatną. Nie jest aplikacją żadnego urzędu ani służby i nie zastępuje syren, Alertu RCB ani poleceń służb."] },
     { h: "Co zostaje w Twoim telefonie", p: ["Wybrane województwo, zgody, odhaczone pozycje listy plecaka, wynik testu gotowości, zapisane miejsca (schrony i ważne miejsca), plan rodziny i karty ICE, ostatnio pobrane komunikaty (kopia na wypadek braku internetu) oraz ustawienia wyglądu.", "Te dane są zapisane tylko w pamięci przeglądarki na tym urządzeniu. W Ustawieniach możesz je pobrać do pliku albo usunąć."] },
@@ -255,7 +256,7 @@ export const PRIVACY = {
     { h: "Z kim łączy się Twoja przeglądarka", p: [
       "GitHub (strona aplikacji oraz pliki z komunikatami i punktami schronienia): widzi Twój adres IP i zwykłe dane przeglądarki. Punkty schronienia pobieramy jako kafelki danych obejmujące okolicę ok. 20 km. Nie wysyłamy dokładnej pozycji, ale nazwa kafelka wskazuje przybliżony obszar.",
       "Dostawcy map (OpenStreetMap, OpenTopoMap, EOX): widzą adres IP i obszary, które oglądasz. Łączymy się z nimi dopiero na ekranach z mapą.",
-      "NEPTUN (neptun.in.ua): warstwa „Obiekty znad Ukrainy” jest domyślnie włączona (na ekranie powitalnym i w Ustawieniach możesz ją wyłączyć). Gdy otwierasz mapę, przeglądarka łączy się z serwisem, który widzi Twój adres IP. To nieoficjalne dane.",
+      "NEPTUN (neptun.in.ua) i wczesne ostrzeżenie: warstwa „Obiekty znad Ukrainy” jest domyślnie włączona (na ekranie powitalnym i w Ustawieniach możesz ją wyłączyć). Gdy jest włączona, aplikacja pobiera dane z serwera EGIDA (188-68-247-201.sslip.io): obiekty, gdy otwierasz mapę, a wczesne ostrzeżenie co 30 s, gdy Pulpit jest na ekranie. Serwer widzi Twój adres IP i niczego o Tobie nie zapisuje. Gdy serwer EGIDA nie odpowiada, mapa łączy się bezpośrednio z neptun.in.ua, który też widzi Twój adres IP. To nieoficjalne dane.",
       "Telegram: jeśli dołączysz do kanału, Twoje dane przetwarza Telegram według własnych zasad. Kanały są prywatne i tylko do czytania.",
       "Przyciski „Pieszo” i „Autem” otwierają zewnętrzną aplikację map (domyślnie Mapy Google) z celem trasy.",
       "Licznik odwiedzin (GoatCounter) zlicza tylko, ile razy strona została otwarta. Działa bez cookies i bez trwałych identyfikatorów i nie zapisuje adresu IP. Usługa rejestruje przy tym ogólne dane zwykłej wizyty, np. kraj i rodzaj przeglądarki. Nie ma dostępu do Twojego planu rodziny, kart ICE, zapisanych miejsc ani lokalizacji."] },

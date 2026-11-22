@@ -4,13 +4,15 @@
 //   node neptun-watch.mjs            – pętla ~52 s (tak uruchamia go cron)
 //   node neptun-watch.mjs --once     – jeden przebieg
 //   node neptun-watch.mjs --preview  – jeden przebieg BEZ wysyłki i BEZ zapisu stanu: pokazuje kandydatów, pominięte i treść wiadomości
-// Środowisko: TELEGRAM_BOT_TOKEN, CHANNELS_FILE, APP_URL, NEPTUN_TG=off (tylko log, bez wysyłki), NEPTUN_STATE (domyślnie /opt/egida/neptun-state.json).
+// Środowisko: TELEGRAM_BOT_TOKEN, CHANNELS_FILE, APP_URL, NEPTUN_TG=off (tylko log, bez wysyłki), NEPTUN_STATE (domyślnie /opt/egida/neptun-state.json),
+//   EARLY_TG=off (wczesne ostrzeżenie bez wysyłki), EARLY_STATE (domyślnie /opt/egida/early-state.json).
 import { readFileSync, writeFileSync } from "node:fs";
 import { ThreatStore, applySnapshotJson } from "../js/neptun.js";
 import { loadRegions } from "../js/regions.js";
 import { candidates, decide, markSent, buildMessage } from "./neptun-notify.mjs";
 import { mergeSeen, loadSeen, saveSeen } from "./neptun-seen.mjs";
-import { fetchThreats } from "./neptun-source.mjs";
+import { fetchThreats, relayLocalUrl } from "./neptun-source.mjs";
+import { decideEarly, markEarlySent, buildEarlyMessage } from "./early-lib.mjs";
 
 const STATE_FILE = process.env.NEPTUN_STATE || "/opt/egida/neptun-state.json";
 const HEALTH_FILE = process.env.NEPTUN_HEALTH || "/opt/egida/neptun-health.json"; // znacznik ostatniego POPRAWNEGO odczytu (czyta go strażnik)
@@ -30,10 +32,13 @@ const channels = (() => {
   } catch { /* brak pliku */ }
   return out;
 })();
+const EARLY_STATE = process.env.EARLY_STATE || "/opt/egida/early-state.json";
+const earlyOn = !preview && process.env.EARLY_TG !== "off";
+const readEarly = () => { try { return JSON.parse(readFileSync(EARLY_STATE, "utf8")); } catch { return { sent: {} }; } };
 const readState = () => { try { return JSON.parse(readFileSync(STATE_FILE, "utf8")); } catch { return { sent: {}, rate: {} }; } };
 
 async function sendTelegram(chat, html) {
-  const r = await fetch(`https://api.telegram.org/bot${TOKEN}/sendMessage`, {
+  const r = await fetch(`${(process.env.TELEGRAM_API || "https://api.telegram.org").replace(/\/$/, "")}/bot${TOKEN}/sendMessage`, {
     method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ chat_id: chat, text: html, parse_mode: "HTML", disable_web_page_preview: true }),
     signal: AbortSignal.timeout(15000),
@@ -86,9 +91,38 @@ async function tick() {
   writeFileSync(STATE_FILE, JSON.stringify(next));
 }
 
+/** Wczesne ostrzeżenie (Siły Powietrzne ZSU, kanały monitoringu) → Telegram dla województw przy granicy. Dane tylko z lokalnego przekaźnika. */
+async function earlyTick() {
+  const base = relayLocalUrl();
+  if (!base) return;
+  let j;
+  try {
+    const r = await fetch(base.replace(/\/snapshot$/, "/early"), { headers: { "user-agent": UA }, signal: AbortSignal.timeout(3000) });
+    if (!r.ok) return;
+    j = await r.json();
+  } catch { return; } // przekaźnik nie działa – ostrzeżenia czekają na niego (strażnik o tym powie)
+  const now = Date.now();
+  const { byRegion, state } = decideEarly(j?.early, readEarly(), now);
+  if (preview) {
+    log(`Wczesne ostrzeżenie: poziom ${j?.early?.level ?? "brak"}, pozycji ${j?.early?.items?.length ?? 0}`);
+    for (const [r, items] of Object.entries(byRegion)) console.log(`\n--- ${r} (wczesne) ---\n` + buildEarlyMessage(r, items, { appUrl: APP_URL }).replace(/<[^>]+>/g, ""));
+    return;
+  }
+  let changed = false;
+  for (const [region, items] of Object.entries(byRegion)) {
+    if (!earlyOn) { log(`[EARLY_TG=off] ${region}: ${items.length} wpis(ów) – bez wysyłki`); markEarlySent(state, region, items, now); changed = true; continue; }
+    if (!channels[region] || !TOKEN) { log(`${region}: brak kanału lub tokenu – wczesne ostrzeżenie pominięte`); continue; }
+    try { await sendTelegram(channels[region], buildEarlyMessage(region, items, { appUrl: APP_URL })); markEarlySent(state, region, items, now); changed = true; log(`Wczesne ostrzeżenie na ${region}: ${items.length} wpis(ów)`); }
+    catch (e) { log(`Telegram (wczesne) ${region}: ${e.message}`); }
+  }
+  // stan zapisujemy zawsze, gdy coś wysłano (albo wygasły stare wpisy) – po zapisie każdej wysyłki ponowne uruchomienie nie dubluje
+  if (changed || JSON.stringify(state) !== JSON.stringify(readEarly())) { try { writeFileSync(EARLY_STATE, JSON.stringify(state)); } catch (e) { log("early-state:", e.message); } }
+}
+
 const until = Date.now() + 52000;
 for (;;) {
   await tick();
+  try { await earlyTick(); } catch (e) { log("Wczesne ostrzeżenie:", e.message); }
   if (once || Date.now() + 10000 > until) break;
   await new Promise((r) => setTimeout(r, 10000));
 }

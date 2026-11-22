@@ -52,6 +52,6 @@ await t("aplikacja: źródło na Pulpicie i opisy wymieniają Alerty RCB z powie
   assert.ok(!app.includes("· Źródło: RSO · ${when}"));
   assert.match(app, /zagrożenie atakiem z powietrza/);
   assert.match(src("js/content.js"), /Alerty RCB o zagrożeniu z powietrza/);
-  assert.match(src("js/version.js"), /APP_VERSION = "v49"/); assert.match(src("sw.js"), /const VERSION = "egida-v49"/);
+  assert.match(src("js/version.js"), /APP_VERSION = "v50"/); assert.match(src("sw.js"), /const VERSION = "egida-v50"/);
 });
 console.log(`test-v48: ${n} testów OK`);

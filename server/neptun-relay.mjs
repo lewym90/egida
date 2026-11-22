@@ -5,6 +5,8 @@
 //  - lokalny serwer HTTP (tylko 127.0.0.1) z gotowym stanem dla aplikacji – na zewnątrz wystawia go Caddy (HTTPS),
 //  - z tego samego stanu korzystają obserwator Telegram (neptun-watch.mjs) i dziennik (neptun-log.mjs) – NEPTUN widzi jednego klienta,
 //  - historia: zmiany obiektów do 400 km od granicy Polski, plik dzienny /opt/egida/neptun-history/RRRR-MM-DD.jsonl (60 dni),
+//  - wczesne ostrzeżenie (early-lib.mjs): wiadomości kanałów z NEPTUN + publiczny podgląd t.me/s/kpszsu (Siły Powietrzne ZSU) raz na minutę;
+//    w odpowiedzi /snapshot (pole early) i osobno /early (działa też, gdy NEPTUN milczy),
 //  - znacznik zdrowia /opt/egida/neptun-relay-health.json (czyta go strażnik).
 // Gdy NEPTUN milczy dłużej niż 90 s, przekaźnik odpowiada 503 – aplikacja przechodzi wtedy na bezpośrednie połączenie z NEPTUN.
 // Proces sam kończy pracę, gdy zmieni się jego kod (git pull) – pilnujący uruchamia nową wersję po 2 s.
@@ -18,6 +20,7 @@ import { promisify } from "node:util";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { RelayState, historyDiff } from "./neptun-relay-lib.mjs";
+import { EarlyState, parseTgPreview } from "./early-lib.mjs";
 
 const gzipAsync = promisify(gzip);
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -45,6 +48,36 @@ const WS_STABLE_MS = Number(process.env.NEPTUN_RELAY_WS_STABLE_MS || 60000); // 
 const S = new RelayState({ freshMs: Number(process.env.NEPTUN_RELAY_FRESH_MS || 90000) });
 let ws = null, wsRetryMs = 5000, wsOpenAt = null, wsLastAt = null, wsStableT = null, served = 0, notFresh = 0;
 let lastRestAt = 0, restBackoff = 0, restBusy = false, extrasBusy = false;
+
+/* ---------- wczesne ostrzeżenie: wiadomości NEPTUN + publiczny podgląd kanału Sił Powietrznych ---------- */
+const E = new EarlyState();
+const TG_BASE = process.env.EARLY_TG_BASE || "https://t.me/s/";
+const TG_CHANNELS = (process.env.EARLY_TG_CHANNELS ?? "kpszsu").split(",").map((x) => x.trim()).filter((x) => /^[A-Za-z0-9_]{4,64}$/.test(x));
+const TG_MS = Math.max(/t\.me/.test(TG_BASE) ? 60000 : 50, Number(process.env.EARLY_TG_MS || 60000)); // raz na minutę – jak zwykły czytelnik
+const TG_UA = "Mozilla/5.0 (compatible; EGIDA-relay/1.1; +https://github.com/lewym90/egida)";
+const tgOk = {}, tgBackoff = {};
+const earlyUpdate = () => S.setEarly(E.snapshot(Date.now()));
+S.onMessages = (list) => { const now = Date.now(); let ch = false; for (const m of list) if (m && typeof m === "object") ch = E.add({ channel: String(m.channel ?? ""), date: m.date, text: String(m.text ?? "") }, now) || ch; if (ch) earlyUpdate(); };
+let tgBusy = false;
+async function tgPoll() {
+  if (tgBusy) return; tgBusy = true;
+  try {
+    for (const k of TG_CHANNELS) {
+      if ((tgBackoff[k] || 0) > Date.now()) continue;
+      try {
+        const r = await fetch(TG_BASE + k, { headers: { "User-Agent": TG_UA, "Accept-Language": "uk,en;q=0.5" }, signal: AbortSignal.timeout(15000) });
+        if (r.status === 429 || r.status === 403) { tgBackoff[k] = Date.now() + 10 * 6e4; log(`t.me/${k}: HTTP ${r.status} – wstrzymuję na 10 min`); continue; }
+        if (!r.ok) { log(`t.me/${k}: HTTP ${r.status}`); continue; }
+        const msgs = parseTgPreview(await r.text(), k);
+        if (!msgs.length) { log(`t.me/${k}: brak wiadomości w odpowiedzi (zmiana formatu strony?)`); continue; }
+        tgOk[k] = Date.now();
+        const now = Date.now(); let ch = false;
+        for (const m of msgs) ch = E.add(m, now) || ch;
+        if (ch) earlyUpdate();
+      } catch (e) { log(`t.me/${k}:`, e.message); }
+    }
+  } finally { tgBusy = false; }
+}
 
 const wsHealthy = (now = Date.now()) => !!(ws && wsOpenAt && wsLastAt && now - wsLastAt <= WS_SILENT_MS);
 
@@ -131,7 +164,7 @@ function wsWatch() {
 /* ---------- HTTP dla aplikacji ---------- */
 // Odpowiedzi budujemy najwyżej raz na sekundę (lub przy zmianie stanu) i trzymamy też w wersji gzip – tysiące telefonów nie obciążają procesu,
 // a telefon na danych komórkowych pobiera kilka KB. Gdy telefon ma już aktualną wersję (?since=N), odpowiadamy 204 bez treści.
-const caches = { snap: { key: null, at: 0, raw: null, gz: null }, msg: { key: null, at: 0, raw: null, gz: null } };
+const caches = { snap: { key: null, at: 0, raw: null, gz: null }, msg: { key: null, at: 0, raw: null, gz: null }, early: { key: null, at: 0, raw: null, gz: null } };
 function cached(name, key, now, build) {
   const c = caches[name];
   if (c.key !== key || now - c.at > 1000) { const raw = Buffer.from(JSON.stringify(build())); caches[name] = { key, at: now, raw, gz: gzipSync(raw) }; }
@@ -161,6 +194,9 @@ const server = http.createServer((req, res) => {
     }
     // Pamięć podręczna wg wersji – ale co najwyżej 1 s, żeby relay.at/lastOkAt w odpowiedzi nie były stare.
     return send(req, res, 200, cached("snap", S.version, now, () => S.payload(now)));
+  }
+  if (p === "/early") { // działa także, gdy NEPTUN milczy (źródło t.me jest niezależne)
+    return send(req, res, 200, cached("early", S.earlyJson || "", now, () => ({ serverTime: new Date(now).toISOString(), early: S.early ?? null, sources: { neptun: S.isFresh(now), tg: Object.fromEntries(TG_CHANNELS.map((k) => [k, tgOk[k] ? new Date(tgOk[k]).toISOString() : null])) } })));
   }
   if (p === "/health") {
     res.writeHead(200, HEAD);
@@ -214,12 +250,12 @@ function trimLog() {
     writeFileSync(LOG_FILE, lines.slice(-300).join("\n"));
   } catch { /* brak pliku */ }
 }
-const codeFiles = ["neptun-relay.mjs", "neptun-relay-lib.mjs", "../js/geo.js", "../js/poland-border.js"].map((f) => path.join(here, f));
+const codeFiles = ["neptun-relay.mjs", "neptun-relay-lib.mjs", "early-lib.mjs", "tg-policy.mjs", "../js/geo.js", "../js/poland-border.js"].map((f) => path.join(here, f));
 const codeStamp = () => codeFiles.map((f) => { try { return statSync(f).mtimeMs; } catch { return 0; } }).join("|");
 const startStamp = codeStamp();
 const STARTED = Date.now();
 function healthTick() {
-  const h = { lastOk: S.lastOkAt, at: Date.now(), started: STARTED, via: S.via, ws: wsHealthy(), threats: S.threats.size, served, notFresh, pid: process.pid };
+  const h = { lastOk: S.lastOkAt, at: Date.now(), started: STARTED, via: S.via, ws: wsHealthy(), threats: S.threats.size, served, notFresh, pid: process.pid, tgOk: Object.fromEntries(TG_CHANNELS.map((k) => [k, tgOk[k] ?? null])), early: S.early?.level ?? null };
   try { writeFileSync(HEALTH + ".tmp", JSON.stringify(h)); renameSync(HEALTH + ".tmp", HEALTH); } catch { /* */ }
   if (codeStamp() !== startStamp) { log("Zmienił się kod przekaźnika – kończę, pilnujący uruchomi nową wersję"); process.exit(0); }
 }
@@ -235,6 +271,8 @@ server.listen(PORT, HOST, () => {
   setInterval(() => restThreats(false), REST_MS);
   setInterval(wsWatch, Math.min(15000, WS_SILENT_MS / 2));
   setInterval(historyTick, 10000);
+  earlyUpdate(); setInterval(earlyUpdate, 15000); // wygasanie ostrzeżenia po 30 min
+  if (TG_CHANNELS.length) { setTimeout(tgPoll, 3000); setInterval(tgPoll, TG_MS); }
   setInterval(healthTick, 30000); healthTick();
   historyCleanup(); setInterval(historyCleanup, 6 * 36e5);
   trimLog(); setInterval(trimLog, 36e5);

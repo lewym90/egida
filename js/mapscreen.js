@@ -3,6 +3,7 @@
 // są nieoficjalne, domyślnie wyłączone i włączane świadomą zgodą; brak świeżych danych ⇒ „brak danych”, nigdy „spokojnie”.
 import { CONFIG } from "./config.js";
 import { createFeed } from "./neptun-feed.js";
+import { earlyHtml } from "./early.js";
 import { ThreatStore, buildView, coneOutline, fmtKmPl, ageText, TYPES, LIMITS } from "./neptun.js";
 import { compassPl, destination, haversineKm } from "./geo.js";
 import { shadeAreas, shadeSignature } from "./ua-shade.js";
@@ -140,7 +141,7 @@ export function renderMapHtml(ctx, { demo = false, diag = false } = {}) {
   </div>
   <div id="nepConsent" class="card" hidden role="dialog" aria-label="Zgoda na połączenie z NEPTUN">
     <h2>Włączyć obiekty znad Ukrainy?</h2>
-    <ul class="how2"><li>Mapa połączy się <b>bezpośrednio</b> z serwisem neptun.in.ua (zewnętrzny, prowadzony anonimowo). Serwis zobaczy Twój adres IP. EGIDA nic tam nie wysyła o Tobie.</li>
+    <ul class="how2"><li>Mapa pobierze dane z <b>serwera EGIDA</b>, który łączy się z serwisem neptun.in.ua (zewnętrzny, prowadzony anonimowo). Gdy serwer EGIDA nie odpowiada, mapa łączy się z neptun.in.ua <b>bezpośrednio</b> – wtedy serwis zobaczy Twój adres IP. EGIDA nic tam nie wysyła o Tobie.</li><li>Na Pulpicie pokażemy też <b>wczesne ostrzeżenie</b>, gdy ukraińskie Siły Powietrzne lub kanały monitoringu zgłaszają cele przy granicy z Polską.</li>
     <li>To <b>nieoficjalne</b> informacje, mogą być spóźnione, niepełne lub błędne. Nie zastępują syren ani Alertu RCB.</li>
     <li>Ocena toru względem Twojej pozycji działa tylko dla dronów, przy świeżych danych. Dla rakiet nie oceniamy toru.</li>
     <li>Możesz to wyłączyć w każdej chwili, tutaj lub w Ustawieniach.</li></ul>
@@ -152,6 +153,7 @@ export function renderMapHtml(ctx, { demo = false, diag = false } = {}) {
   <div class="maptools"><button class="btn sm" id="btnBorder">Granica wschodnia</button><button class="btn sm" id="btnObjects" hidden>Pokaż obiekty</button></div>
   <p id="locMsg" class="muted small" aria-live="polite"></p>
   <div id="nepBox" ${nepOn ? "" : "hidden"}>
+    <div id="nepEarly"></div>
     <div id="nepStatus" class="note neutral" aria-live="polite"></div>
     <p id="nepSummary" class="small" style="margin:10px 0 0;font-weight:600"></p>
     <div class="chips" role="group" aria-label="Filtr obiektów" style="margin-top:10px">
@@ -311,6 +313,7 @@ export function initMapScreen(ctx, { demo = false, diag = false } = {}) {
       const shadeMiss = drawShade(view.alerts, dataOk && ml().uaShade !== false); // bez świeżych danych nie zostawiamy na mapie starego cieniowania
       $("nepStatus").className = "note " + cls;
       $("nepStatus").textContent = msg;
+      { const eh = demo ? "" : earlyHtml(feed.store.extras.early); const el = $("nepEarly"); if (el && el.dataset.h !== eh) { el.innerHTML = eh; el.dataset.h = eh; } } // tylko przez serwer EGIDA
       $("nepList").innerHTML = dataOk && view.rows.length ? view.rows.slice(0, 60).map(itemHtml).join("") + (view.rows.length > 60 ? `<li class="obj muted small">…i ${view.rows.length - 60} dalszych.</li>` : "") : `<li class="obj muted">${dataOk ? "Brak obiektów." : "Brak aktualnych danych."}</li>`;
       $("btnObjects").hidden = !(dataOk && view.rows.length);
       // podsumowanie, obserwacje bez pozycji, alarmy w Ukrainie, wiadomości, diagnostyka

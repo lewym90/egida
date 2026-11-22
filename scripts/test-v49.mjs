@@ -85,12 +85,12 @@ await t("wyścig: spóźniona odpowiedź NEPTUN po powrocie przekaźnika nie nad
   assert.equal(feed.status().via, "relay", "stan nie wrócił na NEPTUN"); assert.equal(feed.store.items.has("late"), false);
   feed.stop();
 });
-await t("konfiguracja i serwer: adresy przekaźnika w CONFIG, mapa je przekazuje, przekaźnik startuje z co-minutowego zadania, wersja v49", () => {
+await t("konfiguracja i serwer: adresy przekaźnika w CONFIG, mapa je przekazuje, przekaźnik startuje z co-minutowego zadania, wersja v50", () => {
   assert.match(src("js/config.js"), /relayUrl: "/); assert.match(src("js/mapscreen.js"), /relayUrl: CONFIG\.neptun\.relayUrl/);
   assert.match(src("js/mapscreen.js"), /przez serwer EGIDA/);
   const w = src("server/run-neptun-watch.sh"); assert.ok(w.indexOf("run-neptun-relay.sh") > 0 && w.indexOf("run-neptun-relay.sh") < w.indexOf("neptun-watch.lock"));
   assert.match(src("server/run-neptun-relay.sh"), /relay\.off/); assert.match(src("server/run.sh"), /setsid -f bash "\$SERVER_DIR\/run-neptun-relay\.sh"/);
   assert.match(src("server/neptun-watch.mjs"), /fetchThreats\(/); assert.match(src("server/neptun-log.mjs"), /fetchThreats\(/); assert.match(src("server/neptun-relay.mjs"), /HOST = process\.env\.NEPTUN_RELAY_HOST \|\| "127\.0\.0\.1"/);
-  assert.match(src("js/version.js"), /APP_VERSION = "v49"/); assert.match(src("sw.js"), /const VERSION = "egida-v49"/);
+  assert.match(src("js/version.js"), /APP_VERSION = "v50"/); assert.match(src("sw.js"), /const VERSION = "egida-v50"/);
 });
 console.log(`test-v49: ${n} testów OK`);

@@ -109,6 +109,7 @@ export function createFeed(opts) {
   /* ---------- przekaźnik EGIDA ---------- */
   function startDirect() {
     if (directOn || !running) return;
+    store.extras.early = null; // bez serwera EGIDA nie mamy wczesnego ostrzeżenia – nie pokazujemy starego
     directOn = true; retryMs = o.wsRetryMs;
     openWs(); pollOnce();
     if (connT) clearTimeout(connT);
@@ -144,6 +145,7 @@ export function createFeed(opts) {
           try { applyAlertsJson(store, j.alerts); const at = relayTime(j.relay, "alertsAt"); if (at != null) store.extras.alertsAt = at; }
           catch (e) { store.extras.alertsErr = String(e?.message || e); }
         }
+        store.extras.early = j && "early" in j ? j.early : null; // wczesne ostrzeżenie (tylko przez serwer EGIDA)
         relayVersion = j && j.version != null ? j.version : null;
         const at = relayTime(j?.relay, "lastOkAt"); if (at != null) okAt = at;
         checkFormat();

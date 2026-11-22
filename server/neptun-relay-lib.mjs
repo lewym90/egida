@@ -70,6 +70,14 @@ export class RelayState {
   setMessages(list, at, viaWs) {
     this.messages = { messages: list.slice(0, MAX_MSG) }; this.msgVersion++;
     this.messagesAt = at; if (viaWs) this.messagesWsAt = at;
+    try { this.onMessages?.(list, at); } catch { /* błąd odbiorcy nie psuje stanu */ }
+  }
+  /** Wczesne ostrzeżenie (early-lib): w odpowiedzi dla aplikacji; zmiana = nowa wersja. */
+  setEarly(snap) {
+    const s = JSON.stringify(snap);
+    if (s === this.earlyJson) return false;
+    this.early = snap; this.earlyJson = s; this.version++;
+    return true;
   }
   applyAlerts(json, at) {
     if (!json || typeof json !== "object") throw new Error("nieoczekiwany format /alerts");
@@ -113,6 +121,7 @@ export class RelayState {
       version: this.version,
       threats: [...this.threats.values()],
       alerts: alertsFresh ? this.alerts : null,
+      early: this.early ?? null,
       relay: { at: iso(now), lastOkAt: iso(this.lastOkAt), alertsAt: alertsFresh ? iso(this.alertsAt) : null, via: this.via, source: "NEPTUN (neptun.in.ua)" },
     };
   }
