@@ -4,9 +4,14 @@ set -uo pipefail
 BASE="${EGIDA_BASE:-/opt/egida}"
 SERVER_DIR="$(cd "$(dirname "$0")" && pwd)"
 exec 8>&-                                               # nie trzymaj blokady obserwatora RCB (gdy uruchomił nas rcb-watch.mjs)
+if [ -n "${EGIDA_ALERTS_ONLY:-}" ]; then
+  # Publikacja po nowym Alercie RCB: czeka naraz tylko jedna. Jeśli się nie uda, znacznik rcb-publish.pending zostaje
+  # i obserwator (co minutę) uruchomi ją ponownie.
+  exec 7>"$BASE/rcb-publish.lock"; flock -n 7 || exit 0
+fi
 exec 9>"$BASE/run.lock"                                 # nie uruchamiaj dwóch naraz
-if [ -n "${EGIDA_ALERTS_ONLY:-}" ]; then flock -w 240 9 || exit 0   # publikacja po nowym Alercie RCB czeka, aż skończy się bieżący przebieg
-else flock -n 9 || exit 0; fi
+if [ -n "${EGIDA_ALERTS_ONLY:-}" ]; then flock -w 280 9 || exit 0   # czeka, aż skończy się bieżący przebieg
+else flock -w 60 9 || exit 0; fi                       # cron: krótko poczekaj (np. na publikację po Alercie RCB), zamiast tracić cały cykl
 set -a; . "$BASE/env"; set +a
 export PATH="$BASE/node/bin:$PATH"
 export EGIDA_REMOTE="${EGIDA_REMOTE:-https://github.com/${EGIDA_REPO:-lewym90/egida}.git}"
@@ -46,7 +51,13 @@ ok() {
 if [ -z "${EGIDA_ALERTS_ONLY:-}" ]; then
   ( flock -n 8 || exit 0; RCB_PUBLISH=off timeout 45 node rcb-watch.mjs >> "$BASE/rcb-log.txt" 2>&1 ) 8>"$BASE/rcb.lock" || true
 fi
-timeout 120 node poll.mjs || { echo "poll nieudany – nic nie publikuję"; fail; exit 1; }
+touch "$BASE/poll.start"
+timeout 120 node poll.mjs; PRC=$?
+# 3 = RSO nie działa, ale plik zaktualizowano Alertami RCB z gov.pl (publikujemy, a porażkę RSO liczymy).
+if [ "$PRC" -ne 0 ] && [ "$PRC" -ne 3 ]; then echo "poll nieudany – nic nie publikuję"; fail; exit 1; fi
+# Znacznik „Alert RCB czeka na publikację” zdejmujemy tylko, gdy powstał PRZED tym odczytem (inaczej nowy alert mógłby nie trafić do pliku).
+pending_done() { [ -f "$BASE/rcb-publish.pending" ] && [ "$BASE/rcb-publish.pending" -ot "$BASE/poll.start" ] && rm -f "$BASE/rcb-publish.pending"; return 0; }
+status_ok() { if [ "$PRC" -eq 3 ]; then echo "RSO nie działa (opublikowano tylko Alerty RCB z gov.pl)"; fail; else ok; fi; }
 
 # Publikuj tylko gdy treść się zmieniła albo minęło ≥25 min (sygnał „żyję”, aby aplikacja nie uznała danych za stare).
 NEW="$(node -e 'const j=JSON.parse(require("fs").readFileSync(process.env.ALERTS_OUT,"utf8"));console.log(require("crypto").createHash("sha1").update(JSON.stringify([j.items,j.telegram||{}])).digest("hex"))')"
@@ -54,9 +65,9 @@ OLD="$(cat "$BASE/last.hash" 2>/dev/null || true)"
 AGE=99999
 [ -f "$BASE/last.push" ] && AGE=$(( ( $(date +%s) - $(stat -c %Y "$BASE/last.push") ) / 60 ))
 if [ "$NEW" != "$OLD" ] || [ "$AGE" -ge 25 ]; then
-  if bash "$SERVER_DIR/publish.sh"; then echo "$NEW" > "$BASE/last.hash"; touch "$BASE/last.push"; echo "opublikowano (alerty)"; ok; else echo "publikacja nieudana"; fail; exit 1; fi
+  if bash "$SERVER_DIR/publish.sh"; then echo "$NEW" > "$BASE/last.hash"; touch "$BASE/last.push"; echo "opublikowano (alerty)"; pending_done; status_ok; else echo "publikacja nieudana"; fail; exit 1; fi
 else
-  echo "alerty bez zmian (ostatnia publikacja ${AGE} min temu)"; ok
+  echo "alerty bez zmian (ostatnia publikacja ${AGE} min temu)"; pending_done; status_ok
 fi
 # Natychmiastowa publikacja po nowym Alercie RCB (rcb-watch.mjs): tylko komunikaty, bez zadań dodatkowych.
 [ -n "${EGIDA_ALERTS_ONLY:-}" ] && { echo "tryb „tylko alerty” – koniec"; exit 0; }

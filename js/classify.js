@@ -10,7 +10,9 @@ const AIR_RE = /(ukrain|powietrzn|z\s+powietrza|rakiet|\bdron|latajac|polsk)/;
 // Alert RCB „Rosyjski atak powietrzny na Ukrainie. Sytuacja jest monitorowana. Podniesiono gotowość…” – atak NA UKRAINĘ, bez polecenia
 // schronienia się: to ostrzeżenie (żółte), nie zagrożenie. Czerwone zostaje „Zagrożenie atakiem z powietrza. Znajdź bezpieczne miejsce”.
 const MONITOR_RE = /(sytuacja\s+jest\s+monitorowana|podniesiono\s+gotowosc)/;
-const SHELTER_RE = /(znajdz\s+bezpieczne\s+miejsce|zagrozenie\s+atakiem|schron\w*\s+sie|ukryj\s+sie|natychmiast)/;
+const SHELTER_RE = /(znajdz\s+bezpieczne\s+miejsce|zagrozenie\s+atakiem|zagrozenie\s+z\s+powietrza|polecen\w*\s+sluzb|schron\w*\s+sie|ukryj\s+sie|natychmiast)/;
+// „Pozostań w nim do odwołania alarmu” to polecenie, nie odwołanie – te zwroty usuwamy przed szukaniem odwołania.
+const UNTIL_CANCEL_RE = /\bdo\s+(?:czasu\s+)?odwolan\w*(?:\s+(?:alarmu|zagrozenia|komunikatu))?/g;
 
 export const degreeOf = (a) => { const m = /(\d)\s*\.?\s*stop(?:ie|ni)/i.exec(String(a.title || "")); return m ? Number(m[1]) : 0; };
 
@@ -31,7 +33,8 @@ const DRY_RE = /(susz|nizowk|niskimi?\s+przeplyw|ponizej\s+snq)/;
 export function classifyOne(a) {
   const t = norm(`${a.title || ""} ${a.body || ""}`);
   const type = a.type || "inne";
-  const cancel = CANCEL_RE.test(t) && (type === "rcb" || ATTACK_RE.test(t) || /ukrain|powietrzn/.test(t));
+  const tc = t.replace(UNTIL_CANCEL_RE, " ");
+  const cancel = CANCEL_RE.test(tc) && (type === "rcb" || ATTACK_RE.test(t) || /ukrain|powietrzn/.test(t));
   const airType = type === "rcb" || type === "inne";
   const attack = !cancel && airType && ATTACK_RE.test(t) && AIR_RE.test(t);
   let sev = "info", kind = type;
@@ -68,7 +71,8 @@ export function analyze(items, now = Date.now()) {
     // Odwołanie kończy zagrożenie, a także ostrzeżenie „atak na Ukrainie – sytuacja monitorowana” (inaczej wisiałoby 12 h po końcu ataku).
     if ((a.sev === "danger" || a.kind === "monitoring") && a.published) {
       const airAlarm = a.kind === "atak" || a.kind === "monitoring";
-      const c = cancels.find((c) => c.published && c.published >= a.published && (c.voivodeship === "all" || c.voivodeship === a.voivodeship) && (!c.airCancel || airAlarm));
+      // Odwołanie z powietrza kończy tylko alarmy z powietrza, a inne odwołanie (np. „woda znów zdatna do picia”) – tylko inne alarmy.
+      const c = cancels.find((c) => c.published && c.published >= a.published && (c.voivodeship === "all" || c.voivodeship === a.voivodeship) && !!c.airCancel === airAlarm);
       if (c) a.supersededBy = c.id || true;
     }
     a.active = !a.supersededBy && (exp == null || exp > now);

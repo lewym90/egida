@@ -12,6 +12,7 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const OUT = process.env.ALERTS_OUT || path.join(here, "..", "data", "alerts.json");
 const STATE = process.env.STATE_FILE || path.join(here, "state.json");
 const MAX_ITEMS = 500;
+const GOV_SOURCE = "RCB (gov.pl)";
 const RCB_GOV = process.env.RCB_GOV_FILE || path.join(process.env.EGIDA_BASE || "/opt/egida", "rcb-gov.json");
 
 const TG_TOKEN = process.env.TELEGRAM_BOT_TOKEN || "";
@@ -84,9 +85,21 @@ async function main() {
     fresh = parseRso(await fetchRso());
     if (!fresh.length) throw new Error("Parser nie znalazł żadnych komunikatów – sprawdź strukturę XML (node poll.mjs --dump)");
   } catch (e) {
-    // Nie nadpisujemy poprzednich danych; „updated” zostaje stare, więc aplikacja sama uzna dane za nieaktualne.
     console.error("Błąd pobierania RSO:", e.message);
-    process.exitCode = 1;
+    // RSO nie działa, ale Alerty RCB z gov.pl (np. atak z powietrza) muszą dotrzeć do aplikacji. Zapisujemy poprzednie komunikaty RSO
+    // + aktualne alerty z gov.pl, z POPRZEDNIM „updated” – aplikacja nadal uczciwie pokaże, że dane RSO mogą być nieaktualne.
+    // Kod 3 = „RSO nie działa, ale plik zaktualizowano” (run.sh publikuje i liczy porażkę).
+    const gov = await readJson(RCB_GOV, { items: [] });
+    const govItems = (Array.isArray(gov.items) ? gov.items : []).filter((g) => g?.id && typeof g.title === "string" && g.published).map(({ key, slug, sig, regionApprox, ...c }) => c);
+    const prevRso = (previous.items || []).filter((a) => a.source !== GOV_SOURCE);
+    const merged = [...new Map([...prevRso, ...govItems].map((a) => [a.id, a])).values()].sort((a, b) => (b.published || "").localeCompare(a.published || "")).slice(0, MAX_ITEMS);
+    const before = JSON.stringify((previous.items || []).map((a) => a.id).sort()), after = JSON.stringify(merged.map((a) => a.id).sort());
+    if (govItems.length && before !== after) {
+      await mkdir(path.dirname(OUT), { recursive: true });
+      await writeFile(OUT, JSON.stringify({ ...previous, updated: previous.updated || null, items: merged }, null, 1));
+      console.log(`RSO nie działa – zapisano poprzednie komunikaty RSO i ${govItems.length} Alertów RCB z gov.pl (bez zmiany „updated”).`);
+      process.exitCode = 3;
+    } else process.exitCode = 1;
     return;
   }
 
@@ -100,7 +113,7 @@ async function main() {
   let govN = 0;
   for (const g of Array.isArray(gov.items) ? gov.items : []) {
     if (!g?.id || byId.has(g.id) || typeof g.title !== "string" || !g.published) continue;
-    const { key, slug, ...clean } = g;
+    const { key, slug, sig, regionApprox, ...clean } = g;
     byId.set(g.id, clean); govN++;
   }
   const items = [...byId.values()].sort((a, b) => (b.published || "").localeCompare(a.published || "")).slice(0, MAX_ITEMS);
@@ -120,7 +133,8 @@ async function main() {
   else if (isFirstRun && !process.env.TELEGRAM_SEND_ON_FIRST_RUN) console.log("Pierwsze uruchomienie: zapamiętuję komunikaty bez wysyłania (ustaw TELEGRAM_SEND_ON_FIRST_RUN=1, aby wysłać).");
   else for (const { a, level } of toSend) {
     const ch = a.voivodeship === "all" ? Object.values(TG_CHANNELS) : [TG_CHANNELS[a.voivodeship]].filter(Boolean);
-    if (level === "danger") state.danger[a.voivodeship] = Date.now();
+    // Zapamiętujemy też ostrzeżenie „atak na Ukrainie – sytuacja monitorowana”, żeby po nim poszło zakończenie ataku.
+    if (level === "danger" || a.kind === "monitoring") state.danger[a.voivodeship] = Date.now();
     for (const c of ch) { try { await sendTelegram(c, tgText(a, level, { appUrl: APP_URL })); await new Promise((r) => setTimeout(r, 1100)); } catch (e) { console.error("Telegram:", e.message); } }
   }
   for (const [k, t] of Object.entries(state.danger)) if (Date.now() - t > 48 * 36e5) delete state.danger[k];

@@ -220,6 +220,28 @@ import { newsMessage, isAirDefence, levelOf as nLevel, categoryOf as nCat, selec
   assert.deepEqual(p10.entries.map((e) => `${e.hh}:${e.mm}`), ["10:20", "10:55"]);
   assert.deepEqual(regionsOf("powiatu opolskiego (woj. lubelskie)"), ["lubelskie"]);
   assert.deepEqual(regionsOf("na terenie całej Polski"), ["all"]);
+  // Poprawki po przeglądzie: dowolnie długa lista województw, same powiaty, Biała Podlaska (lubelskie), brak danych ≠ cała Polska.
+  assert.deepEqual(regionsOf("woj. lubelskiego, podkarpackiego, podlaskiego i mazowieckiego."), ["lubelskie", "mazowieckie", "podkarpackie", "podlaskie"]);
+  assert.deepEqual(regionsOf("powiatów: hrubieszowskiego, zamojskiego, tomaszowskiego."), ["lubelskie"]);
+  assert.deepEqual(regionsOf("pow. bialskiego, m. Biała Podlaska"), ["lubelskie"]);
+  assert.deepEqual(regionsOf("pow. sanockiego i leskiego"), ["podkarpackie"]);
+  assert.deepEqual(regionsOf("pow. stalowowolskiego"), []);
+  const { dateFromTitle } = await import("./rcb-gov-lib.mjs");
+  const NOWD = T("2026-11-22T12:00:00Z");
+  assert.deepEqual(dateFromTitle("Alert RCB - atak (22.11.2026)", NOWD), { y: 2026, m: 11, d: 22 });
+  assert.deepEqual(dateFromTitle("Alert RCB - atak (21-22.11)", NOWD), { y: 2026, m: 11, d: 22 });
+  assert.deepEqual(dateFromTitle("Alert RCB - 22.11 – aktualizacja", NOWD), { y: 2026, m: 11, d: 22 });
+  assert.equal(dateFromTitle("Alert RCB - atak z powietrza", NOWD), null);
+  // Wysyłka bez województwa: gdy inne wysyłki ze strony mają województwo – bierzemy je; gdy żadna nie ma – pomijamy (nie „all”).
+  const solo = toItems({ date: { y: 2026, m: 11, d: 22 }, entries: [{ hh: 10, mm: 0, text: "UWAGA! Zagrożenie atakiem z powietrza.", recipients: "pow. stalowowolskiego." }] }, { slug: "s", url: "u", now: T("2026-11-22T12:00:00Z") });
+  assert.equal(solo.length, 0); assert.equal(solo.unresolved, 1);
+  const withPage = toItems({ date: { y: 2026, m: 11, d: 22 }, entries: [{ hh: 9, mm: 0, text: "UWAGA! Rosyjski atak powietrzny na Ukrainie.", recipients: "woj. podkarpackiego." }, { hh: 10, mm: 0, text: "UWAGA! Zagrożenie atakiem z powietrza.", recipients: "pow. stalowowolskiego." }] }, { slug: "s", url: "u", now: T("2026-11-22T12:00:00Z") });
+  assert.deepEqual(withPage.map((i) => i.voivodeship), ["podkarpackie", "podkarpackie"]);
+  assert.equal(withPage[1].regionApprox, true);
+  // Identyfikator wysyłki nie zmienia się, gdy RCB poprawi treść albo dopisze godzinę.
+  const v1 = toItems({ date: { y: 2026, m: 11, d: 22 }, entries: [{ hh: null, mm: null, text: "UWAGA! Rosyjski atak powietrzny na Ukrainie.", recipients: "woj. lubelskiego." }] }, { slug: "s", url: "u", now: NOWD });
+  const v2 = toItems({ date: { y: 2026, m: 11, d: 22 }, entries: [{ hh: 9, mm: 5, text: "UWAGA! Rosyjski atak powietrzny na Ukrainę.", recipients: "woj. lubelskiego" }] }, { slug: "s", url: "u", now: NOWD });
+  assert.equal(v1[0].id, v2[0].id);
   assert.equal(headline("UWAGA! UWAGA! UWAGA! Zagrożenie atakiem z powietrza. Znajdź bezpieczne miejsce.").title, "Zagrożenie atakiem z powietrza");
 
   // Odtworzenie piątku 20.11.2026 minuta po minucie: co widzi aplikacja i co idzie na Telegram.

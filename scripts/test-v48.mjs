@@ -26,6 +26,15 @@ await t("odwołanie kończy ostrzeżenie „monitorowane”, nie kończy powodzi
   assert.equal(l.find((a) => a.id === "c").relatedTo, undefined);
   assert.equal(statusOf(l.filter((a) => a.active)), "alarm"); // powódź 3. stopnia nadal czerwona
 });
+await t("poprawki po przeglądzie: „do odwołania alarmu” to nie odwołanie; odwołanie innej sprawy nie gasi alarmu z powietrza", () => {
+  assert.equal(classifyOne({ type: "rcb", title: "Alert RCB", body: "Zagrożenie atakiem z powietrza. Znajdź bezpieczne miejsce i pozostań w nim do odwołania alarmu." }).sev, "danger");
+  assert.equal(classifyOne({ type: "rcb", title: "Alert RCB", body: "Zagrożenie z powietrza. Sytuacja jest monitorowana. Stosuj się do poleceń służb." }).sev, "danger");
+  const l = analyze([
+    { id: "a", type: "rcb", title: "Zagrożenie atakiem z powietrza", body: "Znajdź bezpieczne miejsce.", voivodeship: "lubelskie", published: "2026-11-20T05:30:00Z" },
+    { id: "w", type: "rcb", title: "Alert RCB", body: "Odwołano ostrzeżenie o wodzie niezdatnej do picia w gminie X.", voivodeship: "lubelskie", published: "2026-11-20T06:00:00Z" },
+  ], Date.parse("2026-11-20T06:05:00Z"));
+  assert.equal(l.find((a) => a.id === "a").active, true);
+});
 await t("serwer: obserwator co minutę, scalanie w poll.mjs, natychmiastowa publikacja, strażnik", () => {
   assert.match(src("server/run-neptun-watch.sh"), /node rcb-watch\.mjs/);
   assert.match(src("server/run.sh"), /node rcb-watch\.mjs/);
@@ -35,6 +44,8 @@ await t("serwer: obserwator co minutę, scalanie w poll.mjs, natychmiastowa publ
   assert.match(src("server/rcb-watch.mjs"), /robotsAllows/);
   assert.match(src("server/rcb-watch.mjs"), /EGIDA_ALERTS_ONLY: "1"/);
   assert.match(src("server/watchdog.mjs"), /rcbMin: 20/);
+  assert.match(src("server/run.sh"), /rcb-publish\.pending/); assert.match(src("server/poll.mjs"), /exitCode = 3/);
+  assert.ok(src("server/run-neptun-watch.sh").indexOf("rcb-watch.mjs") < src("server/run-neptun-watch.sh").indexOf("neptun-watch.lock"), "RCB przed blokadą NEPTUN");
 });
 await t("aplikacja: źródło na Pulpicie i opisy wymieniają Alerty RCB z powietrza; wersja v48", () => {
   const app = src("js/app.js");

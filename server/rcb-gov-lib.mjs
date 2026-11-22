@@ -10,6 +10,7 @@
 // Dlatego dzielimy treść po zdaniu „Alert RCB został wysłany do odbiorców na terenie …”, które kończy KAŻDĄ wysyłkę.
 import { detectRegion } from "./rso.mjs";
 import { warsawIso } from "./alarm-lib.mjs";
+import { regionsMentioned } from "./news-places.mjs";
 
 export const RCB_LIST_URL = "https://www.gov.pl/web/rcb/komunikaty";
 export const RCB_ORIGIN = "https://www.gov.pl";
@@ -34,12 +35,17 @@ const norm = (s) => String(s ?? "").toLowerCase().normalize("NFD").replace(/[̀-
 export const AIR_TOPIC_RE = /(z\s+powietrza|powietrzn|rakiet|\bdron|nalot|obiekt\w*\s+latajac|obrony\s+powietrznej)/;
 export const isAirTopic = (...parts) => AIR_TOPIC_RE.test(norm(parts.join(" ")));
 
-/** Data z nawiasu w tytule „(20.11)” + rok: najbliższa dacie „teraz” (obsługa przełomu roku). Zwraca { y, m, d } albo null. */
+/**
+ * Data z tytułu: „(20.11)”, „(20.11.2026)”, „(21-22.11)”, „20.11 – aktualizacja” – bierzemy OSTATNIĄ datę w tytule.
+ * Bez roku: rok najbliższy dacie „teraz” (przełom roku). Zwraca { y, m, d } albo null (wtedy datę bierzemy ze strony alertu).
+ */
 export function dateFromTitle(title, now = Date.now()) {
-  const m = /\((\d{1,2})\.(\d{1,2})\)\s*$/.exec(String(title || "").trim());
+  const all = [...String(title || "").matchAll(/(?<![\d.])(\d{1,2})\.(\d{1,2})(?:\.(20\d{2}))?(?![\d])/g)];
+  const m = all[all.length - 1];
   if (!m) return null;
   const d = Number(m[1]), mo = Number(m[2]);
   if (!(d >= 1 && d <= 31 && mo >= 1 && mo <= 12)) return null;
+  if (m[3]) return { y: Number(m[3]), m: mo, d };
   const y0 = new Date(now).getUTCFullYear();
   const cand = [y0 - 1, y0, y0 + 1].map((y) => ({ y, m: mo, d, t: Date.UTC(y, mo - 1, d) }));
   cand.sort((a, b) => Math.abs(a.t - now) - Math.abs(b.t - now));
@@ -51,7 +57,7 @@ export function dateFromTitle(title, now = Date.now()) {
  * Lista komunikatów RCB → alerty RCB: [{ slug, url, title, intro, date: {y,m,d}|null }].
  * Rozpoznajemy odnośniki /web/rcb/… z tekstem zaczynającym się od „Alert RCB”.
  */
-export function parseList(html, now = Date.now()) {
+export function parseList(html, now = Date.now(), origin = RCB_ORIGIN) {
   const out = [], seen = new Set();
   const re = /<a[^>]+href="(?:https:\/\/www\.gov\.pl)?(\/web\/rcb\/([a-z0-9-]{3,160}))"[^>]*>([\s\S]{0,400}?)<\/a>([\s\S]{0,1200}?)(?=<a[^>]+href=|<\/li>|$)/gi;
   let m;
@@ -61,7 +67,7 @@ export function parseList(html, now = Date.now()) {
     if (!/^alert\s+rcb\b/i.test(title) || seen.has(slug)) continue;
     seen.add(slug);
     const im = /class="intro"[^>]*>([\s\S]*?)<\/div>/i.exec(after);
-    out.push({ slug, url: RCB_ORIGIN + path, title: title.slice(0, 200), intro: im ? plain(im[1]).replace(/\s*¶\s*/g, " ").slice(0, 400) : "", date: dateFromTitle(title, now) });
+    out.push({ slug, url: origin + path, title: title.slice(0, 200), intro: im ? plain(im[1]).replace(/\s*¶\s*/g, " ").slice(0, 400) : "", date: dateFromTitle(title, now) });
   }
   return out;
 }
@@ -136,24 +142,42 @@ export function headline(text) {
 const idFor = (s) => { let h = 5381; for (const c of s) h = ((h << 5) + h + c.charCodeAt(0)) >>> 0; return h.toString(36); };
 
 /**
- * Województwa z opisu odbiorców; „całej Polski”/„kraju” → ["all"].
- * Czytamy TYLKO nazwy województw („woj. lubelskiego i podkarpackiego”, „województwa lubelskiego”, „- podlaskiego - powiaty:”,
- * „(woj. lubelskie)”), nigdy listy powiatów – powiat opolski leży w lubelskim, a „opolski” to też rdzeń województwa opolskiego.
+ * Województwa z opisu odbiorców; „całej Polski”/„kraju” → ["all"]. Zwraca [] gdy nie da się ustalić (NIGDY „all” z braku danych).
+ * 1) nazwy województw w znanych układach („woj. lubelskiego, podkarpackiego, podlaskiego i mazowieckiego”, „województwa lubelskiego”,
+ *    „- podlaskiego - powiaty:”, „(woj. lubelskie)”) – cała lista, dowolnie długa; nigdy z list powiatów (powiat opolski leży w lubelskim);
+ * 2) gdy brak nazwy województwa: po nazwach powiatów i miast („pow. hrubieszowskiego, m. Zamość”) wg spisu miejscowości z news-places.mjs.
  */
 export function regionsOf(recipients) {
   const s = String(recipients || "");
   const n = norm(s);
   if (/(calej\s+polski|calego\s+kraju|terenie\s+kraju|wszystkich\s+wojewodztw\b)/.test(n)) return ["all"];
-  const W = "([a-ząćęłńóśźż]+(?:-[a-ząćęłńóśźż]+)?)";
+  const W = "[a-ząćęłńóśźż]+(?:-[a-ząćęłńóśźż]+)?";
   const names = [];
-  const add = (re) => { let m; re.lastIndex = 0; while ((m = re.exec(s))) names.push(...m.slice(1).filter(Boolean)); };
-  add(new RegExp(`\\bwoj(?:\\.|ewództw[a-z]*)\\s*:?\\s+${W}(?:\\s*(?:,|i|oraz)\\s+${W})?(?:\\s*(?:,|i|oraz)\\s+${W})?`, "giu"));
-  add(new RegExp(`(?:^|[\\s:;,.])[-–—]\\s*${W}\\s*[-–—]\\s*powiat`, "giu"));
+  let m;
+  const LIST = new RegExp(`\\bwoj(?:\\.|ewództw[a-ząćęłńóśźż]*)\\s*:?\\s+(${W}(?:\\s*(?:,|\\bi\\b|\\boraz\\b)\\s*${W})*)`, "giu");
+  while ((m = LIST.exec(s))) names.push(m[1]);
+  const BUL = new RegExp(`(?:^|[\\s:;,.])[-–—]\\s*(${W})\\s*[-–—]\\s*powiat`, "giu");
+  while ((m = BUL.exec(s))) names.push(m[1]);
+  // „powiaty” itp. po nazwie województwa nie są województwem – detectRegion i tak ich nie rozpozna.
   const hits = detectRegion(names.join(" "));
   if (hits.length) return hits;
-  // Brak nazwy województwa w znanym układzie: rozpoznajemy z treści po usunięciu list powiatów i gmin.
-  const stripped = s.replace(/\b(?:pow(?:iat\w*)?|gm(?:ina|iny)?)\.?\s*:?[^;()]*?(?=;|\(|$)/giu, " ");
-  return detectRegion(stripped);
+  return regionsFromPlaces(s);
+}
+
+/** Powiaty i miasta → województwa (przymiotnik powiatu sprowadzony do rdzenia: „hrubieszowskiego” → „hrubieszow”). */
+export function regionsFromPlaces(text) {
+  // Biała Podlaska i powiat bialski leżą w LUBELSKIM – „Podlaska” nie może dać województwa podlaskiego.
+  const t = String(text || "").replace(/bia[łl]\p{L}*\s+podlask\p{L}*/giu, " lubelszczyzna ").replace(/\b(pow|powiat\p{L}*|gm|gmin\p{L}*|m|miast\p{L}*)\.?\s*:?/giu, " ");
+  const words = t.split(/[\s,;()]+/).filter((w) => w.length >= 4);
+  const stems = [];
+  for (const w of words) {
+    const a = /^(.*?)(sk|ck|dzk)(?:iego|iemu|ich|im|ie|i|a|iej)$/iu.exec(w);
+    if (!a) continue;
+    stems.push(a[1]);                         // hrubieszowskiego → hrubieszow
+    if (a[2].toLowerCase() === "ck") stems.push(a[1] + "k"); // sanockiego → sanok
+  }
+  const found = regionsMentioned(`${t} , ${stems.join(" , ")}`);
+  return found.length && found.length <= 3 ? found.sort() : [];
 }
 
 /**
@@ -165,8 +189,13 @@ export function toItems(page, { slug, url, firstSeen = {}, now = Date.now() } = 
   if (!page?.date) return items;
   const { y, m, d } = page.date;
   let dayShift = 0, prevMin = -1;
-  for (const e of page.entries) {
-    const key = `${slug}|${e.hh ?? "-"}:${e.mm ?? "-"}|${idFor(e.text + "|" + e.recipients)}`;
+  // Województwa całej strony – zapas dla wysyłki, której odbiorców nie da się przypisać (ta sama akcja RCB, te same okolice).
+  const pageRegions = [...new Set(page.entries.flatMap((e) => regionsOf(e.recipients)).filter((r) => r !== "all"))].sort();
+  for (let idx = 0; idx < page.entries.length; idx++) {
+    const e = page.entries[idx];
+    // Klucz: strona + numer wysyłki licząc od najstarszej. RCB dopisuje nowe wysyłki na górze, więc numer się nie zmienia –
+    // także gdy RCB poprawi literówkę albo dopisze godzinę (wtedy ten sam wpis nie pójdzie drugi raz na Telegram).
+    const key = `${slug}|${idx}`;
     let published;
     if (e.hh != null) {
       const min = e.hh * 60 + e.mm;
@@ -179,16 +208,21 @@ export function toItems(page, { slug, url, firstSeen = {}, now = Date.now() } = 
       published = new Date(Number.isFinite(fs) ? fs : Date.parse(warsawIso(y, m, d, 0, 0))).toISOString();
     }
     if (Date.parse(published) > now + 2 * 6e4) continue; // data z przyszłości (poza różnicą zegarów) = błąd odczytu, pomijamy
-    const regions = regionsOf(e.recipients);
+    let regions = regionsOf(e.recipients), approx = false;
+    if (!regions.length && pageRegions.length) { regions = pageRegions; approx = true; }
     const recip = e.recipients ? `Alert RCB wysłano do odbiorców na terenie ${e.recipients.replace(/[.\s]+$/, "")}.` : "";
     const { title, rest } = headline(e.text);
     const base = {
       title, body: `${rest}${rest && !/[.!?]$/.test(rest) ? "." : ""}${recip ? (rest ? " " : "") + recip : ""}`.slice(0, 1200), type: "rcb",
       published, validTo: null, alarm: true, url, source: SOURCE, key,
+      // Podpis treści: ta sama strona, godzina, tytuł i odbiorcy = ta sama wysyłka (ochrona przed ponowną wysyłką po przebudowie strony).
+      // Godzina jest w podpisie, bo RCB może ponowić identyczne „Zagrożenie atakiem z powietrza” po odwołaniu – to NOWA wysyłka.
+      sig: idFor(`${slug}|${e.hh ?? "-"}:${e.mm ?? "-"}|${norm(title)}|${norm(e.recipients).replace(/[^a-z0-9]+/g, "")}`), ...(approx ? { regionApprox: true } : {}),
     };
     const id = "g" + idFor(key);
-    if (!regions.length) items.push({ ...base, id: `${id}:all`, voivodeship: "all" });
-    else for (const r of regions) items.push({ ...base, id: `${id}:${r}`, voivodeship: r });
+    // Nie umiemy ustalić województwa: NIE wysyłamy do całej Polski (fałszywy alarm w 16 województwach) – wpis pomijamy, obserwator to loguje.
+    if (!regions.length) { items.unresolved = (items.unresolved || 0) + 1; continue; }
+    for (const r of regions) items.push({ ...base, id: `${id}:${r}`, voivodeship: r });
   }
   return items;
 }
