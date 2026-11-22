@@ -39,7 +39,7 @@ export const CONFIG = {
   // relayUrl / relayMessagesUrl: przekaźnik NEPTUN na serwerze EGIDA (jedno połączenie serwera z NEPTUN dla wszystkich telefonów).
   // Puste = telefony łączą się bezpośrednio z NEPTUN. Gdy przekaźnik nie odpowiada, aplikacja sama przechodzi na NEPTUN bezpośrednio.
   neptun: { enabled: true, restUrl: "https://neptun.in.ua/api/v1/threats", alertsUrl: "https://neptun.in.ua/api/v1/alerts", wsUrl: "wss://neptun.in.ua/api/v1/stream", pollMs: 10000, extrasMs: 60000,
-    relayUrl: "", relayMessagesUrl: "" },
+    relayUrl: "https://188-68-247-201.sslip.io/egida/neptun/snapshot", relayMessagesUrl: "https://188-68-247-201.sslip.io/egida/neptun/messages" },
   // Serwer Overpass (OpenStreetMap) do wyszukiwania schronów w pobliżu. Można zmienić na inny publiczny serwer.
   overpassUrl: ["https://overpass-api.de/api/interpreter", "https://overpass.private.coffee/api/interpreter", "https://overpass.kumi.systems/api/interpreter"],
   // Baza schronów z OpenStreetMap, odświeżana raz na dobę przez serwer EGIDA (gałąź data). Telefon nie pyta wtedy OSM o nic.

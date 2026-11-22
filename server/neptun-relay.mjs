@@ -9,7 +9,7 @@
 // Gdy NEPTUN milczy dłużej niż 90 s, przekaźnik odpowiada 503 – aplikacja przechodzi wtedy na bezpośrednie połączenie z NEPTUN.
 // Proces sam kończy pracę, gdy zmieni się jego kod (git pull) – pilnujący uruchamia nową wersję po 2 s.
 // Kody wyjścia: 0 – zwykłe zakończenie / nowy kod, 3 – port zajęty (pilnujący czeka wtedy minutę).
-// Środowisko: EGIDA_BASE, NEPTUN_RELAY_PORT (domyślnie 8790), NEPTUN_BASE (https://neptun.in.ua/api/v1), NEPTUN_RELAY_LOG (plik logu do przycinania).
+// Środowisko: EGIDA_BASE, NEPTUN_RELAY_PORT (domyślnie 18960), NEPTUN_BASE (https://neptun.in.ua/api/v1), NEPTUN_RELAY_LOG (plik logu do przycinania).
 import http from "node:http";
 import { appendFileSync, mkdirSync, readdirSync, statSync, writeFileSync, renameSync, readFileSync } from "node:fs";
 import { readFile, writeFile, unlink } from "node:fs/promises";
@@ -22,7 +22,7 @@ import { RelayState, historyDiff } from "./neptun-relay-lib.mjs";
 const gzipAsync = promisify(gzip);
 const here = path.dirname(fileURLToPath(import.meta.url));
 const BASE = process.env.EGIDA_BASE || "/opt/egida";
-const PORT = Number(process.env.NEPTUN_RELAY_PORT || 8790);
+const PORT = Number(process.env.NEPTUN_RELAY_PORT || 18960);
 const HOST = process.env.NEPTUN_RELAY_HOST || "127.0.0.1";
 const API = (process.env.NEPTUN_BASE || "https://neptun.in.ua/api/v1").replace(/\/$/, "");
 const WS_URL = process.env.NEPTUN_WS || API.replace(/^http/, "ws") + "/stream";

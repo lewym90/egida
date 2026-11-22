@@ -8,7 +8,7 @@ export function relayLocalUrl(env = process.env) {
   if (v === "off") return "";
   if (v) return v;
   if (env.NEPTUN_REST) return "";
-  return `http://127.0.0.1:${env.NEPTUN_RELAY_PORT || 8790}/egida/neptun/snapshot`;
+  return `http://127.0.0.1:${env.NEPTUN_RELAY_PORT || 18960}/egida/neptun/snapshot`;
 }
 
 /** Zwraca { ok:true, json, text, status, via:"relay"|"neptun" } albo { ok:false, status?, error, via }. Nigdy nie rzuca. */

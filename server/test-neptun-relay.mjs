@@ -65,7 +65,7 @@ await t("historia: tylko obiekty ≤ 400 km od granicy Polski, zapis tylko zmian
 });
 
 await t("obserwator/dziennik: najpierw lokalny przekaźnik, przy 503 lub braku – NEPTUN bezpośrednio", async () => {
-  assert.equal(relayLocalUrl({}), "http://127.0.0.1:8790/egida/neptun/snapshot");
+  assert.equal(relayLocalUrl({}), "http://127.0.0.1:18960/egida/neptun/snapshot");
   assert.equal(relayLocalUrl({ NEPTUN_REST: "http://x" }), "", "testy z atrapą NEPTUN pomijają przekaźnik");
   assert.equal(relayLocalUrl({ NEPTUN_RELAY_LOCAL: "off" }), "");
   const mk = (relay) => async (url) => {

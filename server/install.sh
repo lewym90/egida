@@ -7,6 +7,8 @@
 #          bash install.sh --uncron (wyłączenie)
 #          bash install.sh --neptun-cron  (dziennik NEPTUN co minutę, tryb cichy) / --neptun-uncron
 #          bash install.sh --neptun-tg-cron  (powiadomienia Telegram z NEPTUN: obiekt <100 km od granicy i tor w jej stronę) / --neptun-tg-uncron
+#          bash install.sh --relay-caddy (JEDYNA opcja dotykająca Caddy: dodaje własny plik conf.d/egida-neptun.caddy z trasą /egida/neptun/*;
+#                                     Caddyfile i cudze pliki zostają nietknięte; test konfiguracji przed przeładowaniem i automatyczne wycofanie)
 #          bash install.sh --relay-off  (wyłączenie przekaźnika NEPTUN dla telefonów) / --relay-on (ponowne włączenie)
 #          bash install.sh --watchdog-cron  (strażnik komunikatów co 10 min; pisze do Ciebie na Telegram, gdy dane nie docierają) / --watchdog-uncron
 set -euo pipefail
@@ -38,13 +40,49 @@ fi
 if [ "${1:-}" = "--neptun-tg-uncron" ]; then
   ( crontab -u "$US" -l 2>/dev/null | grep -v '# egida_neptun_tg' || true ) | crontab -u "$US" - ; echo "Wyłączono powiadomienia NEPTUN → Telegram."; exit 0
 fi
+if [ "${1:-}" = "--relay-caddy" ]; then
+  CF=/etc/caddy/Caddyfile; CD=/etc/caddy/conf.d; SNIP="$CD/egida-neptun.caddy"; PORT="${NEPTUN_RELAY_PORT:-18960}"
+  command -v caddy >/dev/null || die "Brak Caddy na serwerze."
+  [ -d "$CD" ] || die "Brak folderu $CD – nie zgaduję konfiguracji, napisz do mnie."
+  grep -q "import /etc/caddy/conf.d/\*.caddy" "$CF" || die "Caddyfile nie wczytuje plików z $CD – nie ruszam, napisz do mnie."
+  HOST=$(grep -B1 -m1 "import /etc/caddy/conf.d/\*.caddy" "$CF" | head -n1 | awk '{print $1}')
+  [ -n "$HOST" ] || die "Nie umiem odczytać adresu strony z Caddyfile."
+  # Port: wolny albo zajęty przez przekaźnik EGIDA (użytkownik egida). Cudzy proces = przerywam.
+  OWNER=$(ss -tlnpH "sport = :$PORT" 2>/dev/null | grep -o 'pid=[0-9]*' | head -n1 | cut -d= -f2 || true)
+  if [ -n "$OWNER" ] && [ "$(ps -o user= -p "$OWNER" | tr -d ' ')" != "$US" ]; then die "Port $PORT zajmuje inny program (pid $OWNER) – nie ruszam."; fi
+  # Wszystkie istniejące trasy (strona główna + ścieżki z conf.d): kod odpowiedzi PRZED zmianą.
+  PATHS="/ $( { cat "$CD"/*.caddy 2>/dev/null | grep -oE '^[[:space:]]*(handle_path|handle|route|reverse_proxy)[[:space:]]+/[^ {]+' | awk '{print $2}' | sed 's/\*$//' | grep -v '^/egida/neptun' | sort -u | tr '\n' ' '; } || true )"
+  codes() { for p in $PATHS; do printf '%s=%s ' "$p" "$(curl -s -o /dev/null -m 10 -w '%{http_code}' "https://$HOST$p" || echo ERR)"; done; }
+  BEFORE=$(codes); echo "Trasy przed zmianą: $BEFORE"
+  BAK=""; [ -f "$SNIP" ] && { BAK="$SNIP.bak-$(date +%Y%m%d-%H%M%S)"; cp -a "$SNIP" "$BAK"; }
+  restore() { if [ -n "$BAK" ]; then mv -f "$BAK" "$SNIP"; else rm -f "$SNIP"; fi; }
+  cat > "$SNIP" <<CADDY
+# EGIDA – przekaźnik NEPTUN (dodane przez: bash /opt/egida/repo/server/install.sh --relay-caddy). Tylko odczyt, tylko ta ścieżka.
+handle /egida/neptun/* {
+	reverse_proxy 127.0.0.1:$PORT
+}
+CADDY
+  chmod 644 "$SNIP"
+  if ! caddy validate --config "$CF" --adapter caddyfile >/tmp/egida-caddy-validate.txt 2>&1; then
+    restore; tail -n 5 /tmp/egida-caddy-validate.txt; die "Test konfiguracji Caddy nie przeszedł – wycofałem zmianę, Caddy działa jak przedtem."
+  fi
+  systemctl reload caddy || { restore; systemctl reload caddy || true; die "Przeładowanie Caddy nie udało się – wycofałem zmianę."; }
+  sleep 3
+  AFTER=$(codes); echo "Trasy po zmianie:   $AFTER"
+  if [ "$BEFORE" != "$AFTER" ]; then
+    restore; caddy validate --config "$CF" --adapter caddyfile >/dev/null 2>&1 && systemctl reload caddy
+    die "Któraś z istniejących tras odpowiada inaczej niż przed zmianą – wycofałem zmianę. Wklej mi obie linie „Trasy…”."
+  fi
+  [ -n "$BAK" ] && rm -f "$BAK"
+  echo "Gotowe: https://$HOST/egida/neptun/health →"; curl -s -m 10 "https://$HOST/egida/neptun/health"; echo; exit 0
+fi
 if [ "${1:-}" = "--relay-off" ]; then
   runuser -u "$US" -- touch "$BASE/relay.off"; pkill -u "$US" -f "node neptun-relay.mjs" 2>/dev/null || true
   echo "Wyłączono przekaźnik NEPTUN (telefony łączą się z NEPTUN bezpośrednio). Włączenie: bash install.sh --relay-on"; exit 0
 fi
 if [ "${1:-}" = "--relay-on" ]; then
   rm -f "$BASE/relay.off"; runuser -u "$US" -- setsid -f bash "$BASE/repo/server/run-neptun-relay.sh" </dev/null >/dev/null 2>&1
-  echo "Włączono przekaźnik NEPTUN. Sprawdzenie: curl -s http://127.0.0.1:8790/egida/neptun/health"; exit 0
+  echo "Włączono przekaźnik NEPTUN. Sprawdzenie: curl -s http://127.0.0.1:18960/egida/neptun/health"; exit 0
 fi
 if [ "${1:-}" = "--watchdog-cron" ]; then
   [ -f "$BASE/env" ] || die "Najpierw zrób zwykłą instalację: bash install.sh"
