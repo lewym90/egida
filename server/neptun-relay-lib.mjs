@@ -11,16 +11,25 @@ const MAX_THREATS = 3000, MAX_MSG = 120;
 const num = (v) => (typeof v === "number" && Number.isFinite(v) ? v : typeof v === "string" && v.trim() !== "" && Number.isFinite(Number(v)) ? Number(v) : null);
 const idOf = (t) => (t && (t.id ?? t.threatId ?? t.uuid)) != null ? String(t.id ?? t.threatId ?? t.uuid) : null;
 
+export const ALERTS_MAX_AGE_MS = 10 * 60_000; // starszych alarmów obwodów nie podajemy dalej (lepiej „brak danych” niż stary obraz)
+
 export class RelayState {
   constructor({ freshMs = FRESH_MS } = {}) {
     this.freshMs = freshMs;
     this.threats = new Map(); // id → surowy obiekt z NEPTUN (przekazujemy bez zmian – aplikacja ma własny parser)
+    this.threatJson = new Map(); // id → JSON obiektu (wykrywanie prawdziwych zmian)
     this.alerts = null;       // surowa odpowiedź /alerts ({ raions, oblasts })
-    this.messages = null;     // surowa odpowiedź /messages
+    this.alertsJson = null;
+    this.alertsAt = null;     // kiedy ostatnio przyszły alarmy (WS lub REST)
+    this.alertsWsAt = null;   // … przez WebSocket (wtedy REST /alerts zbędny)
+    this.messages = null;     // { messages: [...] }
+    this.messagesAt = null;
+    this.messagesWsAt = null;
+    this.msgVersion = 0;
     this.offsetMs = 0;        // zegar NEPTUN − nasz zegar
     this.lastOkAt = null;     // ostatnia poprawna wiadomość z NEPTUN (WS lub REST)
     this.via = null;          // "ws" | "rest"
-    this.version = 0;         // rośnie przy każdej zmianie stanu (pamięć podręczna odpowiedzi)
+    this.version = 0;         // rośnie TYLKO przy rzeczywistej zmianie danych (telefony dostają wtedy 204 „bez zmian”)
   }
   noteServerTime(v, at) {
     const t = typeof v === "number" ? v : Date.parse(v);
@@ -34,20 +43,42 @@ export class RelayState {
     const list = Array.isArray(json) ? json : json?.threats;
     if (!Array.isArray(list)) throw new Error("nieoczekiwany format /threats");
     if (json && !Array.isArray(json)) this.noteServerTime(json.serverTime, at);
-    const next = new Map();
-    for (const t of list.slice(0, MAX_THREATS)) { const id = idOf(t); if (id) next.set(id, t); }
-    this.threats = next; this.version++; this.ok(via, at);
+    const next = new Map(), nextJson = new Map();
+    for (const t of list.slice(0, MAX_THREATS)) { const id = idOf(t); if (id) { next.set(id, t); nextJson.set(id, JSON.stringify(t)); } }
+    let changed = next.size !== this.threats.size;
+    if (!changed) for (const [id, s] of nextJson) if (this.threatJson.get(id) !== s) { changed = true; break; }
+    this.threats = next; this.threatJson = nextJson;
+    if (changed) this.version++;
+    this.ok(via, at);
+  }
+  upsert(t) {
+    const id = idOf(t); if (!id) return false;
+    if (this.threats.size >= MAX_THREATS && !this.threats.has(id)) return true;
+    const s = JSON.stringify(t);
+    if (this.threatJson.get(id) !== s) { this.threats.set(id, t); this.threatJson.set(id, s); this.version++; }
+    return true;
+  }
+  remove(id) {
+    id = String(id);
+    if (this.threats.delete(id)) { this.threatJson.delete(id); this.version++; }
+  }
+  setAlerts(d, at, viaWs) {
+    const s = JSON.stringify(d);
+    if (s !== this.alertsJson) { this.alerts = d; this.alertsJson = s; this.version++; }
+    this.alertsAt = at; if (viaWs) this.alertsWsAt = at;
+  }
+  setMessages(list, at, viaWs) {
+    this.messages = { messages: list.slice(0, MAX_MSG) }; this.msgVersion++;
+    this.messagesAt = at; if (viaWs) this.messagesWsAt = at;
   }
   applyAlerts(json, at) {
-    if (!json || (typeof json !== "object")) throw new Error("nieoczekiwany format /alerts");
-    this.alerts = json; this.version++;
-    void at;
+    if (!json || typeof json !== "object") throw new Error("nieoczekiwany format /alerts");
+    this.setAlerts(json, at, false);
   }
   applyMessages(json, at) {
     const list = Array.isArray(json) ? json : json?.messages;
     if (!Array.isArray(list)) throw new Error("nieoczekiwany format /messages");
-    this.messages = { messages: list.slice(0, MAX_MSG) }; this.msgVersion = (this.msgVersion || 0) + 1;
-    void at;
+    this.setMessages(list, at, false);
   }
   /** Koperta WebSocket { type, ts, data }. Zwraca typ albo "invalid"/"unknown". */
   applyEnvelope(env, at) {
@@ -56,26 +87,39 @@ export class RelayState {
     const d = env.data;
     switch (String(env.type)) {
       case "snapshot": this.applySnapshot(Array.isArray(d) ? d : { serverTime: d?.serverTime, threats: d?.threats }, at, "ws"); return "snapshot";
-      case "upsert": { const t = d && typeof d === "object" && d.threat ? d.threat : d; const id = idOf(t); if (!id) return "invalid"; if (this.threats.size < MAX_THREATS || this.threats.has(id)) this.threats.set(id, t); this.version++; this.ok("ws", at); return "upsert"; }
-      case "remove": { const id = d && typeof d === "object" ? d.id ?? d.threatId : d; if (id == null) return "invalid"; this.threats.delete(String(id)); this.version++; this.ok("ws", at); return "remove"; }
+      case "upsert": { const t = d && typeof d === "object" && d.threat ? d.threat : d; if (!this.upsert(t)) return "invalid"; this.ok("ws", at); return "upsert"; }
+      case "remove": { const id = d && typeof d === "object" ? d.id ?? d.threatId : d; if (id == null) return "invalid"; this.remove(id); this.ok("ws", at); return "remove"; }
       case "heartbeat": this.ok("ws", at); return "heartbeat";
-      case "alerts": if (d && typeof d === "object") { this.alerts = d; this.version++; } this.ok("ws", at); return "alerts";
-      case "messages": { const l = Array.isArray(d) ? d : d?.messages; if (Array.isArray(l)) { this.messages = { messages: l.slice(0, MAX_MSG) }; this.msgVersion = (this.msgVersion || 0) + 1; } this.ok("ws", at); return "messages"; }
+      case "alerts": if (d && typeof d === "object") this.setAlerts(d, at, true); this.ok("ws", at); return "alerts";
+      case "messages": { const l = Array.isArray(d) ? d : d?.messages; if (Array.isArray(l)) this.setMessages(l, at, true); this.ok("ws", at); return "messages"; }
+      case "message": {
+        // pojedyncza nowa wiadomość: dokładamy na początek listy (bez duplikatów po id)
+        if (d && typeof d === "object") {
+          const cur = this.messages?.messages || [];
+          const id = d.id ?? null;
+          this.setMessages([d, ...cur.filter((m) => id == null || m?.id !== id)], at, false);
+        }
+        this.ok("ws", at); return "message";
+      }
       default: return "unknown";
     }
   }
   /** Odpowiedź dla aplikacji (co ~10 s): format zgodny z NEPTUN /threats + alarmy obwodów. `version` pozwala odpowiedzieć „bez zmian”. */
   payload(now) {
+    const iso = (t) => (t != null ? new Date(t).toISOString() : null);
+    const alertsFresh = this.alertsAt != null && now - this.alertsAt <= ALERTS_MAX_AGE_MS;
     return {
       serverTime: new Date(now + this.offsetMs).toISOString(),
       version: this.version,
       threats: [...this.threats.values()],
-      alerts: this.alerts,
-      relay: { at: new Date(now).toISOString(), lastOkAt: this.lastOkAt ? new Date(this.lastOkAt).toISOString() : null, via: this.via, source: "NEPTUN (neptun.in.ua)" },
+      alerts: alertsFresh ? this.alerts : null,
+      relay: { at: iso(now), lastOkAt: iso(this.lastOkAt), alertsAt: alertsFresh ? iso(this.alertsAt) : null, via: this.via, source: "NEPTUN (neptun.in.ua)" },
     };
   }
   /** Wiadomości z kanałów (co ~60 s, osobno – są najcięższe). */
-  messagesPayload() { return this.messages || { messages: [] }; }
+  messagesPayload(now = Date.now()) {
+    return { ...(this.messages || { messages: [] }), relay: { at: new Date(now).toISOString(), messagesAt: this.messagesAt != null ? new Date(this.messagesAt).toISOString() : null } };
+  }
 }
 
 /** Skrócony zapis obiektu do historii (tylko to, co potrzebne do odtworzenia sytuacji przy granicy). */

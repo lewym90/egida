@@ -10,14 +10,14 @@ import { ThreatStore, applySnapshotJson } from "../js/neptun.js";
 import { loadRegions } from "../js/regions.js";
 import { candidates, decide, markSent, buildMessage } from "./neptun-notify.mjs";
 import { mergeSeen, loadSeen, saveSeen } from "./neptun-seen.mjs";
+import { fetchThreats } from "./neptun-source.mjs";
 
-const URL_REST = process.env.NEPTUN_REST || "https://neptun.in.ua/api/v1/threats";
 const STATE_FILE = process.env.NEPTUN_STATE || "/opt/egida/neptun-state.json";
 const HEALTH_FILE = process.env.NEPTUN_HEALTH || "/opt/egida/neptun-health.json"; // znacznik ostatniego POPRAWNEGO odczytu (czyta go strażnik)
 const SEEN_FILE = process.env.NEPTUN_SEEN || "/opt/egida/neptun-seen.json"; // skumulowany raport typów i próbek (patrz neptun-seen.mjs)
 const TOKEN = process.env.TELEGRAM_BOT_TOKEN || "";
 const APP_URL = process.env.APP_URL || "";
-const UA = "EGIDA/0.3 (unofficial PWA; border watch every 10 s; repo lewym90/egida)";
+const UA = "EGIDA/0.4 (unofficial PWA; border watch every 10 s, normally via own relay; repo lewym90/egida)";
 const preview = process.argv.includes("--preview"), once = preview || process.argv.includes("--once");
 const sendOn = !preview && process.env.NEPTUN_TG !== "off";
 const log = (...a) => console.log(new Date().toISOString(), ...a);
@@ -45,12 +45,15 @@ const regions = await loadRegions();
 let failStreak = 0;
 
 async function tick() {
-  let json;
-  try {
-    const r = await fetch(URL_REST, { headers: { "user-agent": UA, accept: "application/json" }, signal: AbortSignal.timeout(10000) });
-    if (!r.ok) { failStreak++; log(`NEPTUN HTTP ${r.status} – nie ponawiam poza harmonogramem`); return; }
-    json = await r.json();
-  } catch (e) { failStreak++; log("NEPTUN błąd sieci:", e.message); return; }
+  // Najpierw lokalny przekaźnik (bez dodatkowych zapytań do NEPTUN), a gdy nie działa – bezpośrednio NEPTUN.
+  const got = await fetchThreats({ ua: UA });
+  if (!got.ok) {
+    failStreak++;
+    log(got.error === "http" ? `NEPTUN HTTP ${got.status} – nie ponawiam poza harmonogramem` : got.error === "notjson" ? "NEPTUN: odpowiedź nie jest JSON-em" : `NEPTUN błąd sieci: ${got.message}`);
+    return;
+  }
+  const json = got.json;
+  if (preview) log(`Źródło: ${got.via === "relay" ? "przekaźnik EGIDA (127.0.0.1)" : "NEPTUN bezpośrednio"}`);
   failStreak = 0;
   if (!preview) { // zbieranie wiedzy o formacie: błąd zapisu nigdy nie przerywa powiadomień
     try { saveSeen(SEEN_FILE, mergeSeen(loadSeen(SEEN_FILE), Array.isArray(json) ? json : json?.threats)); } catch (e) { log("neptun-seen:", e.message); }

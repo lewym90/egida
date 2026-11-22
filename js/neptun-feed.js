@@ -18,7 +18,12 @@ export function createFeed(opts) {
   let directOn = !o.relayUrl, relayT = null, relayFails = 0, relayVersion = null;
   let status = { state: "off", via: null, lastOkAt: null, error: null, formatWarning: false };
   const set = (p) => { status = { ...status, ...p }; o.onStatus?.({ ...status }); };
-  const touch = (via) => set({ state: via === "ws" || via === "relay" ? "live" : "polling", via, lastOkAt: Date.now(), error: null });
+  const touch = (via, lastOkAt = Date.now()) => set({ state: via === "ws" || via === "relay" ? "live" : "polling", via, lastOkAt, error: null });
+  // Czas z przekaźnika przeliczony na zegar telefonu: teraz − (relay.at − relay.<pole>) – zegary serwera i telefonu nie muszą się zgadzać.
+  const relayTime = (meta, key) => {
+    const at = Date.parse(meta?.at), v = Date.parse(meta?.[key]);
+    return Number.isFinite(at) && Number.isFinite(v) ? Date.now() - Math.max(0, at - v) : null;
+  };
   const checkFormat = () => set({ formatWarning: store.stats.seen > 0 && store.stats.bad === store.stats.seen });
   const isFresh = () => status.lastOkAt != null && Date.now() - status.lastOkAt <= o.staleMs;
 
@@ -26,12 +31,15 @@ export function createFeed(opts) {
     if (!running || !directOn) return;
     try {
       const r = await o.fetchImpl(o.restUrl, { cache: "no-store", signal: AbortSignal.timeout(10000) });
+      if (!running || !directOn) return; // w międzyczasie wrócił przekaźnik albo ekran zamknięto – nie nadpisujemy jego stanu
       if (!r.ok) throw new Error("HTTP " + r.status);
-      applySnapshotJson(store, await r.json());
+      const j = await r.json();
+      if (!running || !directOn) return;
+      applySnapshotJson(store, j);
       checkFormat();
-      if (running) { touch(wsOpen ? "ws" : "rest"); o.onChange?.(); }
+      touch(wsOpen ? "ws" : "rest"); o.onChange?.();
     } catch (e) {
-      if (running) set({ error: String(e?.message || e) });
+      if (running && directOn) set({ error: String(e?.message || e) });
     }
   }
   /** Alarmy w Ukrainie i wiadomości: wolniej (co extrasMs), a ich błąd nigdy nie wpływa na „świeżość” obiektów. */
@@ -43,7 +51,10 @@ export function createFeed(opts) {
         try {
           const r = await o.fetchImpl(o.relayMessagesUrl, { cache: "no-store", signal: AbortSignal.timeout(10000) });
           if (!r.ok) throw new Error("HTTP " + r.status);
-          applyMessagesJson(store, await r.json());
+          const j = await r.json();
+          if (!running || directOn) return;
+          applyMessagesJson(store, j);
+          const at = relayTime(j?.relay, "messagesAt"); if (at != null) store.extras.messagesAt = at;
         } catch (e) { store.extras.messagesErr = String(e?.message || e); }
         if (running) o.onChange?.();
       }
@@ -54,8 +65,10 @@ export function createFeed(opts) {
       try {
         const r = await o.fetchImpl(url, { cache: "no-store", signal: AbortSignal.timeout(10000) });
         if (!r.ok) throw new Error("HTTP " + r.status);
-        apply(store, await r.json());
-      } catch (e) { store.extras[key] = String(e?.message || e); }
+        const j = await r.json();
+        if (!running || !directOn) return; // przekaźnik przejął – jego dane mają pierwszeństwo
+        apply(store, j);
+      } catch (e) { if (directOn) store.extras[key] = String(e?.message || e); }
     };
     await one(o.alertsUrl, applyAlertsJson, "alertsErr");
     await one(o.messagesUrl, applyMessagesJson, "messagesErr");
@@ -116,21 +129,29 @@ export function createFeed(opts) {
     try {
       const r = await o.fetchImpl(url, { cache: "no-store", signal: AbortSignal.timeout(8000) });
       if (!running) return;
+      // Wiek danych przekaźnika: „świeżość” liczymy od ostatniej wiadomości z NEPTUN, a nie od chwili odpowiedzi przekaźnika.
+      let okAt = Date.now();
       if (r.status === 204) {
         // Bez zmian od naszej wersji – źródło żyje.
         const st = r.headers?.get?.("X-Server-Time"); if (st) store.noteServerTime(st);
+        const age = Number(r.headers?.get?.("X-Relay-Age-Ms")); if (Number.isFinite(age) && age >= 0) okAt = Date.now() - age;
       } else {
         if (!r.ok) throw new Error("HTTP " + r.status);
         const j = await r.json();
+        if (!running) return;
         applySnapshotJson(store, j);
-        if (j && j.alerts) { try { applyAlertsJson(store, j.alerts); } catch (e) { store.extras.alertsErr = String(e?.message || e); } }
+        if (j && j.alerts) {
+          try { applyAlertsJson(store, j.alerts); const at = relayTime(j.relay, "alertsAt"); if (at != null) store.extras.alertsAt = at; }
+          catch (e) { store.extras.alertsErr = String(e?.message || e); }
+        }
         relayVersion = j && j.version != null ? j.version : null;
+        const at = relayTime(j?.relay, "lastOkAt"); if (at != null) okAt = at;
         checkFormat();
       }
       relayFails = 0;
       const wasDirect = directOn;
       stopDirect();
-      touch("relay");
+      touch("relay", okAt);
       if (wasDirect) extrasOnce();
       o.onChange?.();
     } catch (e) {

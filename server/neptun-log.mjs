@@ -3,15 +3,16 @@
 // z tym, czego oczekuje aplikacja (js/neptun.js), zanim cokolwiek pokażemy ludziom.
 //   node neptun-log.mjs --dump   – wypisz surową odpowiedź (pierwsze ~3000 znaków) i wynik normalizacji, nic nie zapisuj
 //   node neptun-log.mjs          – jeden przebieg: zapis do $LOG_DIR/RRRR-MM-DD.jsonl
+// Źródło: najpierw lokalny przekaźnik EGIDA (bez zapytań do NEPTUN), a gdy nie działa – bezpośrednio NEPTUN.
 // Zasady: jedno zapytanie na przebieg, jasny User-Agent, zero omijania blokad (przy 403/429 kończymy i zapisujemy błąd).
 import { mkdirSync, appendFileSync, writeFileSync, readdirSync, readFileSync, unlinkSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { ThreatStore, applySnapshotJson } from "../js/neptun.js";
+import { fetchThreats } from "./neptun-source.mjs";
 
-const URL_REST = process.env.NEPTUN_REST || "https://neptun.in.ua/api/v1/threats";
 const DIR = process.env.NEPTUN_LOG_DIR || "/opt/egida/neptun-log";
 const KEEP_DAYS = 60;
-const UA = "EGIDA/0.2 (unofficial PWA; test log once per minute; repo lewym90/egida)";
+const UA = "EGIDA/0.3 (unofficial PWA; log once per minute, normally via own relay; repo lewym90/egida)";
 const dump = process.argv.includes("--dump");
 
 const day = new Date().toISOString().slice(0, 10);
@@ -22,21 +23,18 @@ const write = (obj) => {
   appendFileSync(join(DIR, day + ".jsonl"), JSON.stringify(obj) + "\n");
 };
 
-let res, text;
-try {
-  res = await fetch(URL_REST, { headers: { "user-agent": UA, accept: "application/json" }, signal: AbortSignal.timeout(20000) });
-  text = await res.text();
-} catch (e) {
-  console.log("BŁĄD sieci:", e.message); write({ at: nowIso, error: "network", msg: String(e.message) }); process.exit(dump ? 1 : 0);
-}
+const got = await fetchThreats({ ua: UA, timeoutMs: 20000 });
 if (dump) {
-  console.log("HTTP", res.status, res.headers.get("content-type"));
-  console.log("--- początek odpowiedzi ---\n" + text.slice(0, 3000));
+  console.log("Źródło:", got.via === "relay" ? "przekaźnik EGIDA (127.0.0.1)" : "NEPTUN bezpośrednio", "HTTP", got.status ?? "-");
+  if (got.text) console.log("--- początek odpowiedzi ---\n" + got.text.slice(0, 3000));
 }
-if (!res.ok) { console.log("HTTP", res.status, "– nie ponawiam, nie omijam."); write({ at: nowIso, error: "http", status: res.status }); process.exit(dump ? 1 : 0); }
-
-let json;
-try { json = JSON.parse(text); } catch { console.log("Odpowiedź nie jest JSON-em."); write({ at: nowIso, error: "notjson", head: text.slice(0, 200) }); process.exit(dump ? 1 : 0); }
+if (!got.ok) {
+  if (got.error === "network") { console.log("BŁĄD sieci:", got.message); write({ at: nowIso, error: "network", msg: String(got.message) }); }
+  else if (got.error === "http") { console.log("HTTP", got.status, "– nie ponawiam, nie omijam."); write({ at: nowIso, error: "http", status: got.status }); }
+  else { console.log("Odpowiedź nie jest JSON-em."); write({ at: nowIso, error: "notjson", head: String(got.text || "").slice(0, 200) }); }
+  process.exit(dump ? 1 : 0);
+}
+const json = got.json;
 const store = new ThreatStore();
 try { applySnapshotJson(store, json); } catch (e) { console.log("FORMAT:", e.message); write({ at: nowIso, error: "format", keys: Object.keys(json || {}).slice(0, 20) }); process.exit(dump ? 1 : 0); }
 

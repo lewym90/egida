@@ -7,6 +7,7 @@
 #          bash install.sh --uncron (wyłączenie)
 #          bash install.sh --neptun-cron  (dziennik NEPTUN co minutę, tryb cichy) / --neptun-uncron
 #          bash install.sh --neptun-tg-cron  (powiadomienia Telegram z NEPTUN: obiekt <100 km od granicy i tor w jej stronę) / --neptun-tg-uncron
+#          bash install.sh --relay-off  (wyłączenie przekaźnika NEPTUN dla telefonów) / --relay-on (ponowne włączenie)
 #          bash install.sh --watchdog-cron  (strażnik komunikatów co 10 min; pisze do Ciebie na Telegram, gdy dane nie docierają) / --watchdog-uncron
 set -euo pipefail
 BASE=/opt/egida
@@ -36,6 +37,14 @@ if [ "${1:-}" = "--neptun-tg-cron" ]; then
 fi
 if [ "${1:-}" = "--neptun-tg-uncron" ]; then
   ( crontab -u "$US" -l 2>/dev/null | grep -v '# egida_neptun_tg' || true ) | crontab -u "$US" - ; echo "Wyłączono powiadomienia NEPTUN → Telegram."; exit 0
+fi
+if [ "${1:-}" = "--relay-off" ]; then
+  runuser -u "$US" -- touch "$BASE/relay.off"; pkill -u "$US" -f "node neptun-relay.mjs" 2>/dev/null || true
+  echo "Wyłączono przekaźnik NEPTUN (telefony łączą się z NEPTUN bezpośrednio). Włączenie: bash install.sh --relay-on"; exit 0
+fi
+if [ "${1:-}" = "--relay-on" ]; then
+  rm -f "$BASE/relay.off"; runuser -u "$US" -- setsid -f bash "$BASE/repo/server/run-neptun-relay.sh" </dev/null >/dev/null 2>&1
+  echo "Włączono przekaźnik NEPTUN. Sprawdzenie: curl -s http://127.0.0.1:8790/egida/neptun/health"; exit 0
 fi
 if [ "${1:-}" = "--watchdog-cron" ]; then
   [ -f "$BASE/env" ] || die "Najpierw zrób zwykłą instalację: bash install.sh"

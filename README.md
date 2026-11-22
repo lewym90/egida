@@ -132,11 +132,14 @@ Alerty poziomu 2 z torem po weryfikacji formatu NEPTUN, zatwierdzenie treści (`
 
 ## Wersja 49: przekaźnik NEPTUN na serwerze EGIDA
 - **Dlaczego:** każdy telefon łączył się z NEPTUN sam. Przy słabym zasięgu, aplikacji w tle albo przeciążeniu NEPTUN w czasie zmasowanego ataku widać było „Brak połączenia z NEPTUN”, a historii nocy nie było nigdzie.
-- **`server/neptun-relay.mjs`** (proces stały, start i wznawianie co minutę z `run-neptun-watch.sh` → `run-neptun-relay.sh`): jedno połączenie WebSocket z NEPTUN + REST `/threats` co 15 s (resynchronizacja), `/alerts` i `/messages` co 30 s. Nasłuchuje tylko na `127.0.0.1:8790` (`NEPTUN_RELAY_PORT`); na zewnątrz wystawia go Caddy pod `/egida/neptun/*`.
+- **`server/neptun-relay.mjs`** (proces stały; pilnujący `run-neptun-relay.sh` restartuje go po 2 s, a cron – `run-neptun-watch.sh` co minutę i `run.sh` co 5 min – sprawdza, czy pilnujący działa): jedno połączenie WebSocket z NEPTUN. REST `/threats` tylko gdy WebSocket milczy > 60 s (wtedy co 15 s) i resynchronizacja co 5 min; `/alerts` i `/messages` co 60 s tylko gdy WebSocket ich nie dostarcza. Wersja stanu rośnie tylko przy prawdziwej zmianie (telefony dostają wtedy 204). Port zajęty → kod 3, bez zapytań do NEPTUN. Nasłuchuje tylko na `127.0.0.1:8790` (`NEPTUN_RELAY_PORT`); na zewnątrz wystawia go Caddy pod `/egida/neptun/*`.
   - `GET /egida/neptun/snapshot` – obiekty (format NEPTUN /threats) + alarmy obwodów, gzip; `?since=<version>` → 204, gdy bez zmian.
   - `GET /egida/neptun/messages` – wiadomości z kanałów (aplikacja pobiera co 60 s).
   - `GET /egida/neptun/health` – stan przekaźnika.
   - Gdy NEPTUN milczy > 90 s: 503 – aplikacja przechodzi na NEPTUN bezpośrednio.
 - **Historia:** `/opt/egida/neptun-history/RRRR-MM-DD.jsonl` (starsze dni `.jsonl.gz`, 60 dni): zmiany obiektów do 400 km od granicy Polski. Log: `/opt/egida/neptun-relay-log.txt`. Wyłączenie: `touch /opt/egida/relay.off`.
 - **Aplikacja** (`js/neptun-feed.js`): gdy `CONFIG.neptun.relayUrl` jest ustawione – najpierw przekaźnik; po 2 błędach z rzędu NEPTUN bezpośrednio (jak dotąd), co 30 s próba powrotu na przekaźnik. Puste `relayUrl` = zachowanie sprzed v49.
-- **Strażnik** zgłasza przekaźnik bez świeżych danych > 15 min.
+- **Obserwator Telegram i dziennik** (`neptun-watch.mjs`, `neptun-log.mjs`) biorą dane najpierw z lokalnego przekaźnika (`server/neptun-source.mjs`), a gdy nie działa – z NEPTUN bezpośrednio. NEPTUN widzi więc jednego klienta.
+- **Świeżość w aplikacji** liczona od `relay.lastOkAt` (i nagłówka `X-Relay-Age-Ms` przy 204), a nie od chwili odpowiedzi przekaźnika; alarmy obwodów starsze niż 10 min nie są podawane dalej.
+- **Strażnik** zgłasza przekaźnik bez świeżych danych > 15 min (nie dubluje, gdy sam NEPTUN milczy; pomija, gdy istnieje `relay.off`).
+- Wyłączenie/włączenie: `bash install.sh --relay-off` / `--relay-on`.

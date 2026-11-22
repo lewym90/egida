@@ -6,6 +6,7 @@
 // (8) odsetek adresów AED poniżej 90% i bez wzrostu od 72 h, (9) NEPTUN bez poprawnego odczytu od ponad 20 min (gdy obserwator jest włączony). Oraz przypomnienia o terminach (odnowienie serwera, wygaśnięcie tokenu): 14 i 3 dni przed.
 // Wymaga ADMIN_CHAT_ID i TELEGRAM_BOT_TOKEN w /opt/egida/env. Opcje: --status (tylko pokaż), --test (wyślij próbną wiadomość).
 import { readFile, writeFile, stat } from "node:fs/promises";
+import { existsSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
@@ -25,7 +26,8 @@ export function evaluate({ pushAgeMin, remoteAgeMin, newsAgeMin = null, newsSour
   if (airAgeMin != null && airAgeMin > limits.airMin) reasons.push(`jakość powietrza (air.json) ma ${Math.round(airAgeMin)} min`);
   if (neptunAgeMin != null && neptunAgeMin > limits.neptunMin) reasons.push(`NEPTUN nie dał poprawnych danych od ${Math.round(neptunAgeMin)} min (źródło nie odpowiada albo obserwator nie działa)`);
   if (rcbAgeMin != null && rcbAgeMin > limits.rcbMin) reasons.push(`Alerty RCB o zagrożeniu z powietrza (gov.pl) nie były odczytane od ${Math.round(rcbAgeMin)} min (zajrzyj do /opt/egida/rcb-log.txt)`);
-  if (relayAgeMin != null && relayAgeMin > limits.relayMin) reasons.push(`przekaźnik NEPTUN nie ma świeżych danych od ${Math.round(relayAgeMin)} min – telefony łączą się z NEPTUN bezpośrednio (zajrzyj do /opt/egida/neptun-relay-log.txt)`);
+  // Gdy sam NEPTUN nie odpowiada, przekaźnik też nie ma danych – nie dublujemy powodu.
+  if (relayAgeMin != null && relayAgeMin > limits.relayMin && !(neptunAgeMin != null && neptunAgeMin > limits.neptunMin)) reasons.push(`przekaźnik NEPTUN nie ma świeżych danych od ${Math.round(relayAgeMin)} min – telefony łączą się z NEPTUN bezpośrednio (zajrzyj do /opt/egida/neptun-relay-log.txt)`);
   for (const [name, h] of Object.entries(dailyAgesH || {})) if (h != null && h > (limits.fileH?.[name] ?? limits.dailyH)) reasons.push(`plik ${name} nie był odświeżany od ${Math.round(h)} h`);
   if (gddkiaBadH != null && gddkiaBadH > limits.gddkiaH) reasons.push(`źródło GDDKiA (drogi) nie zwraca danych od ${Math.round(gddkiaBadH)} h`);
   if (addrPct != null && addrPct < limits.addrMinPct && addrStallH != null && addrStallH > limits.addrStallH) reasons.push(`adresy AED stoją na ${addrPct}% od ${Math.round(addrStallH)} h`);
@@ -132,7 +134,7 @@ async function main() {
   try { const h = JSON.parse(await readFile(path.join(BASE, "rcb-gov.json"), "utf8")); if (Number.isFinite(h?.lastOk)) rcbAgeMin = (now - h.lastOk) / 6e4; } catch { /* brak pliku */ }
   // Przekaźnik NEPTUN: znacznik co 30 s; brak pliku = przekaźnik nie działa jeszcze (nie oceniamy). Proces, który padł, nie odświeża pliku – też wyłapiemy.
   let relayAgeMin = null;
-  try { const h = JSON.parse(await readFile(path.join(BASE, "neptun-relay-health.json"), "utf8")); const last = Number.isFinite(h?.lastOk) ? h.lastOk : h?.started; if (Number.isFinite(h?.at) && Number.isFinite(last)) relayAgeMin = Math.max(now - h.at, now - last) / 6e4; /* proces padł (at stoi) albo NEPTUN milczy (lastOk stoi) */ } catch { /* brak pliku */ }
+  if (!existsSync(path.join(BASE, "relay.off"))) try { const h = JSON.parse(await readFile(path.join(BASE, "neptun-relay-health.json"), "utf8")); const last = Number.isFinite(h?.lastOk) ? h.lastOk : h?.started; if (Number.isFinite(h?.at) && Number.isFinite(last)) relayAgeMin = Math.max(now - h.at, now - last) / 6e4; /* proces padł (at stoi) albo NEPTUN milczy (lastOk stoi) */ } catch { /* brak pliku */ }
   const ev = evaluate({ pushAgeMin, remoteAgeMin, newsAgeMin, newsSources, newsOk, airAgeMin, dailyAgesH, gddkiaBadH, addrPct, addrStallH, neptunAgeMin, rcbAgeMin, relayAgeMin });
   const d = decide(ev.problem, state, now);
   const extras = { gddkiaSince, addr: addrState };

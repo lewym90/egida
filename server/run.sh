@@ -28,6 +28,9 @@ echo "--- $(date -Is)"
 if [ "$(date +%M)" -lt 5 ]; then
   git -C "$BASE/repo" pull --ff-only -q 2>&1 | tail -n 3 || true
 fi
+# Przekaźnik NEPTUN (proces stały, tylko 127.0.0.1): jeśli nie działa – uruchom. Zapasowo, gdyby cron obserwatora NEPTUN był wyłączony.
+# Osobna sesja i zamknięte deskryptory blokad tego skryptu (7, 9), żeby przekaźnik ich nie przejął.
+[ -z "${EGIDA_ALERTS_ONLY:-}" ] && setsid -f bash "$SERVER_DIR/run-neptun-relay.sh" </dev/null >/dev/null 2>&1 7>&- 9>&-
 
 cd "$SERVER_DIR"
 
