@@ -3,7 +3,10 @@
 set -uo pipefail
 BASE="${EGIDA_BASE:-/opt/egida}"
 SERVER_DIR="$(cd "$(dirname "$0")" && pwd)"
-exec 9>"$BASE/run.lock"; flock -n 9 || exit 0          # nie uruchamiaj dwóch naraz
+exec 8>&-                                               # nie trzymaj blokady obserwatora RCB (gdy uruchomił nas rcb-watch.mjs)
+exec 9>"$BASE/run.lock"                                 # nie uruchamiaj dwóch naraz
+if [ -n "${EGIDA_ALERTS_ONLY:-}" ]; then flock -w 240 9 || exit 0   # publikacja po nowym Alercie RCB czeka, aż skończy się bieżący przebieg
+else flock -n 9 || exit 0; fi
 set -a; . "$BASE/env"; set +a
 export PATH="$BASE/node/bin:$PATH"
 export EGIDA_REMOTE="${EGIDA_REMOTE:-https://github.com/${EGIDA_REPO:-lewym90/egida}.git}"
@@ -38,6 +41,11 @@ ok() {
 # ===== 1. ALERTY (RSO) PIERWSZE: pobranie, Telegram i publikacja. Nic poniżej nie może ich opóźniać. =====
 # Skumulowany raport NEPTUN dołącza do publikacji (co najmniej raz na 25 min). Sam nie wymusza publikacji, bo zmienia się co 10 s.
 [ -f "$NEPTUN_SEEN" ] && cp "$NEPTUN_SEEN" "$DATA_DIR/neptun-seen.json"
+# Alerty RCB o zagrożeniu z powietrza z gov.pl (RSO ich nie ma). Zwykle robi to co minutę run-neptun-watch.sh; tu zapasowo, gdyby tamten cron był wyłączony.
+# W trybie „tylko alerty” (wywołanie z rcb-watch.mjs) pomijamy – obserwator właśnie skończył.
+if [ -z "${EGIDA_ALERTS_ONLY:-}" ]; then
+  ( flock -n 8 || exit 0; RCB_PUBLISH=off timeout 45 node rcb-watch.mjs >> "$BASE/rcb-log.txt" 2>&1 ) 8>"$BASE/rcb.lock" || true
+fi
 timeout 120 node poll.mjs || { echo "poll nieudany – nic nie publikuję"; fail; exit 1; }
 
 # Publikuj tylko gdy treść się zmieniła albo minęło ≥25 min (sygnał „żyję”, aby aplikacja nie uznała danych za stare).
@@ -50,6 +58,8 @@ if [ "$NEW" != "$OLD" ] || [ "$AGE" -ge 25 ]; then
 else
   echo "alerty bez zmian (ostatnia publikacja ${AGE} min temu)"; ok
 fi
+# Natychmiastowa publikacja po nowym Alercie RCB (rcb-watch.mjs): tylko komunikaty, bez zadań dodatkowych.
+[ -n "${EGIDA_ALERTS_ONLY:-}" ] && { echo "tryb „tylko alerty” – koniec"; exit 0; }
 
 # ===== 2. ZADANIA DODATKOWE (wiadomości, powietrze, sondy, bazy). Od najczęstszych; każde w budżecie czasu. =====
 PSP_NEW=0; SH_NEW=0; RJ_NEW=0; NP_NEW=0; NEWS_NEW=0; AIR_NEW=0; ALARM_NEW=0

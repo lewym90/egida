@@ -6,7 +6,11 @@ export const DEFAULT_TTL_H = { rcb: 12, drogi: 6, woda: 48, pogoda: 24, inne: 24
 const norm = (s) => String(s ?? "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/ł/g, "l");
 const CANCEL_RE = /(zakonczyl[ao]?\s+sie|zakonczenie|zakonczony|odwola|koniec\s+(ataku|alarmu|zagrozenia)|ustapil|ustalo|przestal)/;
 const ATTACK_RE = /(atak|nalot|ostrzal|alarm\s+powietrzn|zagrozenie\s+z\s+powietrza|rakiet|\bdron|pociski?\b|obiekty?\s+latajac)/;
-const AIR_RE = /(ukrain|powietrzn|rakiet|\bdron|latajac|polsk)/;
+const AIR_RE = /(ukrain|powietrzn|z\s+powietrza|rakiet|\bdron|latajac|polsk)/;
+// Alert RCB „Rosyjski atak powietrzny na Ukrainie. Sytuacja jest monitorowana. Podniesiono gotowość…” – atak NA UKRAINĘ, bez polecenia
+// schronienia się: to ostrzeżenie (żółte), nie zagrożenie. Czerwone zostaje „Zagrożenie atakiem z powietrza. Znajdź bezpieczne miejsce”.
+const MONITOR_RE = /(sytuacja\s+jest\s+monitorowana|podniesiono\s+gotowosc)/;
+const SHELTER_RE = /(znajdz\s+bezpieczne\s+miejsce|zagrozenie\s+atakiem|schron\w*\s+sie|ukryj\s+sie|natychmiast)/;
 
 export const degreeOf = (a) => { const m = /(\d)\s*\.?\s*stop(?:ie|ni)/i.exec(String(a.title || "")); return m ? Number(m[1]) : 0; };
 
@@ -32,11 +36,14 @@ export function classifyOne(a) {
   const attack = !cancel && airType && ATTACK_RE.test(t) && AIR_RE.test(t);
   let sev = "info", kind = type;
   if (cancel) { sev = "info"; kind = "odwolanie"; }
+  else if (attack && MONITOR_RE.test(t) && !SHELTER_RE.test(t)) { sev = "important"; kind = "monitoring"; }
   else if (attack) { sev = "danger"; kind = "atak"; }
   else if (type === "rcb") { if (LIFE_RE.test(t)) { sev = "danger"; kind = "zagrozenie"; } else sev = "important"; }
   else if (type === "pogoda") { const d = degreeOf({ title: a.title }) || degreeOf({ title: a.body }); sev = d >= 3 ? "danger" : d === 2 ? "important" : "info"; if (sev === "danger") kind = "pogoda3"; }
   else if (type === "woda" && FLOOD_RE.test(t) && !DRY_RE.test(t)) { const d = degreeOf({ title: a.title }) || degreeOf({ title: a.body }); sev = d >= 3 ? "danger" : d === 2 ? "important" : "info"; if (sev === "danger") kind = "pogoda3"; }
-  return { sev, kind, cancel, attack };
+  // Odwołanie zagrożenia z powietrza kończy tylko alarmy z powietrza – nie ostrzeżenie powodziowe czy pogodowe w tym samym województwie.
+  const airCancel = cancel && (ATTACK_RE.test(t) || /ukrain|powietrz/.test(t));
+  return { sev, kind, cancel, attack, airCancel };
 }
 
 /**
@@ -58,8 +65,10 @@ export function analyze(items, now = Date.now()) {
     if (a.sev === "info" && !a.cancel && pub != null) { const cap = pub + (a.type === "drogi" ? 24 : 7 * 24) * H; exp = exp == null ? cap : Math.min(exp, cap); }
     a.expiresAt = exp;
     a.supersededBy = null;
-    if (a.sev === "danger" && a.published) {
-      const c = cancels.find((c) => c.published && c.published >= a.published && (c.voivodeship === "all" || c.voivodeship === a.voivodeship));
+    // Odwołanie kończy zagrożenie, a także ostrzeżenie „atak na Ukrainie – sytuacja monitorowana” (inaczej wisiałoby 12 h po końcu ataku).
+    if ((a.sev === "danger" || a.kind === "monitoring") && a.published) {
+      const airAlarm = a.kind === "atak" || a.kind === "monitoring";
+      const c = cancels.find((c) => c.published && c.published >= a.published && (c.voivodeship === "all" || c.voivodeship === a.voivodeship) && (!c.airCancel || airAlarm));
       if (c) a.supersededBy = c.id || true;
     }
     a.active = !a.supersededBy && (exp == null || exp > now);
@@ -106,6 +115,8 @@ export function linkRelated(list) {
     if (i === j) continue;
     const a = list[i], b = list[j];
     if (a.relatedTo || a.voivodeship !== b.voivodeship && a.voivodeship !== "all" && b.voivodeship !== "all") continue;
+    // Odwołanie to osobna, ważna informacja (nie „to samo wydarzenie drugi raz”), a kolejne wysyłki z jednej strony RCB (ten sam adres) to osobne komunikaty.
+    if (a.cancel || b.cancel || (a.url && a.url === b.url)) continue;
     const stronger = RANK[b.sev] > RANK[a.sev] || (RANK[b.sev] === RANK[a.sev] && b.type === "rcb" && a.type !== "rcb");
     if (!stronger || b.relatedTo) continue;
     const ta = a.published ? new Date(a.published).getTime() : null, tb = b.published ? new Date(b.published).getTime() : null;

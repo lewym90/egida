@@ -470,7 +470,8 @@ function screenPulpit() {
     const danger = list.filter((a) => a.sev === "danger"), important = list.filter((a) => a.sev === "important");
     const shown = (a) => !(a.relatedTo && list.some((x) => x.id === a.relatedTo)); // to samo wydarzenie pokazujemy raz
     const info = list.filter((a) => a.sev === "info" && !a.cancel && shown(a));
-    const meta = `Dla: ${name} · Źródło: RSO · ${when}`;
+    const srcNames = [...new Set(list.map((a) => String(a.source || "RSO").replace(/\s*\(.*\)/, "")))].filter(Boolean);
+    const meta = `Dla: ${name} · Źródło: ${esc((srcNames.length ? srcNames : ["RSO"]).join(", "))} · ${when}`;
     const rows = (arr, n) => `<ul class="slist">${arr.slice(0, n).map((a) => `<li>${msgParts(a)}</li>`).join("")}</ul>${arr.length > n ? `<p class="smore">i jeszcze ${arr.length - n}</p>` : ""}`;
     if (lvl === "alarm") {
       const air = danger[0].kind === "atak";
@@ -590,7 +591,7 @@ function screenAlerty() {
   const nAct = all.filter((a) => a.active).length;
   const chips = ALERT_FILTERS.map((f) => `<button class="chip" data-filter="${f.id}" aria-pressed="${alertFilter === f.id}">${f.label}</button>`).join("");
   const stale = alertsData.ok && !alertsFresh() ? `<div class="banner-offline">Dane mogą być nieaktualne (ostatnia aktualizacja: ${esc(fmtDate(alertsData.updated) || "brak")}).</div>` : "";
-  return `<div class="hero"><h1>Alerty</h1><p>Oficjalne komunikaty (RSO: Alert RCB, IMGW, woda, drogi) dla Twojego województwa.</p></div>
+  return `<div class="hero"><h1>Alerty</h1><p>Oficjalne komunikaty dla Twojego województwa: Alerty RCB (także o zagrożeniu z powietrza, wprost ze strony RCB), ostrzeżenia IMGW, woda i drogi (RSO).</p></div>
   <a class="tile" style="flex-direction:row;align-items:center;margin-bottom:12px" href="#/telegram"><span class="ti">${I.send}</span><b>Chcesz dostawać ważne komunikaty na telefon? Powiadomienia Telegram</b></a>
   ${borderNote()}
   <div class="seg" role="group" aria-label="Aktywne lub wcześniejsze"><button class="chip" data-when="active" aria-pressed="${alertWhen === "active"}">Aktywne (${nAct})</button><button class="chip" data-when="past" aria-pressed="${alertWhen === "past"}">Wcześniejsze (${all.length - nAct})</button></div>
@@ -611,12 +612,12 @@ function screenTelegram() {
   }).join("");
   return `<div class="hero"><h1>Powiadomienia Telegram</h1><p>Ważne komunikaty dla Twojego województwa prosto na telefon, także wtedy, gdy nie masz otwartej aplikacji.</p></div>
   <div class="card"><h2>Jak to działa</h2>
-  <ol class="how"><li>EGIDA co kilka minut sprawdza oficjalne komunikaty (RSO), wiadomości z mediów i służb oraz utrudnienia na drogach krajowych (GDDKiA).</li>
+  <ol class="how"><li>EGIDA co minutę sprawdza Alerty RCB o zagrożeniu z powietrza na stronie Rządowego Centrum Bezpieczeństwa, a co kilka minut pozostałe oficjalne komunikaty (RSO), wiadomości z mediów i służb oraz utrudnienia na drogach krajowych (GDDKiA).</li>
   <li>Gdy pojawi się coś nowego dla Twojego województwa, bot publikuje to na kanale Telegram tego województwa. Wiadomości z kraju i ze świata (z wpływem na Polskę) trafiają na wszystkie kanały.</li>
   <li>Jeśli subskrybujesz kanał, dostajesz powiadomienie. W treści jest odsyłacz „Śledź w aplikacji EGIDA”, gdzie możesz śledzić rozwój sytuacji.</li></ol>
   <p class="muted small">To kanały „tylko do czytania”: nikt poza botem nie może w nich pisać, nie ma czatu ani komentarzy, a Twoje dane nie są nikomu udostępniane.</p></div>
   <div class="card"><h2>Co będzie przychodzić</h2>
-  <ul class="how2"><li><b>Alerty RCB</b> i komunikaty ewakuacyjne,</li><li><b>ostrzeżenia pogodowe</b> (IMGW),</li><li><b>komunikaty o wodzie</b>: susza, wysoki stan rzek, jakość wody,</li><li><b>komunikaty oznaczone w RSO jako alarm</b>,</li><li><b>wiadomości</b> z Twojego województwa (bez limitu), z kraju (najwyżej 10 na godzinę) i ze świata, gdy dotyczą Polski (najwyżej 5 na godzinę),</li><li><b>utrudnienia i zamknięcia dróg krajowych</b> (GDDKiA).</li></ul>
+  <ul class="how2"><li><b>Alerty RCB</b>, w tym <b>zagrożenie atakiem z powietrza</b> i jego odwołanie (z listą powiatów), oraz komunikaty ewakuacyjne,</li><li><b>ostrzeżenia pogodowe</b> (IMGW),</li><li><b>komunikaty o wodzie</b>: susza, wysoki stan rzek, jakość wody,</li><li><b>komunikaty oznaczone w RSO jako alarm</b>,</li><li><b>wiadomości</b> z Twojego województwa (bez limitu), z kraju (najwyżej 10 na godzinę) i ze świata, gdy dotyczą Polski (najwyżej 5 na godzinę),</li><li><b>utrudnienia i zamknięcia dróg krajowych</b> (GDDKiA).</li></ul>
   <p class="muted small">Wiadomości są niebieskie 🔵, a te z mediów mają dopisek „doniesienie medialne” (to nie komunikat służb). Drogi: 🟠 droga zamknięta, 🟡 utrudnienia. Alerty z RSO mają osobne kolory według wagi. Wszystkie ważne wiadomości o bezpieczeństwie znajdziesz też w aplikacji.</p>
   <div class="note warn" style="margin-top:10px"><span class="badge soon">Beta</span> <b>Obiekty latające w pobliżu granicy.</b> Alert RCB dostajesz SMS-em, ale nie podaje on szczegółów. Na <a href="#/mapa">mapie</a> jest już wersja testowa nieoficjalnych informacji o dronach i rakietach przy granicy: <b>pozycja, kurs i przewidywany tor</b>. Są oznaczone jako <b>nieoficjalne</b>, pochodzą z zewnętrznego serwisu (NEPTUN) i mogą być spóźnione lub błędne. Na kanały Telegram trafia ostrzeżenie tylko wtedy, gdy obiekt jest bliżej niż 100 km od granicy i leci w jej stronę. Dalsze obiekty są tylko widoczne na mapie.</div></div>
   <div class="card"><h2>Jak dołączyć</h2>

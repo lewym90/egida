@@ -190,4 +190,79 @@ import { newsMessage, isAirDefence, levelOf as nLevel, categoryOf as nCat, selec
   assert.deepEqual(channelsFor(kr[0], chs), ["-1", "-2"]); assert.deepEqual(channelsFor(reg[0], chs), ["-1"]); assert.deepEqual(channelsFor(mk("z", { region: "pomorskie" }), chs), []);
   assert.equal(sampleItems(NOW).length, 6);
 }
-console.log("OK: wszystkie testy serwera przeszły (parser RSO, reguły Telegram wg wagi, strażnik)");
+
+/* ---------- Alerty RCB o zagrożeniu z powietrza z gov.pl (rcb-gov-lib.mjs) – na PRAWDZIWYCH stronach RCB z listopada 2026 ---------- */
+{
+  const { readFileSync } = await import("node:fs");
+  const { parseList, parseAlertPage, toItems, regionsOf, isAirTopic, headline } = await import("./rcb-gov-lib.mjs");
+  const { analyze, statusOf } = await import("../js/classify.js");
+  const fx = (f) => readFileSync(new URL(`./test-fixtures/rcb/${f}`, import.meta.url), "utf8");
+  const T = (iso) => Date.parse(iso);
+
+  // Lista: rozpoznaje alerty RCB, ich daty i które dotyczą zagrożenia z powietrza (woda i ćwiczenia syren są w RSO – pomijamy).
+  const list = parseList(fx("list.html"), T("2026-11-22T12:00:00Z"));
+  const air = list.filter((x) => isAirTopic(x.title, x.intro)).map((x) => x.slug).sort();
+  assert.deepEqual(air, ["alert-rcb---atak-z-powietrza-2011", "alert-rcb---zagrozenie-z-powietrza-0911", "alert-rcb---zagrozenie-z-powietrza-1011"]);
+  assert.deepEqual(list.find((x) => x.slug === "alert-rcb---atak-z-powietrza-2011").date, { y: 2026, m: 11, d: 20 });
+  assert.ok(list.every((x) => x.url.startsWith("https://www.gov.pl/web/rcb/")));
+
+  // Strona z 20.11: sześć wysyłek, od najstarszej, z godzinami w różnych zapisach.
+  const p20 = parseAlertPage(fx("alert-rcb---atak-z-powietrza-2011.html"));
+  assert.deepEqual(p20.entries.map((e) => `${e.hh}:${String(e.mm).padStart(2, "0")}`), ["2:30", "6:30", "6:34", "7:30", "8:58", "9:48"]);
+  assert.deepEqual(regionsOf(p20.entries[1].recipients), ["lubelskie"], "6:30 – tylko powiaty lubelskie");
+  assert.deepEqual(regionsOf(p20.entries[2].recipients), ["lubelskie", "podkarpackie"], "6:34 – powiat opolski (lubelskie) NIE oznacza województwa opolskiego");
+  assert.deepEqual(regionsOf(p20.entries[0].recipients), ["lubelskie", "podkarpackie"]);
+  // Inne zapisy godzin: „Aktualizacja! - 22:41” + pierwotny wpis bez godziny; samo „10:20”.
+  const p09 = parseAlertPage(fx("alert-rcb---zagrozenie-z-powietrza-0911.html"));
+  assert.deepEqual(p09.entries.map((e) => e.hh), [null, 22]);
+  assert.deepEqual(regionsOf(p09.entries[1].recipients), ["lubelskie", "podlaskie"]);
+  const p10 = parseAlertPage(fx("alert-rcb---zagrozenie-z-powietrza-1011.html"));
+  assert.deepEqual(p10.entries.map((e) => `${e.hh}:${e.mm}`), ["10:20", "10:55"]);
+  assert.deepEqual(regionsOf("powiatu opolskiego (woj. lubelskie)"), ["lubelskie"]);
+  assert.deepEqual(regionsOf("na terenie całej Polski"), ["all"]);
+  assert.equal(headline("UWAGA! UWAGA! UWAGA! Zagrożenie atakiem z powietrza. Znajdź bezpieczne miejsce.").title, "Zagrożenie atakiem z powietrza");
+
+  // Odtworzenie piątku 20.11.2026 minuta po minucie: co widzi aplikacja i co idzie na Telegram.
+  const slug = "alert-rcb---atak-z-powietrza-2011";
+  const at = (iso) => toItems(p20, { slug, url: "https://www.gov.pl/web/rcb/" + slug, now: T(iso) });
+  const stat = (items, reg, iso) => statusOf(analyze(items, T(iso)).filter((a) => a.active && (a.voivodeship === reg || a.voivodeship === "all")));
+  // 6:31 – strona ma już wpis z 6:30 (wpisy „z przyszłości” są pomijane).
+  const i631 = at("2026-11-20T05:31:00Z");
+  assert.equal(i631.length, 3, "2:30 (lubelskie, podkarpackie) + 6:30 (lubelskie)");
+  assert.equal(stat(i631, "lubelskie", "2026-11-20T05:31:00Z"), "alarm", "6:31 – Lubelskie: ZAGROŻENIE (czerwone)");
+  assert.equal(stat(i631, "podkarpackie", "2026-11-20T05:31:00Z"), "warn", "6:31 – Podkarpackie: ostrzeżenie (atak na Ukrainie, sytuacja monitorowana)");
+  assert.equal(analyze(i631, T("2026-11-20T05:31:00Z")).find((a) => a.voivodeship === "lubelskie" && a.sev === "danger").kind, "atak", "Pulpit pokaże „Zagrożenie z powietrza”");
+  // Telegram: o 2:30 poszło ostrzeżenie; o 6:31 idzie ZAGROŻENIE tylko do Lubelskiego.
+  const st = { sent: {}, danger: {} };
+  const s230 = selectForTelegram(at("2026-11-20T01:31:00Z"), st, { now: T("2026-11-20T01:31:00Z"), recentH: 3 });
+  assert.deepEqual(s230.map((x) => `${x.level}:${x.a.voivodeship}`).sort(), ["important:lubelskie", "important:podkarpackie"]);
+  for (const { a } of s230) { st.sent[a.id] = 1; st.danger[a.voivodeship] = T("2026-11-20T01:31:00Z"); }
+  const s631 = selectForTelegram(i631, st, { now: T("2026-11-20T05:31:00Z"), recentH: 3 });
+  assert.deepEqual(s631.map((x) => `${x.level}:${x.a.voivodeship}`), ["danger:lubelskie"]);
+  for (const { a } of s631) { st.sent[a.id] = 1; st.danger[a.voivodeship] = T("2026-11-20T05:31:00Z"); }
+  const s635 = selectForTelegram(at("2026-11-20T05:35:00Z"), st, { now: T("2026-11-20T05:35:00Z"), recentH: 3 });
+  assert.deepEqual(s635.map((x) => `${x.level}:${x.a.voivodeship}`).sort(), ["danger:lubelskie", "danger:podkarpackie"], "6:34 – rozszerzenie na Podkarpackie");
+  for (const { a } of s635) { st.sent[a.id] = 1; st.danger[a.voivodeship] = T("2026-11-20T05:35:00Z"); }
+  // 7:31 – odwołanie: oba województwa dostają ODWOŁANIE, a w aplikacji jest spokojnie.
+  const i731 = at("2026-11-20T06:31:00Z");
+  const s731 = selectForTelegram(i731, st, { now: T("2026-11-20T06:31:00Z"), recentH: 3 });
+  assert.deepEqual(s731.map((x) => `${x.level}:${x.a.voivodeship}`).sort(), ["cancel:lubelskie", "cancel:podkarpackie"]);
+  assert.equal(stat(i731, "lubelskie", "2026-11-20T06:31:00Z"), "calm");
+  assert.equal(stat(i731, "podkarpackie", "2026-11-20T06:31:00Z"), "calm");
+  // 9:00 – znów „atak na Ukrainie, sytuacja monitorowana” (żółte); 9:50 – koniec ataku, spokojnie.
+  assert.equal(stat(at("2026-11-20T08:00:00Z"), "lubelskie", "2026-11-20T08:00:00Z"), "warn");
+  assert.equal(stat(at("2026-11-20T08:50:00Z"), "lubelskie", "2026-11-20T08:50:00Z"), "calm");
+  // Czas: 6:30 czasu polskiego (CET) = 5:30 UTC.
+  assert.ok(i631.some((x) => x.published === "2026-11-20T05:30:00.000Z"));
+  // Odwołanie ataku z powietrza NIE kasuje ostrzeżenia powodziowego 3. stopnia w tym samym województwie.
+  const flood = { id: "f", type: "woda", title: "Ostrzeżenie hydrologiczne 3. stopnia – wezbranie z przekroczeniem stanów alarmowych", body: "Powódź", voivodeship: "lubelskie", published: "2026-11-20T04:00:00.000Z", validTo: null };
+  const mixed = analyze([flood, ...at("2026-11-20T06:31:00Z")], T("2026-11-20T06:31:00Z"));
+  assert.equal(mixed.find((a) => a.id === "f").active, true);
+  assert.equal(mixed.find((a) => a.id === "f").sev, "danger");
+  // Bez daty w przyszłości: wpis o dacie późniejszej niż „teraz” + 2 min jest pomijany.
+  assert.equal(at("2026-11-20T00:00:00Z").length, 0);
+  // Treść wiadomości Telegram: nagłówek ZAGROŻENIE, tytuł z treści alertu, źródło RCB.
+  const msg = tgText(s631[0].a, "danger");
+  assert.ok(msg.includes("ZAGROŻENIE") && msg.includes("Zagrożenie atakiem z powietrza") && msg.includes("RCB (gov.pl)") && msg.includes("hrubieszowskiego"));
+}
+console.log("OK: wszystkie testy serwera przeszły (parser RSO, reguły Telegram wg wagi, strażnik, Alerty RCB z gov.pl)");

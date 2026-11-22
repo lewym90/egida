@@ -12,6 +12,7 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const OUT = process.env.ALERTS_OUT || path.join(here, "..", "data", "alerts.json");
 const STATE = process.env.STATE_FILE || path.join(here, "state.json");
 const MAX_ITEMS = 500;
+const RCB_GOV = process.env.RCB_GOV_FILE || path.join(process.env.EGIDA_BASE || "/opt/egida", "rcb-gov.json");
 
 const TG_TOKEN = process.env.TELEGRAM_BOT_TOKEN || "";
 // JSON: {"mazowieckie":"@egida_mazowieckie", ...} – publiczne kanały (bot musi być ich administratorem).
@@ -93,10 +94,19 @@ async function main() {
   const now = Date.now();
   const byId = new Map();
   for (const a of fresh) if (!byId.has(a.id) && !(a.validTo && new Date(a.validTo).getTime() < now)) byId.set(a.id, a);
+  // Alerty RCB o zagrożeniu z powietrza z gov.pl (RSO ich nie publikuje). Zbiera je rcb-watch.mjs co minutę; Telegram wysyła on sam,
+  // więc tutaj trafiają tylko do pliku aplikacji (nie do `fresh`, żeby nie poszły na Telegram drugi raz).
+  const gov = await readJson(RCB_GOV, { items: [] });
+  let govN = 0;
+  for (const g of Array.isArray(gov.items) ? gov.items : []) {
+    if (!g?.id || byId.has(g.id) || typeof g.title !== "string" || !g.published) continue;
+    const { key, slug, ...clean } = g;
+    byId.set(g.id, clean); govN++;
+  }
   const items = [...byId.values()].sort((a, b) => (b.published || "").localeCompare(a.published || "")).slice(0, MAX_ITEMS);
   await mkdir(path.dirname(OUT), { recursive: true });
-  await writeFile(OUT, JSON.stringify({ updated: new Date().toISOString(), source: "RSO (komunikaty.tvp.pl)", telegram: { ...Object.fromEntries(Object.entries(TG_CHANNELS).filter(([, c]) => /^@[A-Za-z0-9_]{5,32}$/.test(c)).map(([id, c]) => [id, "https://t.me/" + c.slice(1)])), ...PRIVATE_LINKS }, items }, null, 1));
-  console.log(`Zapisano ${items.length} komunikatów (nowych w pobraniu: ${fresh.filter((a) => !(previous.items || []).some((p) => p.id === a.id)).length}).`);
+  await writeFile(OUT, JSON.stringify({ updated: new Date().toISOString(), source: "RSO (komunikaty.tvp.pl), RCB (gov.pl)", telegram: { ...Object.fromEntries(Object.entries(TG_CHANNELS).filter(([, c]) => /^@[A-Za-z0-9_]{5,32}$/.test(c)).map(([id, c]) => [id, "https://t.me/" + c.slice(1)])), ...PRIVATE_LINKS }, items }, null, 1));
+  console.log(`Zapisano ${items.length} komunikatów (w tym Alertów RCB z gov.pl: ${govN}; nowych w pobraniu RSO: ${fresh.filter((a) => !(previous.items || []).some((p) => p.id === a.id)).length}).`);
 
   // Telegram: tylko nowe, tylko ważne wg wagi (czerwone i żółte + odwołania zagrożeń), tylko z ostatnich 6 godzin
   // (żeby po pierwszym uruchomieniu nie zalać kanałów).
